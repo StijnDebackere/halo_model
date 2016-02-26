@@ -1,0 +1,563 @@
+'''This module implements some different density profiles. All
+density profiles should have r_range and m_range as first arguments
+for density.Profile to be able to use them.
+
+All Fourier transformed profiles should have k_range and m_range as first
+arguments for density.Profile to use them.
+
+The user can add profiles here, following the present profiles as
+example.
+'''
+import numpy as np
+import scipy.special
+import scipy.optimize as opt
+import commah
+
+import matplotlib.pyplot as plt
+
+import halo.tools as tools
+import halo.sersic as sersic
+import halo.model.density as dens
+
+import pdb
+
+def c_correa(m_range,z_range,cosmology='WMAP7'):
+    '''
+    Returns the mass-concentration relation from Correa et al (2015c)
+    through the commah code.
+
+    Parameters
+    ----------
+    m_range : (m,) array
+      array containing masses to compute NFW profile for (mass at z=0)
+    z_range : (z,) array
+      redshift to evaluate mass-concentration relation at
+    cosmology : string or dict for commah
+      cosmological parameters for commah
+
+    Returns
+    -------
+    c : (m,z) array
+      array containing concentration for each (m,z)
+    '''
+    # (m,z) array
+    c = commah.run(cosmology=cosmology, Mi=m_range, z=z_range, mah=False)['c']
+    return c
+
+# ------------------------------------------------------------------------------
+# End of c_correa()
+# ------------------------------------------------------------------------------
+
+def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
+    '''
+    Returns the mass-concentration relation from Duffy et al (2008).
+
+        c = A * (m/m_pivot)^B * (1+z)^C
+
+    Parameters
+    ----------
+    m_range : (m,) array
+      array containing masses to compute NFW profile for (mass at z=0)
+    z_range : (z,) array
+      redshift to evaluate mass-concentration relation at
+    m_pivot : float (same units as m_range)
+      pivot scale for fit
+    A : float
+      scale parameter for fit
+    B : float
+      mass parameter for fit
+    C : float
+      redshift parameter for fit
+
+    Returns
+    -------
+    c : (m,z) array
+      array containing concentration for each (m,z)
+    
+    '''
+    m = m_range.shape[0]
+    z = np.array(np.array(z_range).shape)
+    
+    m_range = m_range.reshape([m] + list(z/z))
+    z_range = np.array(z_range).reshape([1] + list(z))
+
+    c = A * (m_range/m_pivot)**B * (1+z_range)**C
+    return c
+
+# ------------------------------------------------------------------------------
+# End of c_duffy()
+# ------------------------------------------------------------------------------
+
+def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
+    '''
+    Returns an NFW profile for m_range along axis 0 and r_range along
+    axis 1 (with optional z_range along axis 2). 
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each M (with r_range[:,-1] = r_vir)
+    m_range : (m,) array
+      array containing masses to compute NFW profile for (mass at z=0)
+    c_x : (m,) or (m,z) array
+      array containing mass-concentration relation
+    r_x : (m,) or (m,z) array
+      array containing r_x to evaluate r_s from r_s = r_x/c_x
+    rho_mean : float
+      mean dark matter density
+    z_range : float/array (default=0)
+      redshift range
+    Delta : float (default=200.)
+      critical overdensity for collapse
+    
+    Returns
+    -------
+    profile : (m,r) 
+      array containing NFW profile
+    or (if z is an array)
+    profile : (m,r,z) 
+      array containing NFW profile
+    '''
+    m = m_range.shape[0]
+    r = r_range.shape[-1]
+    # want an empty array for scalar z so we can easily construct shapes
+    # later on
+    z = np.array(np.array(z_range).shape)
+
+    # (m,z) array
+    r_s = r_x.reshape([m] + list(z))/c_x.reshape([m] + list(z))
+    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    
+    # (m,r,z) array
+    x = r_range.reshape([m,r] + list(z/z)) / r_s.reshape([m,1] + list(z))
+
+    profile = rho_s.reshape([m,1] + list(z)) / (x * (1+x)**2)
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_NFW()
+# ------------------------------------------------------------------------------
+def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
+    '''
+    Returns the analytic Fourier transform of the NFW profile for m_range along
+    axis 0 and k_range along axis 1 (and optional z_range along axis 2).
+
+    Parameters
+    ----------
+    k_range : (k,) array
+      array containing k_range for profile
+    m_range : (m,) array
+      array containing each M for which we compute profile
+    c_x : (m,z) array
+      array containing mass-concentration relation
+    r_x : (m,z) array
+      array containing r_x to evaluate r_s from r_s = r_x/c_x
+    rho_mean : float
+      mean dark matter density
+    z_range : float/array (default=0)
+      redshift to evaluate mass-concentration relation at
+    Delta : float (default=200.)
+      critical overdensity for collapse
+    
+    Returns
+    -------
+    profile_f : (m,k) array
+      array containing Fourier transform of NFW profile
+    or (if z is an array)
+    profile_f : (m,k,z) array 
+      array containing Fourier transform of NFW profile
+    '''
+    m = m_range.shape[0]
+    k = k_range.shape[0]
+    # want an empty array for scalar z so we can easily construct shapes
+    # later on
+    z = np.array(np.array(z_range).shape)
+
+    # (m,z) array
+    r_s = r_x.reshape([m] + list(z))/c_x.reshape([m] + list(z))
+    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+
+    # reshape to match up with k range
+    r_s = r_s.reshape([m,1] + list(z))
+    rho_s = rho_s.reshape([m,1] + list(z))
+    c_x = c_x.reshape([m,1] + list(z))
+    # (m,1,z) array
+    new_shape = [m,1] + list(z/z)
+    prefactor = 4 * np.pi * rho_s * r_s**3 / m_range.reshape(new_shape)
+
+    # (1,k,1) array
+    k_range = k_range.reshape([1,k] + list(z/z))
+    K = k_range * r_s
+
+    # (1,k,1) array
+    Si, Ci = scipy.special.sici(K)
+    # (m,k,z) array
+    Si_c, Ci_c = scipy.special.sici((1+c_x) * K)
+
+    gamma_s = Si_c - Si
+    gamma_c = Ci_c - Ci
+
+    # (m,k,z) array
+    profile_f = prefactor * (np.sin(K) * gamma_s + np.cos(K) * gamma_c -
+                             np.sin(c_x*K) / (K * (1+c_x)))
+
+    # normalize spectrum so that u[k=0] = 1, otherwise we get a small
+    # systematic offset, while we know that theoretically u[k=0] = 1
+    profile_f = profile_f / profile_f[:,0].reshape(m,1)
+
+    return profile_f
+
+# ------------------------------------------------------------------------------
+# End of profile_NFW_f()
+# ------------------------------------------------------------------------------
+def profile_Schaller(r_range, r_s, d_s, r_i, d_i, rho_crit):
+    '''
+    Generalized matter profile defined by Schaller et al (2014). Outer profile
+    is NFW, inner profile is modified NFW characterized by d_i corresponding to
+    additional mass due to baryons.
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each M (with r_range[:,-1] = r_vir)
+    r_s : float (same units as r_range)
+      value for r_s in Schaller profile (~constant)
+    d_s : (m,) array
+      value for d_s in Schaller profile
+    r_i : float (same units as r_range)
+      value for r_i in Schaller profile (~constant)
+    d_i : (m,) array
+      value for d_i in Schaller profile
+    m_i : (m,) array
+      value for m_i in Schaller profile
+    rho_crit : float
+      critical density of universe
+    Returns
+    -------
+    profile : (m,r) 
+      array containing profile
+    '''
+    m = r_range.shape[0]
+    r = r_range.shape[1]
+
+    d_s = d_s.reshape(m,1)
+    r_s = r_s.reshape(m,1)
+    d_i = d_i.reshape(m,1)
+    r_i = r_i.reshape(m,1)
+
+    rs = r_range/r_s
+    rho_NFW = rho_crit * d_s * 1/(rs * (1+rs)**2)
+
+    ri = r_range/r_i
+    rho_bar = rho_crit * d_i * 1/(ri * (1 + ri**2))
+
+    return rho_NFW + rho_bar
+
+# ------------------------------------------------------------------------------
+# End of profile_Schaller()
+# ------------------------------------------------------------------------------
+def profile_gNFW(r_range, c_x, alpha, r_x, m_s):
+    '''
+    Returns a gNFW profile for m_range along axis 0 and r_range along
+    axis 1.
+
+        rho[r] = delta_c * rho_crit * (r/r_s)^-alpha * (1 + r/r_s)^(alpha-3)
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each M (with r_range[:,-1] = r_vir)
+    m_range : (m,) array
+      array containing masses to compute NFW profile for (mass at z=0)
+    c_x : (m,)
+      array containing mass-concentration relation
+    alpha : float
+      exponent in the gNFW profile
+    m_s : (m,) array
+      equivalent halo mass of the stellar component
+
+    Returns
+    -------
+    profile : (m,r) 
+      array containing gNFW profile
+    '''
+    # pdb.set_trace()
+    m = r_range.shape[0]
+    r = r_range.shape[-1]
+
+    # (m,) array
+    r_s = r_x/c_x
+    
+    # (m,r) array
+    x = r_range.reshape(m,r) / r_s.reshape(m,1)
+
+    profile = 1. / (x**alpha * (1+x)**(3-alpha))
+    m_s_prof = 4 * np.pi * tools.Integrate(y=profile * r_range**2,
+                                           x=r_range,
+                                           axis=1)
+    profile *= m_s.reshape(m,1) / m_s_prof.reshape(m,1)
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_NFW()
+# ------------------------------------------------------------------------------
+
+def profile_BCG(r_range, m_range, r_half):
+    '''
+    Returns the BCG profile for m_range along axis 0 and r_range along
+    axis 1.
+
+        rho[r] = m / (4 * pi^1.5 * r_half * r^2) * exp(-(r/r_half)^2)
+    
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each M (with r_range[:,-1] = r_vir)
+    m_range : (m,) array
+      array containing masses to compute profile for (mass at z=0)
+    r_half : (m,) array
+      half-light radius of BCG (standard relation r_half = 0.015 r_vir)
+
+    Returns
+    -------
+    profile : (m,r) 
+      array containing BCG profile
+    '''
+    m = r_range.shape[0]
+    r = r_range.shape[-1]
+
+    r_half = r_half.reshape(m,1)
+
+    profile = m_range.reshape(m,1) / (4*np.pi**1.5 * r_half * r_range**2) \
+              * np.exp(-(r_range/(2 * r_half))**2)
+    profile[profile < 1.e-20] = 0.
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_BCG()
+# ------------------------------------------------------------------------------
+
+def profile_ICL(r_range, m_range, r_half, n):
+    '''
+    Returns the BCG profile for m_range along axis 0 and r_range along
+    axis 1.
+
+                 | m / (8 * pi * r_half * r^2)                   for r < 2r_half
+        rho[r] = | 
+                 | m / (32 * pi * r_half^3) * (r/(2r_half))^(-n) for r > 2r_half
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each M (with r_range[:,-1] = r_vir)
+    m_range : (m,) array
+      array containing masses to compute profile for (mass at z=0)
+    r_half : (m,) array
+      half-light radius of BCG (standard relation r_half = 0.015 r_vir)
+    n : float
+      power law slope of ICL component
+
+    Returns
+    -------
+    profile : (m,r) 
+      array containing BCG profile
+    '''
+    m = r_range.shape[0]
+    r = r_range.shape[-1]
+
+    r_half = r_half.reshape(m,1)
+    m_range = m_range.reshape(m,1)
+    
+    profile = m_range / (8*np.pi * r_half * r_range**2)
+    profile_2 = m_range / (32 * np.pi * r_half**3) * (r_range/(2*r_half))**(-n)
+    # do it the lazy way, easier because of shapes...
+    profile[r_range > 2*r_half] = profile_2[r_range > 2*r_half]
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_ICL()
+# ------------------------------------------------------------------------------
+
+def profile_beta(r_range, m_x, r_x, beta, r_c):
+    '''
+    Returns a beta profile for m_range along axis 0 and r_range along
+    axis 1.
+
+        rho[r] =  rho_c[m_x, r_c, r_x] / (1 + (r/r_c)^2)^(3 * beta / 2)
+
+    rho_c is determined by the mass of the profile.
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each M
+    m_x : float or (m,) array
+      mass enclosed within r_x to compute profile for
+    r_x : float or (m,) array
+      x overdensity radius to match mass at
+    beta : float or (m,) array
+      power law slope of profile
+    r_c : float or (m,) array
+      core radius of beta profile
+
+    Returns
+    -------
+    profile : (r,) or (m,r) array
+      array containing beta profile
+    
+    '''
+    # modify shapes such that we can input floats or arrays
+    m = np.array(np.array(m_x).shape)
+    m_x = m_x.reshape(list(m) + [1])
+    r_x = r_x.reshape(list(m) + [1])
+    c = np.array(np.array(r_c).shape)
+    r_c = r_c.reshape(list(c) + [1])
+
+    norm = m_x / (4./3 * np.pi * r_x**3 * \
+                      scipy.special.hyp2f1(1.5, 1.5 * beta, 2.5, -(r_x/r_c)**2))
+
+    profile = norm / (1 + (r_range/r_c)**2)**(3*beta/2)
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_beta()
+# ------------------------------------------------------------------------------
+
+def fit_profile_beta(r_range, m_x, r_x, profile):
+    '''
+    Fit a beta profile to profile, optimize fit for beta and r_c
+
+    Parameters
+    ----------
+    r_range : array
+      radius corresponding to profile density
+    m_x : (m,) array
+      mass enclosed within r_x
+    r_x : array
+      x overdensity radius of halo
+    profile : array
+      data to fit
+
+    Returns
+    -------
+    fit_prms : (m,2) array
+      (beta, r_c) for each fit
+    fit : array
+      beta function fit to profile
+    '''
+    fit_prms = np.zeros((m_x.shape[0],) + (2,), dtype=float)
+    for idx, mass in enumerate(m_x):
+        popt, pcov = opt.curve_fit(lambda r_range, beta, r_c: \
+                                   profile_beta(r_range, mass, r_x, beta,r_c),
+                                   r_range, profile,
+                                   bounds=(0,[5, r_x]))
+
+        fit_prms[idx] = popt
+        fit = profile_beta(r_range, mass, r_x, popt[0], popt[1])
+
+    return fit_prms, fit
+
+# ------------------------------------------------------------------------------
+# End of fit_profile_beta()
+# ------------------------------------------------------------------------------
+
+def profile_beta_plaw(r_range, norm, beta, r_c, gamma):
+    # modify shapes such that we can input floats or arrays
+    c = np.array(np.array(r_c).shape)
+    r_c = r_c.reshape(list(c) + [1])
+
+    profile = norm * ((1 + (r_range/r_c)**2)**(-3*beta/2) + 
+                      (r_range/(0.654*r_c))**(-gamma))
+
+    return profile
+    
+def fit_profile_beta(r_range, r_x, profile):
+    '''
+    Fit a beta profile to profile, optimize fit for beta and r_c
+
+    Parameters
+    ----------
+    r_range : array
+      radius corresponding to profile density
+    r_x : float
+      x overdensity radius
+    profile : array
+      data to fit
+
+    Returns
+    -------
+    fit_prms : (m,4) array
+      (norm, beta, gamma, r_c) for each fit
+    fit : array
+      beta function fit to profile
+    '''
+    popt, pcov = opt.curve_fit(lambda r_range, norm, beta, gamma, r_c: \
+                               profile_beta_plaw(r_range, norm, beta, r_c,
+                                                 gamma),
+                               r_range, profile,
+                               bounds=([0.1 * profile[0], 0, 0, 0],
+                                       [2*profile[0], 5, r_x, 5]))
+
+    fit_prms = popt
+    fit = profile_beta_plaw(r_range, popt[0], popt[1], popt[2], popt[3])
+
+    return fit_prms, fit
+
+# ------------------------------------------------------------------------------
+# End of fit_profile_beta_plaw()
+# ------------------------------------------------------------------------------
+
+def profile_sersic(r_range, m_range, r_eff, p, q=1):
+    '''
+    Returns a sersic profile for m_range along axis 0 and r_range along
+    axis 1.
+
+        rho[r] = Gamma * nu[r]
+
+    Gamma is determined by the mass of the profile. nu[r] is deprojected 
+    luminosity density for a sersic profile with sersic index n=p/q as defined
+    by Baes & Gentile (2010).
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each m
+    m : (m,) array
+      mass to compute profile for (mass at z=0)
+    r_eff : (m,) array
+      effective radius of galaxy
+    p : int
+      numerator of sersic index n = p/q
+    q : int
+      denominator of sersic index n = p/q
+    
+    Returns
+    -------
+    profile : (r,) or (m,r) array
+      array containing beta profile
+    
+    '''
+    m = m_range.shape[0]
+
+    lum = sersic.luminosity(p, q)
+    rho = np.ones_like(r_range)
+
+    s = r_range / r_eff.reshape(m,1)
+    # luminosity density nu(r), following Baes & Gentile (2010)
+    nu = lum(s[-1])
+
+    for idx, r in enumerate(r_range):
+        nu2rho = m_range[idx] / (4*np.pi * tools.Integrate(nu * r**2, r))
+        rho[idx] = nu2rho * nu
+
+    return rho
+
+# ------------------------------------------------------------------------------
+# End of profile_sersic()
+# ------------------------------------------------------------------------------
