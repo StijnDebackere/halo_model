@@ -467,17 +467,16 @@ def fit_profile_beta(r_range, m_x, r_x, profile):
 # End of fit_profile_beta()
 # ------------------------------------------------------------------------------
 
-def profile_beta_plaw(r_range, norm, beta, r_c, gamma):
+def profile_beta_plaw(r_range, norm, beta, gamma, r_c):
     # modify shapes such that we can input floats or arrays
     c = np.array(np.array(r_c).shape)
     r_c = r_c.reshape(list(c) + [1])
 
-    profile = norm * ((1 + (r_range/r_c)**2)**(-3*beta/2) + 
-                      (r_range/(0.654*r_c))**(-gamma))
+    profile = norm * (1 + (r_range/r_c)**gamma)**(-beta/gamma)
 
     return profile
     
-def fit_profile_beta(r_range, r_x, profile):
+def fit_profile_beta_plaw(r_range, r_x, profile):
     '''
     Fit a beta profile to profile, optimize fit for beta and r_c
 
@@ -498,11 +497,10 @@ def fit_profile_beta(r_range, r_x, profile):
       beta function fit to profile
     '''
     popt, pcov = opt.curve_fit(lambda r_range, norm, beta, gamma, r_c: \
-                               profile_beta_plaw(r_range, norm, beta, r_c,
-                                                 gamma),
+                               profile_beta_plaw(r_range, norm, beta, gamma, r_c),
                                r_range, profile,
                                bounds=([0.1 * profile[0], 0, 0, 0],
-                                       [2*profile[0], 5, r_x, 5]))
+                                       [2*profile[0], 5, 10, r_x]))
 
     fit_prms = popt
     fit = profile_beta_plaw(r_range, popt[0], popt[1], popt[2], popt[3])
