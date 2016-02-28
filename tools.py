@@ -211,9 +211,10 @@ def inverse(f, delta=1/1024.):
 # # End of extrapolate_func()
 # # ------------------------------------------------------------------------------
 
-def extrapolate_plaw(x_range, func):
+def extrapolate_plaw(x_range, func, verbose=False):
     '''
-    Extrapolate func NaN values as a powerlaw.
+    Extrapolate func NaN values as a powerlaw. Works best if power law behaviour
+    is already apparent, extrapolates from largest change/bump in func.
 
     Parameters
     ----------
@@ -255,7 +256,7 @@ def extrapolate_plaw(x_range, func):
 
         func[idx_nan:] = func[idx_nan] * \
                          (x_range[idx_nan:]/x_range[idx_nan])**slope
-
+    if verbose: print 'Power law slope: %f'%slope
     return func
 
 # ------------------------------------------------------------------------------

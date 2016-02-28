@@ -135,17 +135,15 @@ def fit_beta_eckert():
     m_bins = 0.5* (m_edges[1:] + m_edges[:-1])
     m_range = p.prms.m_range_lin
 
-    fit_prms = np.empty((0,2), dtype=float)
-    # profiles = np.empty((0,) + prms.m_range_lin.shape, dtype=float)
+    fit_prms = np.empty((0,4), dtype=float)
+    profiles = np.empty((0,) + r200.shape, dtype=float)
     for profile, m_bin in zip(rho, m_bins):
-        
         m_idx = np.argmin(np.abs(m_range - m_bin))
         r_x = prms.r_h[m_idx]
-        fit, prof = profs.fit_profile_beta(r200 * r_x,
-                                           np.array([m_bin]),
-                                           r_x,
-                                           profile)
+        fit, prof = profs.fit_profile_beta_plaw(r200 * r_x,
+                                                r_x,
+                                                profile)
         fit_prms = np.vstack([fit_prms, fit])
-        # profiles = np.vstack([profiles, prof])
+        profiles = np.vstack([profiles, prof])
 
     return fit_prms, profiles
