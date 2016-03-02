@@ -3,6 +3,7 @@ import numpy as np
 import halo.tools as tools
 import halo.density_profiles as profs
 import halo.stars as stars
+import halo.gas as gas
 import halo.bias as bias
 import halo.parameters as p
 import halo.model.density as dens
@@ -148,15 +149,9 @@ def load_icl():
 # ------------------------------------------------------------------------------
 
 def load_gas():
-    global rho
-    # Gas profile    
-    fit_prms, fit = profs.fit_profile_beta(r,
-                                           np.array([prms.m_range_lin[idx_M]]),
-                                           prms.r_range_lin[idx_M,-1],
-                                           rho)
-    print fit_prms
-    prof_gas = profs.profile_beta(prms.r_range_lin, prms.m_range_lin,#st.m_cen_fit,
-                                  r_x=prms.r_range_lin[:,-1],
+    prof_gas = profs.profile_beta_plaw(prms.r_range_lin,
+                                       prms.m_range_lin,
+                                       r_x=prms.r_range_lin[:,-1],
                                   beta=fit_prms[0,0],r_c=fit_prms[0,1])
     gas_extra = {'profile': prof_gas,
                  'profile_f': None}
