@@ -41,7 +41,7 @@ def Integrate(y, x, axis=-1): # Simpson integration on fixed spaced data!
 # End of Integrate()
 # ------------------------------------------------------------------------------
 
-def m_h(rho, r_range, r_0=None, r_1=None):
+def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
     '''
     Calculate the mass of the density profile between over r_range, or between
     r_0 and r_1.
@@ -75,7 +75,7 @@ def m_h(rho, r_range, r_0=None, r_1=None):
         int_range = int_range[...,:idx_1]
         int_rho = int_rho[...,:idx_1]
 
-    return 4 * np.pi * Integrate(int_rho * int_range**2, int_range, axis=-1)
+    return 4 * np.pi * Integrate(int_rho * int_range**2, int_range, axis=axis)
 
 # ------------------------------------------------------------------------------
 # End of m_h()
