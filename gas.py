@@ -130,29 +130,6 @@ def rhogas_croston():
 # End of rhogas_croston()
 # ------------------------------------------------------------------------------
 
-# def find_mass_eckert():
-    # r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
-    # r200 = r500 * tools.rx_to_r200(1., 500)
-
-    # m_range = p.prms.m_range_lin
-    # c_x = profs.c_correa(m_range, z_range=0).reshape(-1)
-    # mgas = 0.5*(mgas_edges[1:] + mgas_edges[:-1])
-    # # m500 = m_range * tools.Mx_to_My(1., 200, 500, c_x)
-    # # mgas = Mgas_M500_lovisari(m500)
-
-    # mass_diff = np.empty((rho.shape[0], mgas.shape[0]), dtype=float)
-    # for idx_r, prof in enumerate(rho):
-    #     for idx_m, m in enumerate(mgas):
-    #         r = r200 * p.prms.r_h[idx_m]
-    #         # r500 is at index -2
-    #         mass = tools.m_h(prof[:-1], r[:-1])
-    #         mass_diff[idx_r, idx_m] = np.abs(mass/m - 1)
-
-    # mass_idx = np.argmin(mass_diff, axis=-1).reshape(-1)
-    # masses = mgas[mass_idx]
-
-    # return masses, mass_idx, mass_diff
-
 def find_mass_eckert():
     r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()    
     mwl = 0.5*(mwl_edges[1:] + mwl_edges[:-1])
@@ -168,14 +145,17 @@ def find_mass_eckert():
     c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
     M500 = p.prms.m_range_lin * tools.Mx_to_My(1, 200, 500, c_x)
     M_gas = Mgas_M500_lovisari(M500)
-
     
     diff = M_gas.reshape(-1,1) / M_obs.reshape(1,-1) - (r**3).reshape(1,-1)
 
-    # find closest 
+    # find closest theoretical mass
     m_idx = np.argmin(np.abs(diff), axis=0)
 
     return m_idx
+
+# ------------------------------------------------------------------------------
+# End of find_mass_eckert()
+# ------------------------------------------------------------------------------
     
 def fit_beta_eckert():
     r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
