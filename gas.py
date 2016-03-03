@@ -205,12 +205,20 @@ def fit_beta_eckert():
     
     return fit_prms, profiles
 
-def f_gas_fit(M_halo, M_trans, a):
+# ------------------------------------------------------------------------------
+# End of fit_beta_eckert()
+# ------------------------------------------------------------------------------
+
+def f_gas(M_halo, M_trans, a):
     # baryon fraction
     f_b = p.prms.omegab / p.prms.omegam
     return f_b / (1 + (M_trans/M_halo)**a)
 
-def f_gas(n_bins=10):
+# ------------------------------------------------------------------------------
+# End of f_gas()
+# ------------------------------------------------------------------------------
+
+def f_gas_fit(n_bins=10):
     m500, f = np.loadtxt(ddir + 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                          unpack=True)
     f_b = p.prms.omegab / p.prms.omegam
@@ -229,22 +237,26 @@ def f_gas(n_bins=10):
                       axis=-1)
 
     centers = np.power(10, 0.5*(edges[1:] + edges[:-1]))
-    popt, pcov = opt.curve_fit(f_gas_fit, centers, f_med, sigma=f_std,
+    popt, pcov = opt.curve_fit(f_gas, centers, f_med, sigma=f_std,
                                bounds=([1e13, 0],[1e15, 2]))
 
     fit_prms = {'M_trans' : popt[0],
                 'a' : popt[1]}
                 # 'f_0' : popt[2]}
-    fit = f_gas_fit(centers, **fit_prms)
+    fit = f_gas(centers, **fit_prms)
 
-    plt.plot(m500, f, label=r'data', lw=0, marker='o')
-    plt.plot(centers, f_med, label=r'median')
-    plt.plot(centers, fit, label=r'fit')
-    plt.axhline(y=f_b, c='k')
-    plt.xscale('log')
-    plt.xlabel(r'$\log_{10} M/M_\odot$')
-    plt.ylabel(r'$f_{\mathrm{gas}}$')
-    plt.legend(loc='best')
-    plt.show()
+    # plt.plot(m500, f, label=r'data', lw=0, marker='o')
+    # plt.plot(centers, f_med, label=r'median')
+    # plt.plot(centers, fit, label=r'fit')
+    # plt.axhline(y=f_b, c='k')
+    # plt.xscale('log')
+    # plt.xlabel(r'$\log_{10} M/M_\odot$')
+    # plt.ylabel(r'$f_{\mathrm{gas}}$')
+    # plt.legend(loc='best')
+    # plt.show()
 
     return fit_prms, fit, m_idx
+
+# ------------------------------------------------------------------------------
+# End of f_gas_fit()
+# ------------------------------------------------------------------------------
