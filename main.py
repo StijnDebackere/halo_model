@@ -149,10 +149,11 @@ def load_icl():
 # ------------------------------------------------------------------------------
 
 def load_gas():
+    f_gas = gas.f_gas()
     prof_gas = profs.profile_beta_plaw(prms.r_range_lin,
                                        prms.m_range_lin,
                                        r_x=prms.r_range_lin[:,-1],
-                                  beta=fit_prms[0,0],r_c=fit_prms[0,1])
+                                       beta=fit_prms[0,0],r_c=fit_prms[0,1])
     gas_extra = {'profile': prof_gas,
                  'profile_f': None}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)

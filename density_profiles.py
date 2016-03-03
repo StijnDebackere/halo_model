@@ -490,6 +490,8 @@ def profile_beta_plaw(r_range, m_x, r_x, beta, gamma, r_c):
 
     rho_c is determined by the mass of the profile.
 
+    Based on Vikhlinin, Markevitch & Murray (2005).
+
     Parameters
     ----------
     r_range : (m,r) array

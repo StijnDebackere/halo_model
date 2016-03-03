@@ -43,7 +43,7 @@ r500, rho_m, rho_16, rho_84 = np.loadtxt(ddir + 'data_mccarthy/gas/Sun09_rhogas_
 
 M = 8.7e13
 # Look for closest halo mass in our range, need to convert to M500 first.
-M500 = prms.m_range_lin * tools.Mx_to_My(1., 200, 500,
+M500 = prms.m_range_lin * tools.Mx_to_My(1., 500, 200,
                                          c_x.reshape(prms.m_range_lin.shape[0],))
 idx_M = np.argmin(np.abs(M500 - M))
 # r converted to our units

@@ -310,16 +310,22 @@ def Mx_to_My(M_x, x, y, c_200):
     -------
     M_y : array
       masses in units of M_y
+
+    Examples
+    --------
+    Conversion factor gives 1 M_500 in units of M_200, multiplying by m_200
+    gives the m_500 corresponding for the haloes with m_200
+    >>> m_500 = m_200 * Mx_to_My(1., 500, 200, c_x)
     '''
     r_x = rx_to_r200(1., x)
     r_y = rx_to_r200(1., y)
     c_x = r_x * c_200
     c_y = r_y * c_200
     
-    M_y = M_x * (np.log(1 + c_y) - c_y / (1 + c_y)) / \
-          (np.log(1 + c_x) - c_x / (1 + c_x))
+    M_xy = M_x * (np.log(1 + c_x) - c_x / (1 + c_x)) / \
+           (np.log(1 + c_y) - c_y / (1 + c_y))
 
-    return M_y
+    return M_xy
 
 # ------------------------------------------------------------------------------
 # End of Mx_to_My()

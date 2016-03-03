@@ -1,6 +1,10 @@
 import numpy as np
 import astropy.constants as const
 import astropy.units as u
+import scipy.optimize as opt
+import scipy.stats as stats
+
+import matplotlib.pyplot as plt
 
 import halo.parameters as p
 import halo.density_profiles as profs
@@ -143,7 +147,7 @@ def find_mass_eckert():
 
     # find matching halo in model
     c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
-    M500 = p.prms.m_range_lin * tools.Mx_to_My(1, 200, 500, c_x)
+    M500 = p.prms.m_range_lin * tools.Mx_to_My(1., 500, 200, c_x)
     M_gas = Mgas_M500_lovisari(M500)
     
     diff = M_gas.reshape(-1,1) / M_obs.reshape(1,-1) - (r**3).reshape(1,-1)
@@ -200,3 +204,47 @@ def fit_beta_eckert():
         profiles.append(prof)
     
     return fit_prms, profiles
+
+def f_gas_fit(M_halo, M_trans, a):
+    # baryon fraction
+    f_b = p.prms.omegab / p.prms.omegam
+    return f_b / (1 + (M_trans/M_halo)**a)
+
+def f_gas(n_bins=10):
+    m500, f = np.loadtxt(ddir + 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
+                         unpack=True)
+    f_b = p.prms.omegab / p.prms.omegam
+    # bin f_gas
+    f_med, edges, bin_idx = stats.binned_statistic(x=m500, values=f,
+                                                   statistic='median',
+                                                   bins=n_bins)
+    f_std, edges, bin_idx = stats.binned_statistic(x=m500, values=f,
+                                                   statistic=np.std,
+                                                   bins=n_bins)
+    m500 = np.power(10, m500)
+    c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
+    m500_model = p.prms.m_range_lin * tools.Mx_to_My(1., 500, 200, c_x)
+
+    m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
+                      axis=-1)
+
+    centers = np.power(10, 0.5*(edges[1:] + edges[:-1]))
+    popt, pcov = opt.curve_fit(f_gas_fit, centers, f_med, sigma=f_std,
+                               bounds=([1e13, 0],[1e15, 2]))
+
+    fit_prms = {'M_trans' : popt[0],
+                'a' : popt[1]}
+                # 'f_0' : popt[2]}
+    fit = f_gas_fit(centers, **fit_prms)
+
+    plt.plot(m500, f, label=r'data', lw=0, marker='o')
+    plt.plot(centers, f_med, label=r'median')
+    plt.plot(centers, fit, label=r'fit')
+    plt.axhline(y=f_b, c='k')
+    plt.xscale('log')
+    plt.xlabel(r'$\log_{10} M/M_\odot$')
+    plt.ylabel(r'$f_{\mathrm{gas}}$')
+    plt.legend(loc='best')
+    plt.show()
+
+    return fit_prms, fit, m_idx
