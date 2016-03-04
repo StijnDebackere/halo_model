@@ -58,7 +58,7 @@ def load_dm():
 # ------------------------------------------------------------------------------
 
 def load_sat():
-    f_sat = stars.f_s()
+    f_sat = stars.f_s(p.rpms.m_range_lin)
     # Satellite profile
     # generalized NFW profile determined by van der Burg, Hoekstra et al. (2015)
     prof_sat = profs.profile_gNFW(prms.r_range_lin, c_x=0.64*np.ones(prms.m_bins),
@@ -84,7 +84,7 @@ def load_sat():
 # ------------------------------------------------------------------------------
 
 def load_bcg():
-    f_cen = stars.f_c()
+    f_cen = stars.f_c(p.prms.m_range_lin)
     # BCG profile
     # Kravtsov (2014) -> r1/2 = 0.015 r200
     # prof_bcg = profs.profile_BCG(prms.r_range_lin, prms.m_range_lin,#st.m_cen_fit,
@@ -125,7 +125,7 @@ def load_bcg():
 # ------------------------------------------------------------------------------
 
 def load_icl():
-    f_cen = stars.f_c()
+    f_cen = stars.f_c(p.prms.m_range_lin)
     # ICL profile
     prof_icl = profs.profile_ICL(prms.r_range_lin, prms.m_range_lin,
                                  r_half=0.015*prms.r_range_lin[:,-1], n=5)
@@ -149,7 +149,12 @@ def load_icl():
 # ------------------------------------------------------------------------------
 
 def load_gas():
-    f_gas = gas.f_gas()
+    fit_prms, fit, m_idx = gas.f_gas_fit()
+
+    c_x = profs.c_correa(p.prms.m_range_lin, z_range=0)
+    M500 = tools.Mx_to_My(p.prms.m_range_lin, 500, 200, c_x)
+    f_gas = f_gas(M500, **fit_prms)
+
     prof_gas = profs.profile_beta_plaw(prms.r_range_lin,
                                        prms.m_range_lin,
                                        r_x=prms.r_range_lin[:,-1],
@@ -159,14 +164,11 @@ def load_gas():
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
         
     # TODO:
-    # - Implement correct gas mass fractions
     # - Look at FT of gas profile
     #   -> for smallest mass, we get almost flat profile -> sinc as FT
     #      mass dependence in core radius should be added?
     #   -> extrapolate highest mass gas profile, also gives contributions at
     #      largest scales, but not negative there, compensates small M
-    # - DONE: Conversion to r200 -> still need to multiply with r200 to
-    #   get correct units
     
     comp_gas_kwargs = {'name': 'gas',
                        'm_fn': prms.m_fn,

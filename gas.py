@@ -167,32 +167,14 @@ def fit_beta_eckert():
     # r200 = r500 * tools.rx_to_r200(1., 500)
     # m_bins = 0.5* (mwl_edges[1:] + mwl_edges[:-1])
     # m_range = p.prms.m_range_lin
-
-    # m = np.array([tools.m_h(prof, )])
-    # # eckert 0 -> rho_eckert[0][3:] cutoff
-
-    # # fit_prms = np.empty((0,4), dtype=float)
-    # # profiles = np.empty((0,) + r200.shape, dtype=float)
     norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
     rho_norm = rho / norm.reshape(-1,1)
 
     fit_prms = []
     profiles = []
-    # for profile, m_bin in zip(rho, m_bins):
-    #     m_idx = np.argmin(np.abs(m_range - m_bin))
-    #     r_x = prms.r_h[m_idx]
-    #     if idx == 0:
-    #         fit, prof = profs.fit_profile_beta_plaw(r200[3:] * r_x,
-    #                                                 r_x,
-    #                                                 profile[3:])
-    #     else:
-    #         fit, prof = profs.fit_profile_beta_plaw(r200 * r_x,
-    #                                                 r_x,
-    #                                                 profile)
-    #     fit_prms.append(fit)
-    #     profiles.append(prof)
     for idx, profile in enumerate(rho_norm):
         if idx == 0:
+            # do not fit bump
             fit, prof = profs.fit_profile_beta_plaw(r500[3:], 1,
                                                     r500[idx_500],
                                                     profile[3:])
@@ -210,6 +192,25 @@ def fit_beta_eckert():
 # ------------------------------------------------------------------------------
 
 def f_gas(M_halo, M_trans, a):
+    '''
+    Returns parametrization for gas fraction.
+
+    Based on sigmoid parametrization in Schneider & Teyssier (2015).
+
+    Parameters
+    ----------
+    M_halo : array
+      Halo mass in terms of M_500
+    M_trans : float
+      Mass of transition in units of M_500
+    a : float
+      power law slope of sigmoid
+
+    Returns
+    -------
+    f_gas : array
+      Gas fraction for halo of mass M_halo
+    '''
     # baryon fraction
     f_b = p.prms.omegab / p.prms.omegam
     return f_b / (1 + (M_trans/M_halo)**a)
@@ -218,7 +219,7 @@ def f_gas(M_halo, M_trans, a):
 # End of f_gas()
 # ------------------------------------------------------------------------------
 
-def f_gas_fit(n_bins=10):
+def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
     m500, f = np.loadtxt(ddir + 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                          unpack=True)
     f_b = p.prms.omegab / p.prms.omegam
@@ -230,8 +231,8 @@ def f_gas_fit(n_bins=10):
                                                    statistic=np.std,
                                                    bins=n_bins)
     m500 = np.power(10, m500)
-    c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
-    m500_model = p.prms.m_range_lin * tools.Mx_to_My(1., 500, 200, c_x)
+    c_x = profs.c_correa(m_range, z_range=0).reshape(-1)
+    m500_model = m_range * tools.Mx_to_My(1., 500, 200, c_x)
 
     m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
                       axis=-1)

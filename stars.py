@@ -151,13 +151,13 @@ def mcen_fit(m_h):
 # End of mcen_fit()
 # ------------------------------------------------------------------------------
 
-def f_s():
+def f_s(m_range):
     '''
     Satellite fraction from Zu & Mandelbaum
     '''
     m_f, f, f_c, f_s = np.loadtxt(ddir + 'data_mccarthy/StellarFraction-Mh.txt',
                                  unpack=True)
-    f_s_interp = f_interp(p.m_range_lin, f_s, m_f)
+    f_s_interp = f_interp(m_range, f_s, m_f)
 
     return f_s_interp
 
@@ -165,13 +165,13 @@ def f_s():
 # End of f_s()
 # ------------------------------------------------------------------------------
 
-def f_c():
+def f_c(m_range):
     '''
     Central fraction from Zu & Mandelbaum
     '''
     m_f, f, f_c, f_s = np.loadtxt(ddir + 'data_mccarthy/StellarFraction-Mh.txt',
                                  unpack=True)
-    f_c_interp = f_interp(p.m_range_lin, f_c, m_f)
+    f_c_interp = f_interp(m_range, f_c, m_f)
     
     return f_c_interp
 
