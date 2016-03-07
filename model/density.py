@@ -26,11 +26,11 @@ class Profile(Cache):
       array containing wavevectors to compute profile for
     profile : function or array
       function to compute the density profile (should have first and second
-      args for r_range and m_range) or array containing profile with M along 
+      args for r_range and m_range) or array containing profile with M along
       axis 0 and r along axis 1
     profile_f : function/array or None
-      function to compute the density profile Fourier transform (should have 
-      first and second args for k_range and m_range) or array containing profile 
+      function to compute the density profile Fourier transform (should have
+      first and second args for k_range and m_range) or array containing profile
       with M along axis 0 and k along axis 1.
       Choose None if you want to use the Taylor expanded Fourier transform.
     n : int
@@ -77,10 +77,10 @@ class Profile(Cache):
         self.profile_args = profile_args
         self.profile_f = profile_f
         self.profile_f_args = profile_f_args
-        
+
     #===========================================================================
     # Parameters
-    #===========================================================================    
+    #===========================================================================
     @parameter
     def r_range(self, val):
         return val
@@ -127,7 +127,7 @@ class Profile(Cache):
 
     #===========================================================================
     # Methods
-    #===========================================================================    
+    #===========================================================================
     @cached_property('r_range', 'm_range','profile', 'profile_args')
     def rho_r(self):
         '''
@@ -148,7 +148,7 @@ class Profile(Cache):
 
         if len(dens_profile.shape) != 2:
             raise ValueError('profile should be an (m,r) array. ')
-                
+
         else:
             return dens_profile
 
@@ -176,7 +176,7 @@ class Profile(Cache):
 
         if len(dens_profile_f.shape) != 2:
             raise ValueError('profile_f should be an (m,k) array. ')
-                
+
         else:
             return dens_profile_f
 
@@ -218,7 +218,7 @@ class Profile(Cache):
         out_q.put(results)
 
         return
-    
+
     @staticmethod
     def _taylor_expansion_multi(n,r_range,profile,cpus):
         '''
@@ -300,14 +300,14 @@ class Profile(Cache):
         F_n *= prefactor
 
         return F_n
-        
+
     @cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'm_range',
                      'taylor_err')
     def rho_k_T(self):
         '''
         Computes the Fourier transform of the density profile, using a Taylor
         expansion of the sin(kr)/(kr) term. We have
-        
+
             u[M,k] = sum_n (-1)^n F_n[M] k^(2n)
 
         Returns
@@ -325,7 +325,7 @@ class Profile(Cache):
         n_arr = np.arange(0,n+1,dtype=np.longdouble).reshape(1,n+1)
         # -> (m,n) array
         c_n = np.power(-1,n_arr) * Fn
-        
+
         # need (k,n+1) array for exponent
         k_range = np.longdouble(self.k_range).reshape(self.k_range.shape[0],1)
         k_n = np.power(np.tile(k_range, (1,n+1)), (2 * n_arr))

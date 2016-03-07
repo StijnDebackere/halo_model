@@ -37,10 +37,10 @@ def T2Mgas(T):
     Returns M500 for gas associated to temperature T (in keV)
 
         log[M500 / h_70^-5/2] = log(12.22) + 2.02 log(T)
-   
+
     Eq. 6 in Eckert et al. XXL XIII (2015)
     '''
-    
+
     M500 = 10**(12.22) * (T**2.02)
     return M500
 
@@ -53,10 +53,9 @@ def T2Mwl(T):
     Returns M500 for halo associated to temperature T (in keV)
 
         log[M500 / h^-5/2] = log(12.22) + 2.02 log(T)
-   
+
     Eq. 6 in Eckert et al. XXL XIII (2015)
     '''
-    
     M500 = 10**(13.57) * (T**1.67)
     # faulty measurement -> scale to match hydrostatic mass
     M500 *= 1.3
@@ -82,7 +81,7 @@ def rhogas_eckert():
     rho2 = 2.25 * 0.59 * const.m_p.cgs * n2 * 1/u.cm**3
     rho3 = 2.25 * 0.59 * const.m_p.cgs * n3 * 1/u.cm**3
     rho4 = 2.25 * 0.59 * const.m_p.cgs * n4 * 1/u.cm**3
-    s1 = 2.25 * 0.59 * const.m_p.cgs * s1 * 1/u.cm**3 
+    s1 = 2.25 * 0.59 * const.m_p.cgs * s1 * 1/u.cm**3
     s2 = 2.25 * 0.59 * const.m_p.cgs * s2 * 1/u.cm**3
     s3 = 2.25 * 0.59 * const.m_p.cgs * s3 * 1/u.cm**3
     s4 = 2.25 * 0.59 * const.m_p.cgs * s4 * 1/u.cm**3
@@ -129,13 +128,13 @@ def rhogas_croston():
     rho = rho_m * prms.rho_crit
 
     return r500, rho
-    
+
 # ------------------------------------------------------------------------------
 # End of rhogas_croston()
 # ------------------------------------------------------------------------------
 
 def find_mass_eckert():
-    r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()    
+    r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
     mwl = 0.5*(mwl_edges[1:] + mwl_edges[:-1])
     mgas = 0.5*(mgas_edges[1:] + mgas_edges[:-1])
 
@@ -149,7 +148,7 @@ def find_mass_eckert():
     c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
     M500 = p.prms.m_range_lin * tools.Mx_to_My(1., 500, 200, c_x)
     M_gas = Mgas_M500_lovisari(M500)
-    
+
     diff = M_gas.reshape(-1,1) / M_obs.reshape(1,-1) - (r**3).reshape(1,-1)
 
     # find closest theoretical mass
@@ -160,7 +159,7 @@ def find_mass_eckert():
 # ------------------------------------------------------------------------------
 # End of find_mass_eckert()
 # ------------------------------------------------------------------------------
-    
+
 def fit_beta_eckert():
     r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
     idx_500 = np.argmin(np.abs(r500 - 1))
@@ -184,7 +183,7 @@ def fit_beta_eckert():
                                                     profile)
         fit_prms.append(fit)
         profiles.append(prof)
-    
+
     return fit_prms, profiles
 
 # ------------------------------------------------------------------------------

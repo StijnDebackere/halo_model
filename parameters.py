@@ -57,7 +57,7 @@ class Parameters(Cache):
     mf_fit : string (accepted by hmf.MassFunction)
       Fitting function for halo mass function
     cut_fit : bool
-      Whether to forcibly cut f(sigma) at bounds in literature. If false, 
+      Whether to forcibly cut f(sigma) at bounds in literature. If false,
       will use whole range of M.
     delta_h : float
       Overdensity for halo definition
@@ -71,7 +71,7 @@ class Parameters(Cache):
     -------
     dlog10m : float
       log10m mass interval for mass function
-    
+
     '''
     def __init__(self, m_min=8.5, m_max=13.5, m_bins=100,
                  r_min=-4.0, r_bins=10000,
@@ -109,7 +109,7 @@ class Parameters(Cache):
 
     #===========================================================================
     # Parameters
-    #===========================================================================    
+    #===========================================================================
     @parameter
     def m_min(self, val):
         return val
@@ -210,7 +210,7 @@ class Parameters(Cache):
 
     #===========================================================================
     # Methods
-    #===========================================================================    
+    #===========================================================================
     @cached_property('omegab', 'omegac')
     def omegam(self):
         return self.omegab + self.omegac
@@ -226,7 +226,7 @@ class Parameters(Cache):
     @cached_property('m_range')
     def m_range_lin(self):
         return np.power(10, self.m_range)
-    
+
     @cached_property('k_min', 'k_max', 'k_bins')
     def dlnk(self):
         return (self.k_max - self.k_min)/np.float(self.k_bins)
@@ -307,8 +307,8 @@ class Parameters(Cache):
     @cached_property('r_range')
     def r_range_lin(self):
         return np.power(10, self.r_range)
-    
-        
+
+
 # ------------------------------------------------------------------------------
 # End of Parameters()
 # ------------------------------------------------------------------------------

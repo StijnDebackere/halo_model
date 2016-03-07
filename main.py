@@ -91,21 +91,23 @@ def load_bcg():
     #                              r_half=0.015*prms.r_range_lin[:,-1])
 
     # quite arbitrary...
-    n1_idx = (prms.m_range_lin * f_cen < 1e11)
-    n4_idx = (prms.m_range_lin * f_cen >= 1e11)
+    # n1_idx = (prms.m_range_lin * f_cen < 1e11)
+    # n4_idx = (prms.m_range_lin * f_cen >= 1e11)
 
-    prof_bcg_n1 = profs.profile_sersic(prms.r_range_lin[n1_idx],
-                                       prms.m_range_lin[n1_idx],
-                                       r_eff=0.015*prms.r_range_lin[n1_idx,-1],
-                                       p=1)
-    prof_bcg_n4 = profs.profile_sersic(prms.r_range_lin[n4_idx],
-                                       prms.m_range_lin[n4_idx],
-                                       r_eff=0.015*prms.r_range_lin[n4_idx,-1],
-                                       p=4)
-    prof_bcg = np.concatenate([prof_bcg_n1, prof_bcg_n4], axis=0)
+    # prof_bcg_n1 = profs.profile_sersic(prms.r_range_lin[n1_idx],
+    #                                    prms.m_range_lin[n1_idx],
+    #                                    r_eff=0.015*prms.r_range_lin[n1_idx,-1],
+    #                                    p=1)
+    # prof_bcg_n4 = profs.profile_sersic(prms.r_range_lin[n4_idx],
+    #                                    prms.m_range_lin[n4_idx],
+    #                                    r_eff=0.015*prms.r_range_lin[n4_idx,-1],
+    #                                    p=4)
+    # prof_bcg = np.concatenate([prof_bcg_n1, prof_bcg_n4], axis=0)
 
+    prof_bcg = profs.profile_delta(p.prms.r_range_lin, p.prms.m_range_lin)
+    prof_bcg_f = profs.profile_delta_f(p.prms.k_range_lin, p.prms.m_range_lin)
     bcg_extra = {'profile': prof_bcg,
-                 'profile_f': None}
+                 'profile_f': prof_bcg_f}
     prof_bcg_kwargs = tools.merge_dicts(profile_kwargs, bcg_extra)
 
     print '! Check M_h-M* relation !'
@@ -129,21 +131,21 @@ def load_icl():
     # ICL profile
     prof_icl = profs.profile_ICL(prms.r_range_lin, prms.m_range_lin,
                                  r_half=0.015*prms.r_range_lin[:,-1], n=5)
-    
+
     icl_extra = {'profile': prof_icl,
                  'profile_f': None}
     prof_icl_kwargs = tools.merge_dicts(profile_kwargs, icl_extra)
-        
+
     comp_icl_kwargs = {'name': 'icl',
                        'm_fn': prms.m_fn,
                        'f_comp': f_cen,
                        'bias_fn': bias.bias_Tinker10,
                        'bias_fn_args': {'m_fn': prms.m_fn}}
-    
+
     icl_kwargs = tools.merge_dicts(prof_icl_kwargs, comp_icl_kwargs)
     comp_icl = comp.Component(**icl_kwargs)
     return comp_icl
-    
+
 # ------------------------------------------------------------------------------
 # End of load_icl()
 # ------------------------------------------------------------------------------
@@ -162,20 +164,20 @@ def load_gas():
     gas_extra = {'profile': prof_gas,
                  'profile_f': None}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-        
+
     # TODO:
     # - Look at FT of gas profile
     #   -> for smallest mass, we get almost flat profile -> sinc as FT
     #      mass dependence in core radius should be added?
     #   -> extrapolate highest mass gas profile, also gives contributions at
     #      largest scales, but not negative there, compensates small M
-    
+
     comp_gas_kwargs = {'name': 'gas',
                        'm_fn': prms.m_fn,
                        'f_comp': f_gas,
                        'bias_fn': bias.bias_Tinker10,
                        'bias_fn_args': {'m_fn': prms.m_fn}}
-    
+
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
     comp_gas = comp.Component(**gas_kwargs)
     return comp_gas

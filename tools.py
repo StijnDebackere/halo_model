@@ -30,11 +30,11 @@ def Integrate(y, x, axis=-1): # Simpson integration on fixed spaced data!
     Parameters
     ----------
     y : array
-          
+
     '''
 	y_new = np.nan_to_num(y)
 	result = scipy.integrate.simps(y=y_new, x=x, axis=axis, even='first')
-	
+
 	return result
 
 # ------------------------------------------------------------------------------
@@ -55,8 +55,8 @@ def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
     r_0 : float
       start radius of integration interval
     r_1 : float
-      end radius of integration interval    
-    
+      end radius of integration interval
+
     Returns
     -------
     m_h : float
@@ -84,19 +84,19 @@ def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
 def mass_to_radius(m, mean_dens):
     '''
     Calculate radius of a region of space from its mass.
-    
+
     Parameters
     ----------
     m : float or array of floats
       Masses
     mean_dens : float
       The mean density of the universe
-        
+
     Returns
     -------
     r : float or array of floats
       The corresponding radii to m
-    
+
     Notes
     -----
     The units of r don't matter as long as they are consistent with
@@ -155,7 +155,7 @@ def binary_search(f, y, lo, hi, delta):
 
 def inverse(f, delta=1/1024.):
     ''''
-    Returns the inverse of the monotonic function f, to a precision of delta. 
+    Returns the inverse of the monotonic function f, to a precision of delta.
 
     Parameters
     ----------
@@ -163,7 +163,7 @@ def inverse(f, delta=1/1024.):
       function to invert
     delta : float
       precision
-    
+
     Returns
     -------
     f_1 : function
@@ -249,7 +249,7 @@ def extrapolate_plaw(x_range, func, verbose=False):
             slope, cov = opt.curve_fit(plaw_neg,
                                        (x_fit).astype(float),
                                        (func_fit).astype(float))
-        else: 
+        else:
             slope, cov = opt.curve_fit(plaw_pos,
                                        np.log10(x_fit).astype(float),
                                        np.log10(func_fit).astype(float))
@@ -278,6 +278,12 @@ def rx_to_r200(r_x, x):
     -------
     r200 : array
       r_x in units of r_200
+
+    Examples
+    --------
+    Conversion factor gives 1 r_500 in units of r_200, multiplying by r_200
+    gives the r_500 for the haloes with r_200
+    >>> r_500 = r_200 * rx_to_ry(1., 500)
     '''
     x /= 100.
     # analytic solution from scaling radius of NFW profile to overdensity
@@ -314,14 +320,14 @@ def Mx_to_My(M_x, x, y, c_200):
     Examples
     --------
     Conversion factor gives 1 M_500 in units of M_200, multiplying by m_200
-    gives the m_500 corresponding for the haloes with m_200
+    gives the m_500 for the haloes with m_200
     >>> m_500 = m_200 * Mx_to_My(1., 500, 200, c_x)
     '''
     r_x = rx_to_r200(1., x)
     r_y = rx_to_r200(1., y)
     c_x = r_x * c_200
     c_y = r_y * c_200
-    
+
     M_xy = M_x * (np.log(1 + c_x) - c_x / (1 + c_x)) / \
            (np.log(1 + c_y) - c_y / (1 + c_y))
 
