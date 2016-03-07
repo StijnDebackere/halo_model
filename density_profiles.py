@@ -536,12 +536,16 @@ def profile_delta(r_range, m_range):
     '''
     Returns a delta function profile
     '''
-    profile = np.zeros_like(r_range)
+    profile = np.zeros_like(r_range, dtype=float)
 
     profile[:,0] = 1.
     profile *= m_range.reshape(-1,1)
 
     return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_delta()
+# ------------------------------------------------------------------------------
 
 def profile_delta_f(k_range, m_range):
     '''
@@ -560,11 +564,14 @@ def profile_delta_f(k_range, m_range):
     profile_f : (m,k) array
       array containing Fourier transform of delta profile
     '''
-    profile = np.ones_like(m_range.shape + k_range.shape)
-
-    profile *= 1./m_range.reshape(-1,1)
+    profile = np.ones(m_range.shape + k_range.shape, dtype=float)
+    # profile /= m_range.reshape(-1,1)
 
     return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_delta_f()
+# ------------------------------------------------------------------------------
 
 def profile_sersic(r_range, m_range, r_eff, p, q=1):
     '''

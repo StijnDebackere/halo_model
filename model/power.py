@@ -14,28 +14,28 @@ class Power(Cache):
     ----------
     components : list
       list of components
-      
+
 
     Methods
     -------
-    
+
     '''
     def __init__(self, components):
         super(Power, self).__init__()
         self.comps = {}
         for comp in components:
             self.comps[comp.name] = comp
-            
+
     #===========================================================================
     # Parameters
-    #===========================================================================    
+    #===========================================================================
     @parameter
     def comps(self, val):
         return val
 
     #===========================================================================
     # Methods
-    #===========================================================================    
+    #===========================================================================
     @staticmethod
     def _cross_1halo(comp_1, comp_2):
         '''
@@ -58,9 +58,9 @@ class Power(Cache):
         result *= prefactor
 
         return result
-        
+
     @staticmethod
-    def _cross_2halo_cc(comp_1, comp_2):
+    def _cross_2halo(comp_1, comp_2):
         '''
         Compute the 2-halo cross-correlation between components comp_1 and
         comp_2
@@ -68,7 +68,7 @@ class Power(Cache):
         # define shapes for readability
         m = comp_1.m_range.shape[0]
         k = comp_1.k_range.shape[0]
-        
+
         dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
         m_range = comp_1.m_range.reshape(m,1)
         f_comp_1 = comp_1.f_comp.reshape(m,1)
@@ -87,62 +87,65 @@ class Power(Cache):
         result *= prefactor
 
         return result
-        
-    @staticmethod
-    def _cross_2halo_dc(comp_1, comp_2):
-        '''
-        Compute the 2-halo cross-correlation between diffuse and normal 
-        components comp_1 and comp_2
-        '''
-        # define shapes for readability
-        m = comp_2.m_range.shape[0]
-        k = comp_2.k_range.shape[0]
-        
-        dndlnm = comp_2.m_fn.dndlnm.reshape(m,1)
-        m_range = comp_2.m_range.reshape(m,1)
-        f_comp_2 = comp_2.f_comp.reshape(m,1)
-        bias_2 = comp_2.bias.reshape(m,1)
 
-        prefactor = comp_1.bias * comp_1.P_lin
-        result = 1./comp_2.rho_comp * Integrate(y=dndlnm * bias_2 *
-                                                f_comp_2 * comp_2.rho_k,
-                                                x=m_range,
-                                                axis=0)
-        result *= prefactor
+    # @staticmethod
+    # def _cross_2halo_dc(comp_1, comp_2):
+    #     '''
+    #     Compute the 2-halo cross-correlation between diffuse and normal
+    #     components comp_1 and comp_2
+    #     '''
+    #     # define shapes for readability
+    #     m = comp_2.m_range.shape[0]
+    #     k = comp_2.k_range.shape[0]
 
-        return result
-        
-    @staticmethod
-    def _cross_2halo_dd(comp_1, comp_2):
-        '''
-        Compute the 2-halo cross-correlation between diffuse components
-        comp_1 and comp_2
-        '''
-        return (comp_1.bias * comp_1.P_lin * comp_2.bias * comp_2.P_lin)
+    #     dndlnm = comp_2.m_fn.dndlnm.reshape(m,1)
+    #     m_range = comp_2.m_range.reshape(m,1)
+    #     f_comp_2 = comp_2.f_comp.reshape(m,1)
+    #     bias_2 = comp_2.bias.reshape(m,1)
+
+    #     prefactor = comp_1.bias * comp_1.P_lin
+    #     result = 1./comp_2.rho_comp * Integrate(y=dndlnm * bias_2 *
+    #                                             f_comp_2 * comp_2.rho_k,
+    #                                             x=m_range,
+    #                                             axis=0)
+    #     result *= prefactor
+
+    #     return result
+
+    # @staticmethod
+    # def _cross_2halo_dd(comp_1, comp_2):
+    #     '''
+    #     Compute the 2-halo cross-correlation between diffuse components
+    #     comp_1 and comp_2
+    #     '''
+    #     return (comp_1.bias * comp_1.P_lin * comp_2.bias * comp_2.P_lin)
 
     @staticmethod
     def _cross_power(comp_1, comp_2):
         '''
         Compute the cross-correlation between comp_1 and comp_2.
         '''
-        if comp_1.__class__ == comp.DiffuseComponent:
-            if comp_2.__class__ == comp.DiffuseComponent:
-                P_2h = Power._cross_2halo_dd(comp_1, comp_2)
+        # if comp_1.__class__ == comp.DiffuseComponent:
+        #     if comp_2.__class__ == comp.DiffuseComponent:
+        #         P_2h = Power._cross_2halo_dd(comp_1, comp_2)
 
-            elif comp_2.__class__ == comp.Component:
-                P_2h = Power._cross_2halo_dc(comp_1, comp_2)
+        #     elif comp_2.__class__ == comp.Component:
+        #         P_2h = Power._cross_2halo_dc(comp_1, comp_2)
 
-            P_tot = P_2h
+        #     P_tot = P_2h
 
-        elif comp_1.__class__ == comp.Component:
-            if comp_2.__class__ == comp.DiffuseComponent:
-                P_2h = Power._cross_2halo_dc(comp_2, comp_1)
-                P_tot = P_2h
+        # elif comp_1.__class__ == comp.Component:
+        #     if comp_2.__class__ == comp.DiffuseComponent:
+        #         P_2h = Power._cross_2halo_dc(comp_2, comp_1)
+        #         P_tot = P_2h
 
-            elif comp_2.__class__ == comp.Component:
-                P_2h = Power._cross_2halo_cc(comp_1, comp_2)
-                P_1h = Power._cross_1halo(comp_1, comp_2)
-                P_tot = P_2h + P_1h
+        #     elif comp_2.__class__ == comp.Component:
+        #         P_2h = Power._cross_2halo_cc(comp_1, comp_2)
+        #         P_1h = Power._cross_1halo(comp_1, comp_2)
+        #         P_tot = P_2h + P_1h
+        P_2h = Power._cross_2halo(comp_1, comp_2)
+        P_1h = Power._cross_1halo(comp_1, comp_2)
+        P_tot = P_1h + P_2h
 
         return P_tot
 

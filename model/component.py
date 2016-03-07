@@ -13,7 +13,7 @@ import pdb
 class Component(dens.Profile):
     '''
     An object containing information about a matter component.
-    
+
     Parameters
     ----------
     name : str
@@ -26,11 +26,11 @@ class Component(dens.Profile):
       fractional contribution of component to total mass for an object of
       equivalent mass m at redshift z
     bias_fn : function or array
-      function to compute the bias (should have first arg for m_range) or array 
+      function to compute the bias (should have first arg for m_range) or array
       containing profile with m along axis 0
     bias_fn_args : dict
       dictionary containing the additional arguments to the bias function
-    
+
     Methods
     -------
     P_1h : (k,) array
@@ -59,7 +59,7 @@ class Component(dens.Profile):
 
     #===========================================================================
     # Parameters
-    #===========================================================================    
+    #===========================================================================
     # @parameter
     # def dndlnm(self, val):
     #     return val
@@ -76,9 +76,9 @@ class Component(dens.Profile):
     def m_fn(self, val):
         if not isinstance(val, hmf.MassFunction):
             raise TypeError('m_fn should be hmf.MassFunction instance.')
-        else: 
+        else:
             return val
-    
+
     @parameter
     def f_comp(self, val):
         return val
@@ -86,14 +86,14 @@ class Component(dens.Profile):
     @parameter
     def bias_fn(self, val):
         return val
-    
+
     @parameter
     def bias_fn_args(self, val):
         return val
 
     #===========================================================================
     # Methods
-    #===========================================================================    
+    #===========================================================================
     @cached_property('m_range', 'f_comp', 'm_fn')
     def rho_comp(self):
         '''
@@ -115,7 +115,7 @@ class Component(dens.Profile):
 
         if len(b.shape) != 1:
             raise ValueError('bias_fn should be an (m,) array. ')
-                
+
         else:
             # correct bias such that P_2h -> P_lin for k -> 0
             # this correction assumes Simpson integration!!!
@@ -149,7 +149,7 @@ class Component(dens.Profile):
                 b[0] += (diff * 6./(hsum * (2 - 1.0/h0divh1)) *
                          1./(dndlnm[0] * self.f_comp[0]))
 
-            
+
             bias_int = Integrate(y=dndlnm * b * self.f_comp,
                                  x=self.m_range,
                                  axis=0)
@@ -167,7 +167,7 @@ class Component(dens.Profile):
           array containing halo mass for each profile
         '''
         m = self.m_range.shape[0]
-        
+
         f_comp = self.f_comp.reshape(m,1)
         return 4*np.pi * Integrate(self.rho_r * f_comp * self.r_range**2,
                                    self.r_range,
@@ -181,7 +181,7 @@ class Component(dens.Profile):
         # define shapes for readability
         m = self.m_range.shape[0]
         k = self.k_range.shape[0]
-        
+
         dndlnm = self.m_fn.dndlnm.reshape(m,1)
         m_range = self.m_range.reshape(m,1)
         f_comp = self.f_comp.reshape(m,1)
@@ -194,7 +194,7 @@ class Component(dens.Profile):
         result *= prefactor
 
         return result
-        
+
     @cached_property('m_range', 'k_range', 'm_fn', 'rho_comp', 'rho_k')
     def P_2h(self):
         '''
@@ -203,7 +203,7 @@ class Component(dens.Profile):
         # define shapes for readability
         m = self.m_range.shape[0]
         k = self.k_range.shape[0]
-        
+
         dndlnm = self.m_fn.dndlnm.reshape(m,1)
         m_range = self.m_range.reshape(m,1)
         f_comp = self.f_comp.reshape(m,1)
@@ -226,7 +226,7 @@ class Component(dens.Profile):
     def Delta_1h(self):
         '''
         Return the dimensionless power spectrum for 1-halo term of component
-        
+
                Delta[k] = 1/(2*pi^2) * k^3 P(k)
         '''
         return 1./(2*np.pi**2) * self.k_range**3 * self.P_1h
@@ -235,7 +235,7 @@ class Component(dens.Profile):
     def Delta_2h(self):
         '''
         Return the dimensionless power spectrum for 2-halo term of component
-        
+
                Delta[k] = 1/(2*pi^2) * k^3 P(k)
         '''
         return 1./(2*np.pi**2) * self.k_range**3 * self.P_2h
@@ -248,108 +248,107 @@ class Component(dens.Profile):
 # End of Component()
 # ------------------------------------------------------------------------------
 
-# class DiffuseComponent(Cache):
-#     '''
-#     An object containing information about a diffuse matter component. This 
-#     component traces the linear matter power spectrum with a bias factor.
-    
-#     Parameters
-#     ----------
-#     name : str
-#       name of the component
-#     m_fn : hmf.MassFunction object
-#       the halo mass function
-#     f_comp : (m,) array
-#       fractional contribution of component to total mass for an object of
-#       equivalent mass m at redshift z
-#     bias : float
-#       bias factor between diffuse component and linear power spectrum
+class DiffuseComponent(Cache):
+    '''
+    An object containing information about a diffuse matter component. This
+    component traces the linear matter power spectrum with a bias factor.
 
-#     Methods
-#     -------
-#     P_2h : (k,) array
-#       2 halo term of power spectrum
-#     Delta_2h : (k,) array
-#       2 halo term of dimensionless power spectrum
-#     '''
-#     def __init__(self, name, m_range, k_range, m_fn, f_comp, bias):
-#         super(DiffuseComponent, self).__init__()
-#         self.name = name
-#         self.m_range = m_range
-#         self.k_range = k_range
-#         self.m_fn = m_fn
-#         self.f_comp = f_comp
-#         self.bias = bias
+    Parameters
+    ----------
+    name : str
+      name of the component
+    m_fn : hmf.MassFunction object
+      the halo mass function
+    f_comp : (m,) array
+      fractional contribution of component to total mass for an object of
+      equivalent mass m at redshift z
+    bias : float
+      bias factor between diffuse component and linear power spectrum
 
-#     #===========================================================================
-#     # Parameters
-#     #===========================================================================    
-#     @parameter
-#     def name(self, val):
-#         return val
+    Methods
+    -------
+    P_2h : (k,) array
+      2 halo term of power spectrum
+    Delta_2h : (k,) array
+      2 halo term of dimensionless power spectrum
+    '''
+    def __init__(self, name, m_range, k_range, m_fn, f_comp, bias):
+        super(DiffuseComponent, self).__init__()
+        self.name = name
+        self.m_range = m_range
+        self.k_range = k_range
+        self.m_fn = m_fn
+        self.f_comp = f_comp
+        self.bias = bias
 
-#     @parameter
-#     def m_range(self, val):
-#         return val
+    #===========================================================================
+    # Parameters
+    #===========================================================================
+    @parameter
+    def name(self, val):
+        return val
 
-#     @parameter
-#     def k_range(self, val):
-#         return val
+    @parameter
+    def m_range(self, val):
+        return val
 
-#     @parameter
-#     def m_fn(self, val):
-#         if not isinstance(val, hmf.MassFunction):
-#             raise TypeError('m_fn should be hmf.MassFunction instance.')
-#         else: 
-#             return val
+    @parameter
+    def k_range(self, val):
+        return val
 
-#     @parameter
-#     def f_comp(self, val):
-#         return val
+    @parameter
+    def m_fn(self, val):
+        if not isinstance(val, hmf.MassFunction):
+            raise TypeError('m_fn should be hmf.MassFunction instance.')
+        else:
+            return val
 
-#     @parameter
-#     def bias(self, val):
-#         return val
-    
-#     #===========================================================================
-#     # Methods
-#     #===========================================================================    
-#     @cached_property('m_range', 'f_comp', 'm_fn')
-#     def rho_comp(self):
-#         '''
-#         Compute the average density of the component.
+    @parameter
+    def f_comp(self, val):
+        return val
 
-#             rho_comp(z) = int_m m n(m,z) f_comp(m,z)
-#         '''
-#         return Integrate(y=self.m_fn.dndlnm * self.f_comp,
-#                          x=self.m_range,
-#                          axis=0)
+    @parameter
+    def bias(self, val):
+        return val
 
-#     @cached_property('m_range', 'k_range', 'm_fn')
-#     def P_lin(self):
-#         '''
-#         Compute linear power spectrum
-#         '''
-#         return np.exp(self.m_fn.power)
-    
-#     @cached_property('P_lin', 'bias')
-#     def P_2h(self):
-#         '''
-#         Compute the 2-halo term of the power spectrum.
-#         '''
-#         return np.power(self.bias, 2) * self.P_lin
+    #===========================================================================
+    # Methods
+    #===========================================================================
+    @cached_property('m_range', 'f_comp', 'm_fn')
+    def rho_comp(self):
+        '''
+        Compute the average density of the component.
+
+            rho_comp(z) = int_m m n(m,z) f_comp(m,z)
+        '''
+        return Integrate(y=self.m_fn.dndlnm * self.f_comp,
+                         x=self.m_range,
+                         axis=0)
+
+    @cached_property('m_range', 'k_range', 'm_fn')
+    def P_lin(self):
+        '''
+        Compute linear power spectrum
+        '''
+        return np.exp(self.m_fn.power)
+
+    @cached_property('P_lin', 'bias')
+    def P_2h(self):
+        '''
+        Compute the 2-halo term of the power spectrum.
+        '''
+        return np.power(self.bias, 2) * self.P_lin
 
 
-#     @cached_property('k_range', 'P_1h')
-#     def Delta_2h(self):
-#         '''
-#         Return the dimensionless power spectrum for 2-halo term of component
-        
-#                Delta[k] = 1/(2*pi^2) * k^3 P(k)
-#         '''
-#         return 1./(2*np.pi**2) * self.k_range**3 * self.P_2h
-        
-# # ------------------------------------------------------------------------------
-# # End of DiffuseComponent()
-# # ------------------------------------------------------------------------------
+    @cached_property('k_range', 'P_1h')
+    def Delta_2h(self):
+        '''
+        Return the dimensionless power spectrum for 2-halo term of component
 
+               Delta[k] = 1/(2*pi^2) * k^3 P(k)
+        '''
+        return 1./(2*np.pi**2) * self.k_range**3 * self.P_2h
+
+# ------------------------------------------------------------------------------
+# End of DiffuseComponent()
+# ------------------------------------------------------------------------------

@@ -58,7 +58,7 @@ def load_dm():
 # ------------------------------------------------------------------------------
 
 def load_sat():
-    f_sat = stars.f_s(p.rpms.m_range_lin)
+    f_sat = stars.f_s(p.prms.m_range_lin)
     # Satellite profile
     # generalized NFW profile determined by van der Burg, Hoekstra et al. (2015)
     prof_sat = profs.profile_gNFW(prms.r_range_lin, c_x=0.64*np.ones(prms.m_bins),
@@ -87,27 +87,28 @@ def load_bcg():
     f_cen = stars.f_c(p.prms.m_range_lin)
     # BCG profile
     # Kravtsov (2014) -> r1/2 = 0.015 r200
-    # prof_bcg = profs.profile_BCG(prms.r_range_lin, prms.m_range_lin,#st.m_cen_fit,
-    #                              r_half=0.015*prms.r_range_lin[:,-1])
+    prof_bcg = profs.profile_BCG(prms.r_range_lin, prms.m_range_lin,#st.m_cen_fit,
+                                 r_half=0.015*prms.r_range_lin[:,-1])
 
     # quite arbitrary...
-    # n1_idx = (prms.m_range_lin * f_cen < 1e11)
-    # n4_idx = (prms.m_range_lin * f_cen >= 1e11)
+    n1_idx = (prms.m_range_lin * f_cen < 1e11)
+    n4_idx = (prms.m_range_lin * f_cen >= 1e11)
 
-    # prof_bcg_n1 = profs.profile_sersic(prms.r_range_lin[n1_idx],
-    #                                    prms.m_range_lin[n1_idx],
-    #                                    r_eff=0.015*prms.r_range_lin[n1_idx,-1],
-    #                                    p=1)
-    # prof_bcg_n4 = profs.profile_sersic(prms.r_range_lin[n4_idx],
-    #                                    prms.m_range_lin[n4_idx],
-    #                                    r_eff=0.015*prms.r_range_lin[n4_idx,-1],
-    #                                    p=4)
-    # prof_bcg = np.concatenate([prof_bcg_n1, prof_bcg_n4], axis=0)
+    prof_bcg_n1 = profs.profile_sersic(prms.r_range_lin[n1_idx],
+                                       prms.m_range_lin[n1_idx],
+                                       r_eff=0.015*prms.r_range_lin[n1_idx,-1],
+                                       p=1)
+    prof_bcg_n4 = profs.profile_sersic(prms.r_range_lin[n4_idx],
+                                       prms.m_range_lin[n4_idx],
+                                       r_eff=0.015*prms.r_range_lin[n4_idx,-1],
+                                       p=4)
+    prof_bcg = np.concatenate([prof_bcg_n1, prof_bcg_n4], axis=0)
 
-    prof_bcg = profs.profile_delta(p.prms.r_range_lin, p.prms.m_range_lin)
-    prof_bcg_f = profs.profile_delta_f(p.prms.k_range_lin, p.prms.m_range_lin)
+    # prof_bcg = profs.profile_delta(p.prms.r_range_lin, p.prms.m_range_lin)
+    # prof_bcg_f = profs.profile_delta_f(p.prms.k_range_lin, p.prms.m_range_lin)
     bcg_extra = {'profile': prof_bcg,
-                 'profile_f': prof_bcg_f}
+                 'profile_f' : None}
+                 # 'profile_f': prof_bcg_f}
     prof_bcg_kwargs = tools.merge_dicts(profile_kwargs, bcg_extra)
 
     print '! Check M_h-M* relation !'

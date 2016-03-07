@@ -6,7 +6,7 @@ import halo.parameters as p
 
 import pdb
 
-ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/halo/data/'
+ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/data/'
 
 def f_interp(m_range, f, m_f):
     '''
@@ -28,7 +28,7 @@ def f_interp(m_range, f, m_f):
     f_interp : (m,) array
       interpolated fractions
     '''
-    f_interp = intrp.interp1d(m_range, f, axis=0)
+    f_interp = intrp.interp1d(m_f, f, axis=0)
     mask = ((m_range < m_f[0]) & (m_range > m_f[-1]))
     f = np.zeros_like(m_range)
     f[~mask] = f_interp(m_range[~mask])
@@ -41,7 +41,7 @@ def f_interp(m_range, f, m_f):
 
 def mh_theory(m_cen):
     '''
-    Returns the mean halo mass for fixed central stellar mass m_cen, 
+    Returns the mean halo mass for fixed central stellar mass m_cen,
     using the iHOD model from Zu & Mandelbaum (2015).
 
         http://dx.doi.org/10.1093/mnras/stv2062
@@ -71,7 +71,7 @@ def mh_theory(m_cen):
 
 def mcen_theory(m_h):
     '''
-    Returns the central stellar mass m_s for the mean halo mass m_h, 
+    Returns the central stellar mass m_s for the mean halo mass m_h,
     using iHOD model from Zu & Mandelbaum (2015).
 
          http://dx.doi.org/10.1093/mnras/stv2062
@@ -99,7 +99,7 @@ def mcen_theory(m_h):
 
 def mh_fit(m_cen):
     '''
-    Returns the mean halo mass for fixed central stellar mass m_cen, using 
+    Returns the mean halo mass for fixed central stellar mass m_cen, using
     the iHOD model from Zu & Mandelbaum (2015), fitting function Eq. 59.
 
         http://dx.doi.org/10.1093/mnras/stv2062
@@ -125,7 +125,7 @@ def mh_fit(m_cen):
 
 def mcen_fit(m_h):
     '''
-    Returns the central stellar mass m_cen for the mean halo mass m_h, 
+    Returns the central stellar mass m_cen for the mean halo mass m_h,
     using the iHOD model from Zu & Mandelbaum (2015), inverse of eq. 59.
 
          http://dx.doi.org/10.1093/mnras/stv2062
@@ -155,8 +155,9 @@ def f_s(m_range):
     '''
     Satellite fraction from Zu & Mandelbaum
     '''
-    m_f, f, f_c, f_s = np.loadtxt(ddir + 'data_mccarthy/StellarFraction-Mh.txt',
-                                 unpack=True)
+    m_f, f, f_c, f_s = np.loadtxt(ddir +
+                                  'data_mccarthy/stars/StellarFraction-Mh.txt',
+                                  unpack=True)
     f_s_interp = f_interp(m_range, f_s, m_f)
 
     return f_s_interp
@@ -169,10 +170,11 @@ def f_c(m_range):
     '''
     Central fraction from Zu & Mandelbaum
     '''
-    m_f, f, f_c, f_s = np.loadtxt(ddir + 'data_mccarthy/StellarFraction-Mh.txt',
-                                 unpack=True)
+    m_f, f, f_c, f_s = np.loadtxt(ddir +
+                                  'data_mccarthy/stars/StellarFraction-Mh.txt',
+                                  unpack=True)
     f_c_interp = f_interp(m_range, f_c, m_f)
-    
+
     return f_c_interp
 
 # ------------------------------------------------------------------------------
