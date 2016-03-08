@@ -484,7 +484,7 @@ def profile_beta_plaw(r_range, m_x, r_x, beta, gamma, r_c):
     Return modified beta profile with transition depending on gamma for m_range
     along axis 0 and r_range along axis 1.
 
-        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + (r/r_c)^2)^(3 * beta) *
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + (r/r_c)^2)^(beta/2) *
                   (r/r_c)**(-gamma)
 
     rho_c is determined by the mass of the profile.
@@ -668,7 +668,7 @@ def fit_profile_beta(r_range, m_x, r_x, profile):
 # End of fit_profile_beta()
 # ------------------------------------------------------------------------------
 
-def fit_profile_beta_plaw(r_range, m_x, r_x, profile):
+def fit_profile_beta_plaw(r_range, m_x, r_x, profile, err=None):
     '''
     Fit a beta profile to profile, optimize fit for beta and r_c
 
@@ -680,6 +680,8 @@ def fit_profile_beta_plaw(r_range, m_x, r_x, profile):
       x overdensity radius
     profile : array
       data to fit
+    err : array
+      error on data
 
     Returns
     -------
@@ -705,7 +707,8 @@ def fit_profile_beta_plaw(r_range, m_x, r_x, profile):
                                profile_b_plaw(r_range, m_x, r_x,
                                                  beta, gamma, r_c),
                                r_range, profile,
-                               bounds=([0, 0, 0],[5, 5, r_x]))
+                               bounds=([0, 0, 0],[5, 5, r_x]),
+                               sigma=err)
 
     fit_prms = {'beta' : popt[0],
                 'gamma': popt[1],

@@ -168,6 +168,7 @@ def fit_beta_eckert():
     # m_range = p.prms.m_range_lin
     norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
     rho_norm = rho / norm.reshape(-1,1)
+    s_norm = s / norm.reshape(-1,1)
 
     fit_prms = []
     profiles = []
@@ -176,11 +177,13 @@ def fit_beta_eckert():
             # do not fit bump
             fit, prof = profs.fit_profile_beta_plaw(r500[3:], 1,
                                                     r500[idx_500],
-                                                    profile[3:])
+                                                    profile[3:],
+                                                    err=s_norm[idx,3:])
         else:
             fit, prof = profs.fit_profile_beta_plaw(r500, 1,
                                                     r500[idx_500],
-                                                    profile)
+                                                    profile,
+                                                    err=s_norm[idx])
         fit_prms.append(fit)
         profiles.append(prof)
 

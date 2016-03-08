@@ -1,10 +1,10 @@
 # Code taken from sersic python module
 # https://pypi.python.org/pypi/sersic
 ##############################
-# Exact deprojections of Sersic surface brightness profiles following 
+# Exact deprojections of Sersic surface brightness profiles following
 # Baes and Gentile, Astronomy and Astrophysics, Volume 525:A136 (2011)
 # http://arxiv.org/abs/1009.4713
-# 
+#
 # Very likely the only function any user will care about is:
 #
 # def luminosity(pp, qq, reff=1.0, lum=1.0) where pp and qq are the
@@ -12,14 +12,14 @@
 # that nn=pp/qq, reff is the projected half-light radius, and
 # luminosity is the total luminosity.  This returns a function that
 # takes a radius and returns a luminosity density.
-# 
+#
 # >>> lum = luminosity(5,3)
 # >>> lum(1.1)
 # >>> lum([1.1, 2.2, 3.3])
-# 
+#
 # All of the other functions in the module are just to help make sure
 # that the Baes + Gentile expressions are implemented correctly.
-# 
+#
 # If you find that the calculations are taking a long time, you can
 # try reducing the precision of the calculation of the Meijer G
 # function.  The mpmath library is designed to be able to work to
@@ -107,7 +107,7 @@ def all_rationals(qmax, rmin=None, rmax=None, sort=False):
     if rmin is None and rmax is None: rmin, rmax = 0, 1
     elif rmax is None: rmin, rmax = 0, rmin
     elif rmin is None: raise SyntaxError
-    
+
     result = [ [(pp,qq) for pp in range(1,int(rmax*qq+1))
                 if euclid_gcf(pp,qq) == 1 and pp/(1.0*qq) >= rmin \
                 and pp/(1.0*qq) <= rmax]
@@ -124,7 +124,7 @@ def all_rationals(qmax, rmin=None, rmax=None, sort=False):
 
 def lum_int_2d(ir, rpi, rpo):
     # Tested 2011-08-30
-    "Total projected lum between rpi and rpo"    
+    "Total projected lum between rpi and rpo"
     return scipy.integrate.quad(lambda x: 2*np.pi*x*ir(x), rpi, rpo)[0]
 
 def lum_int_3d(lr, ri, ro):
@@ -150,7 +150,7 @@ def half_light_3d(lr, ro=reff_max):
     ltot = lum_int_3d(lr, 0.0, ro)
     return scipy.optimize.bisect(lambda xx: lum_int_3d(lr, 0.0, xx)-0.5*ltot,
                                  0.01, 100.0)
-    
+
 ##############################
 ## Baes + Gentile (arxiv:1009.4713) parameterization.
 ##############################
@@ -164,7 +164,7 @@ def bg_constants_from_bm(nn, ro=reff_max):
     # Tested 2011-08-30 through bg
     """Find Baes + Gentile constants by first finding B+M constants numerically"""
     bn = bm_bn(nn, ro=ro)
-    ie = bm_ie(nn, bn, ro=ro)    
+    ie = bm_ie(nn, bn, ro=ro)
     reff = 1.0
     i0 = ie*10**bn
     bb = np.log(10)*bn
@@ -180,7 +180,7 @@ def bg_bb_estimate(pp,qq=None):
     est = np.exp(-1/(2.7*nn))
     est = np.where(nn < 0.7, est, est + 2*nn-0.33-1)
     return est
-    
+
 def bg_constants(pp, qq):
     # Tested 2011-08-31
     """Find Baes + Gentile constants directly from their expressions"""
@@ -193,14 +193,14 @@ def bg_constants(pp, qq):
 
     # find bb
     reff=1.0
-    def ff(xx): return (lum_int_2d(lambda rp: bg(rp, nn, i0i, xx), 0.0, reff) - 
+    def ff(xx): return (lum_int_2d(lambda rp: bg(rp, nn, i0i, xx), 0.0, reff) -
                         0.5*bg_lum_tot(pp,qq,i0i,xx))
     bb = scipy.optimize.newton(ff, bbi)
 
     # find i0
     i0 = i0i/bg_lum_tot(pp,qq,i0i,bb)
     return i0,bb
-                                                  
+
 def bg_3d_lum_int_func(pp,qq):
     """Return a function that gives deprojected sersic profile"""
     i0,bb = bg_constants(pp, qq)
@@ -220,8 +220,8 @@ def bg_3d_lum_int(rr,pp,qq,i0,bb):
     ss = rr/reff
     avect = [[1-1.0/qq], [xx/(1.0*qq) for xx in range(1,qq)]]
     bvect = [[xx/(2.0*pp) for xx in range(1,2*pp)] +
-             [xx/(2.0*qq) for xx in range(1,2*qq,2)], [-1.0/qq]]    
-    factor = 2*i0*reff**2*np.sqrt(pp)/((2*np.pi)**(pp-1)*np.sqrt(qq))    
+             [xx/(2.0*qq) for xx in range(1,2*qq,2)], [-1.0/qq]]
+    factor = 2*i0*reff**2*np.sqrt(pp)/((2*np.pi)**(pp-1)*np.sqrt(qq))
     zz = (bb/(2*pp))**(2*pp) * ss**(2*qq)
     return factor*ss**2*mpmath.meijerg(avect, bvect, zz)
 
@@ -241,11 +241,11 @@ def bg_lum_hi(pp, qq):
     if not (pp==int(pp) and qq==int(qq)): raise RuntimeError
     if not (qq == 1 or qq == 2): raise RuntimeError
 
-    pp, qq = int(pp), int(qq)    
+    pp, qq = int(pp), int(qq)
     mm = (1.0*pp)/qq
     i0, bb = bg_constants(pp, qq)
 
-    # a and b vectors are specified: [[num1, num2, num3],[denom1,denom2,denom3]]    
+    # a and b vectors are specified: [[num1, num2, num3],[denom1,denom2,denom3]]
     avect = [[], []]
     nums = range(1,2*pp/qq)
     bvect = [[xx/(2.0*mm) for xx in nums] + [0.5], []]
@@ -274,9 +274,9 @@ def luminosity(pp, qq):
     described by Baes + Gentile arxiv:1009.4713.
 
     pp and qq are the numerator and denominator of the Sersic index
-      (both integers) so that n=pp/qq, 
+      (both integers) so that n=pp/qq,
     reff is the projected half-light radius
-    lum is the total luminosity.  
+    lum is the total luminosity.
 
     This returns a function that takes a radius and returns a
     luminosity density.
@@ -294,20 +294,19 @@ def luminosity(pp, qq):
     i0, bb = bg_constants(pp, qq)
 
     # Solution gets slow for larger p,q, so make sure that fraction is reduced
-    the_gcf = euclid_gcf(pp,qq)    
-    if the_gcf != 1: return luminosity(pp/the_gcf, qq/the_gcf)        
+    the_gcf = euclid_gcf(pp,qq)
+    if the_gcf != 1: return luminosity(pp/the_gcf, qq/the_gcf)
 
-    # a and b vectors are specified: [[num1, num2, num3],[denom1,denom2,denom3]]    
+    # a and b vectors are specified: [[num1, num2, num3],[denom1,denom2,denom3]]
     avect = [[], [xx/(1.0*qq) for xx in range(1,qq)]]
     bvect = [[xx/(2.0*pp) for xx in range(1,2*pp)] +
              [xx/(2.0*qq) for xx in range(1,2*qq,2)], []]
     factor = 2*i0*np.sqrt(pp*qq)/(reff*(2*np.pi)**pp)
 
-
     def lumi_multi(procn, rr, out_q):
         ss = rr/reff
         zz = (bb/(2*pp))**(2*pp) * ss**(2*qq)
-        result = np.ones_like(rr)
+        result = np.zeros_like(rr)
 
         for idx, s in enumerate(ss):
             result[idx] = float(lum*((factor/s)*mpmath.meijerg(avect,

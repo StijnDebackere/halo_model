@@ -28,6 +28,7 @@ def load_dm():
     c_x = profs.c_correa(prms.m_range_lin, z_range=0.)
     r_x = prms.r_h
 
+    # Fit NFW profile with c(z,M) relation from Correa et al (2015c)
     f_dm = 1 - prms.omegab/prms.omegam * np.ones_like(prms.m_range_lin)
     # DM profile
     # specific dm extra kwargs
@@ -85,15 +86,18 @@ def load_sat():
 
 def load_bcg():
     f_cen = stars.f_c(p.prms.m_range_lin)
-    # BCG profile
-    # Kravtsov (2014) -> r1/2 = 0.015 r200
-    prof_bcg = profs.profile_BCG(prms.r_range_lin, prms.m_range_lin,#st.m_cen_fit,
-                                 r_half=0.015*prms.r_range_lin[:,-1])
+
+    # # BCG profile
+    # # Kravtsov (2014) -> r1/2 = 0.015 r200
+    # prof_bcg = profs.profile_BCG(prms.r_range_lin, prms.m_range_lin,#st.m_cen_fit,
+    #                              r_half=0.015*prms.r_range_lin[:,-1])
 
     # quite arbitrary...
     n1_idx = (prms.m_range_lin * f_cen < 1e11)
     n4_idx = (prms.m_range_lin * f_cen >= 1e11)
 
+    # Fit sersic profile with n=1 for M<1e11 and n=4 for M>=1e11
+    # Kravtsov (2014) -> r1/2 = 0.015 r200
     prof_bcg_n1 = profs.profile_sersic(prms.r_range_lin[n1_idx],
                                        prms.m_range_lin[n1_idx],
                                        r_eff=0.015*prms.r_range_lin[n1_idx,-1],
@@ -156,7 +160,7 @@ def load_gas():
 
     c_x = profs.c_correa(p.prms.m_range_lin, z_range=0)
     M500 = tools.Mx_to_My(p.prms.m_range_lin, 500, 200, c_x)
-    f_gas = f_gas(M500, **fit_prms)
+    f_gas = gas.f_gas(M500, **fit_prms)
 
     prof_gas = profs.profile_beta_plaw(prms.r_range_lin,
                                        prms.m_range_lin,
