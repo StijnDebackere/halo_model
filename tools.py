@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import scipy.integrate
 import scipy.optimize as opt
 
+import halo.parameters as p
+
 import pdb
 
 def merge_dicts(*dict_args):
@@ -263,55 +265,55 @@ def extrapolate_plaw(x_range, func, verbose=False):
 # End of extrapolate_plaw()
 # ------------------------------------------------------------------------------
 
-def mean_density_NFW(r, c_x):
+def mean_density_NFW(r, c_x, rho_mean=p.prms.rho_m):
     '''
     Return mean density inside r for halo with concentration c_x
 
     Parameters
     ----------
-    r : array
-      radius in units of r_x
-    c_x : array
+    r : float
+      radius in units of r_200
+    c_x : float
       concentration of halo
 
     Returns
     -------
-    
+    rho : float
+      mean enclosed density at radius r
     '''
-    rho = 3./r**3 * 
+    rho_s = 200./3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    rho = 3./r**3 * rho_s * (np.log(1+c_x*r) - c_x*r/(1+c_x*r))/c_x**3
 
-def rx_to_r200(r_x, x):
+    return rho
+
+def rx_to_r200(x, c_x, rho_mean=p.prms.rho_m):
     '''
     Returns the radius at overdensity x in units of r_200.
 
     Parameters
     ----------
-    r_x : array
-      radius in units of r_x
     x : float
       overdensity with respect to mean
+    c_x : array
+      concentration of halo
 
     Returns
     -------
-    r200 : array
+    rx_200 : array
       r_x in units of r_200
 
     Examples
     --------
     Conversion factor gives 1 r_500 in units of r_200, multiplying by r_200
     gives the r_500 for the haloes with r_200
-    >>> r_500 = r_200 * rx_to_ry(1., 500)
+    >>> r_500 = r_200 * rx_to_ry(1., 500, c_x)
     '''
-    # -> not mean density, but actual density at r_x
-    # x /= 100.
-    # # analytic solution from scaling radius of NFW profile to overdensity
-    # factor = (x**3 + 108 * x**2 + 6*np.sqrt(6 * (x**5+ 54 * x**4)))**(1/3.) / x
-    # r2r200 = 1/3. * (factor + 1./factor) - 2/3.
-    delta = x/200.
+    def dens_diff(r, x, c):
+        return mean_density_NFW(r, c, rho_mean) - x * rho_mean
 
-    
+    rx_200 = np.array([opt.brentq(dens_diff, 1e-6, 10, args=(x, c)) for c in c_x])
 
-    return r_x * r2r200
+    return rx_200
 
 # ------------------------------------------------------------------------------
 # End of rx_to_r200()
@@ -344,8 +346,8 @@ def Mx_to_My(M_x, x, y, c_200):
     gives the m_500 for the haloes with m_200
     >>> m_500 = m_200 * Mx_to_My(1., 500, 200, c_x)
     '''
-    r_x = rx_to_r200(1., x)
-    r_y = rx_to_r200(1., y)
+    r_x = rx_to_r200(x, c_200)
+    r_y = rx_to_r200(y, c_200)
     c_x = r_x * c_200
     c_y = r_y * c_200
 
