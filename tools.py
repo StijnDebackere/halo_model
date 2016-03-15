@@ -263,6 +263,23 @@ def extrapolate_plaw(x_range, func, verbose=False):
 # End of extrapolate_plaw()
 # ------------------------------------------------------------------------------
 
+def mean_density_NFW(r, c_x):
+    '''
+    Return mean density inside r for halo with concentration c_x
+
+    Parameters
+    ----------
+    r : array
+      radius in units of r_x
+    c_x : array
+      concentration of halo
+
+    Returns
+    -------
+    
+    '''
+    rho = 3./r**3 * 
+
 def rx_to_r200(r_x, x):
     '''
     Returns the radius at overdensity x in units of r_200.
@@ -285,10 +302,14 @@ def rx_to_r200(r_x, x):
     gives the r_500 for the haloes with r_200
     >>> r_500 = r_200 * rx_to_ry(1., 500)
     '''
-    x /= 100.
-    # analytic solution from scaling radius of NFW profile to overdensity
-    factor = (x**3 + 108 * x**2 + 6*np.sqrt(6 * (x**5+ 54 * x**4)))**(1/3.) / x
-    r2r200 = 1/3. * (factor + 1./factor) - 2/3.
+    # -> not mean density, but actual density at r_x
+    # x /= 100.
+    # # analytic solution from scaling radius of NFW profile to overdensity
+    # factor = (x**3 + 108 * x**2 + 6*np.sqrt(6 * (x**5+ 54 * x**4)))**(1/3.) / x
+    # r2r200 = 1/3. * (factor + 1./factor) - 2/3.
+    delta = x/200.
+
+    
 
     return r_x * r2r200
 

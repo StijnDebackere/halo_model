@@ -137,6 +137,7 @@ def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 # ------------------------------------------------------------------------------
 # End of profile_NFW()
 # ------------------------------------------------------------------------------
+
 def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     '''
     Returns the analytic Fourier transform of the NFW profile for m_range along
@@ -210,6 +211,7 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 # ------------------------------------------------------------------------------
 # End of profile_NFW_f()
 # ------------------------------------------------------------------------------
+
 def profile_Schaller(r_range, r_s, d_s, r_i, d_i, rho_crit):
     '''
     Generalized matter profile defined by Schaller et al (2014). Outer profile
@@ -256,6 +258,7 @@ def profile_Schaller(r_range, r_s, d_s, r_i, d_i, rho_crit):
 # ------------------------------------------------------------------------------
 # End of profile_Schaller()
 # ------------------------------------------------------------------------------
+
 def profile_gNFW(r_range, c_x, alpha, r_x, m_s):
     '''
     Returns a gNFW profile for m_range along axis 0 and r_range along
@@ -662,7 +665,7 @@ def fit_profile_beta(r_range, m_x, r_x, profile):
                 'r_c' : popt[1]}
     fit = profile_b(r_range, m_x, r_x, **fit_prms)
 
-    return fit_prms, fit
+    return fit_prms, pcov, fit
 
 # ------------------------------------------------------------------------------
 # End of fit_profile_beta()
@@ -713,9 +716,10 @@ def fit_profile_beta_plaw(r_range, m_x, r_x, profile, err=None):
     fit_prms = {'beta' : popt[0],
                 'gamma': popt[1],
                 'r_c'  : popt[2]}
+
     fit = profile_b_plaw(r_range, m_x, r_x, **fit_prms)
 
-    return fit_prms, fit
+    return fit_prms, pcov, fit
 
 # ------------------------------------------------------------------------------
 # End of fit_profile_beta_plaw()
@@ -765,7 +769,7 @@ def fit_profile_beta_gamma(r_range, m_x, r_x, profile):
                 'r_c'  : popt[2]}
     fit = profile_b_gamma(r_range, m_x, r_x, **fit_prms)
 
-    return fit_prms, fit
+    return fit_prms, pcov, fit
 
 # ------------------------------------------------------------------------------
 # End of fit_profile_beta_gamma()

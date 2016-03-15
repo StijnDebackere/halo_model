@@ -163,34 +163,65 @@ def find_mass_eckert():
 def fit_beta_eckert():
     r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
     idx_500 = np.argmin(np.abs(r500 - 1))
-    # r200 = r500 * tools.rx_to_r200(1., 500)
-    # m_bins = 0.5* (mwl_edges[1:] + mwl_edges[:-1])
-    # m_range = p.prms.m_range_lin
     norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
     rho_norm = rho / norm.reshape(-1,1)
     s_norm = s / norm.reshape(-1,1)
 
     fit_prms = []
+    covs     = []
     profiles = []
     for idx, profile in enumerate(rho_norm):
         if idx == 0:
             # do not fit bump
-            fit, prof = profs.fit_profile_beta_plaw(r500[3:], 1,
+            fit, cov, prof = profs.fit_profile_beta_plaw(r500[3:], 1,
                                                     r500[idx_500],
                                                     profile[3:],
                                                     err=s_norm[idx,3:])
         else:
-            fit, prof = profs.fit_profile_beta_plaw(r500, 1,
+            fit, cov, prof = profs.fit_profile_beta_plaw(r500, 1,
                                                     r500[idx_500],
                                                     profile,
                                                     err=s_norm[idx])
         fit_prms.append(fit)
+        covs.append(cov)
         profiles.append(prof)
 
-    return fit_prms, profiles
+    return fit_prms, covs, profiles
 
 # ------------------------------------------------------------------------------
 # End of fit_beta_eckert()
+# ------------------------------------------------------------------------------
+
+def fit_beta_bahamas():
+    r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
+    idx_500 = np.argmin(np.abs(r500 - 1))
+    norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
+    rho_norm = rho / norm.reshape(-1,1)
+    s_norm = s / norm.reshape(-1,1)
+
+    fit_prms = []
+    covs     = []
+    profiles = []
+    for idx, profile in enumerate(rho_norm):
+        if idx == 0:
+            # do not fit bump
+            fit, cov, prof = profs.fit_profile_beta_plaw(r500[3:], 1,
+                                                    r500[idx_500],
+                                                    profile[3:],
+                                                    err=s_norm[idx,3:])
+        else:
+            fit, cov, prof = profs.fit_profile_beta_plaw(r500, 1,
+                                                    r500[idx_500],
+                                                    profile,
+                                                    err=s_norm[idx])
+        fit_prms.append(fit)
+        covs.append(cov)
+        profiles.append(prof)
+
+    return fit_prms, covs, profiles
+
+# ------------------------------------------------------------------------------
+# End of fit_beta_bahamas()
 # ------------------------------------------------------------------------------
 
 def f_gas(M_halo, M_trans, a):
@@ -233,11 +264,11 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
                                                    statistic=np.std,
                                                    bins=n_bins)
     m500 = np.power(10, m500)
-    c_x = profs.c_correa(m_range, z_range=0).reshape(-1)
-    m500_model = m_range * tools.Mx_to_My(1., 500, 200, c_x)
+    # c_x = profs.c_correa(m_range, z_range=0).reshape(-1)
+    # m500_model = m_range * tools.Mx_to_My(1., 500, 200, c_x)
 
-    m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
-                      axis=-1)
+    # m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
+    #                   axis=-1)
 
     centers = np.power(10, 0.5*(edges[1:] + edges[:-1]))
     popt, pcov = opt.curve_fit(f_gas, centers, f_med, sigma=f_std,
