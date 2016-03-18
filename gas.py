@@ -95,7 +95,10 @@ def rhogas_eckert():
     rho = (np.vstack([rho1, rho2, rho3, rho4]) * cgs2cos).value
     s = (np.vstack([s1, s2, s3, s4]) * cgs2cos).value
 
-    return r, rho, s, mwl_bins, mgas_bins
+    mwl = 0.5 * (mwl_bins[1:] + mwl_bins[:-1])
+    mgas = 0.5 * (mgas_bins[1:] + mgas_bins[:-1])
+
+    return r, rho, s, mwl, mgas
 
 # ------------------------------------------------------------------------------
 # End of rhogas_eckert()
@@ -133,35 +136,39 @@ def rhogas_croston():
 # End of rhogas_croston()
 # ------------------------------------------------------------------------------
 
-def find_mass_eckert():
-    r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
-    mwl = 0.5*(mwl_edges[1:] + mwl_edges[:-1])
-    mgas = 0.5*(mgas_edges[1:] + mgas_edges[:-1])
+def m200_eckert():
+    def M2Mgas(M200, Mobs, r):
+        c_x = profs.c_correa(M200, z_range=0).reshape(-1)
+        M500 = tools.Mx_to_My(M200, 500, 200, c_x, p.prms.rho_m * 0.7**2)
+        M_gas = f_gas(M500, **fit_prms) * M500
+
+        diff = M_gas/Mobs - r**3
+        return diff
+
+    r500, rho, s, mwl, mgas = rhogas_eckert()
+    fit_prms = f_gas_fit()
 
     idx_500 = np.argmin(np.abs(r500 - 1))
 
     # get observed mass in profile
     M_obs = tools.m_h(rho[:,:idx_500], r500[:idx_500].reshape(1,-1), axis=-1)
-    r = (mgas / M_obs)**(1./3) # difference is r_delta^3 from integration
+    r_delta = (mgas/M_obs)**(1./3) # difference is r_delta^3 from integration
 
-    # find matching halo in model
-    c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
-    M500 = p.prms.m_range_lin * tools.Mx_to_My(1., 500, 200, c_x)
-    M_gas = Mgas_M500_lovisari(M500)
+    m200 = []
+    for m_obs, r in zip(M_obs, r_delta):
+        print M2Mgas(m_obs*r**3,m_obs,r)
+        print M2Mgas(50*m_obs*r**3,m_obs,r)
+        m200.append(opt.brentq(M2Mgas, m_obs*r**3, 50*m_obs*r**3,
+                               args=(m_obs, r)))
 
-    diff = M_gas.reshape(-1,1) / M_obs.reshape(1,-1) - (r**3).reshape(1,-1)
-
-    # find closest theoretical mass
-    m_idx = np.argmin(np.abs(diff), axis=0)
-
-    return m_idx
+    return np.array(m200)
 
 # ------------------------------------------------------------------------------
-# End of find_mass_eckert()
+# End of m200_eckert()
 # ------------------------------------------------------------------------------
 
 def fit_beta_eckert():
-    r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
+    r500, rho, s, mwl, mgas = rhogas_eckert()
     idx_500 = np.argmin(np.abs(r500 - 1))
     norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
     rho_norm = rho / norm.reshape(-1,1)
@@ -193,7 +200,7 @@ def fit_beta_eckert():
 # ------------------------------------------------------------------------------
 
 def fit_beta_bahamas():
-    r500, rho, s, mwl_edges, mgas_edges = rhogas_eckert()
+    r500, rho, s, mwl, mgas = rhogas_eckert()
     idx_500 = np.argmin(np.abs(r500 - 1))
     norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
     rho_norm = rho / norm.reshape(-1,1)
@@ -253,6 +260,9 @@ def f_gas(M_halo, M_trans, a):
 # ------------------------------------------------------------------------------
 
 def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
+    '''
+    Fit the f_gas-M_500 relation
+    '''
     m500, f = np.loadtxt(ddir + 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                          unpack=True)
     f_b = p.prms.omegab / p.prms.omegam
@@ -265,7 +275,7 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
                                                    bins=n_bins)
     m500 = np.power(10, m500)
     # c_x = profs.c_correa(m_range, z_range=0).reshape(-1)
-    # m500_model = m_range * tools.Mx_to_My(1., 500, 200, c_x)
+    # m500_model = m_range * tools.Mx_to_My(1., 500, 200, c_x, p.prms.rho_m * 0.7**2)
 
     # m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
     #                   axis=-1)
@@ -289,7 +299,7 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
     # plt.legend(loc='best')
     # plt.show()
 
-    return fit_prms, fit, m_idx
+    return fit_prms
 
 # ------------------------------------------------------------------------------
 # End of f_gas_fit()

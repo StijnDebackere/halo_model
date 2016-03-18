@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import scipy.integrate
 import scipy.optimize as opt
 
-import halo.parameters as p
-
 import pdb
 
 def merge_dicts(*dict_args):
@@ -41,6 +39,42 @@ def Integrate(y, x, axis=-1): # Simpson integration on fixed spaced data!
 
 # ------------------------------------------------------------------------------
 # End of Integrate()
+# ------------------------------------------------------------------------------
+
+def median_slices(data, medians):
+    '''
+    Return slices for data such that the median of each slice returns medians
+
+    Parameters
+    ----------
+    data : (n,) array
+      array to slice
+    medians : (m,) array
+      medians to match
+
+    Returns
+    -------
+    slices : (m,2) array
+      array containing slices for each median
+    '''
+    data_sorted = np.sort(data, axis=0)
+
+    # index of matching elements
+    idx_med = np.argmin(np.abs(data_sorted.reshape(-1,1) - medians.reshape(1,-1)),
+                        axis=0)
+    shapes = np.array([0, data_sorted.shape[0]])
+
+    min_dist = np.min(np.abs(idx_med.reshape(-1,1) - shapes.reshape(1,-1)),
+                      axis=1)
+
+    slices = np.concatenate([(idx_med - min_dist).reshape(-1,1),
+                             (idx_med + min_dist).reshape(-1,1)],
+                            axis=1)
+
+    return slices
+
+# ------------------------------------------------------------------------------
+# End of median_slices()
 # ------------------------------------------------------------------------------
 
 def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
@@ -265,7 +299,7 @@ def extrapolate_plaw(x_range, func, verbose=False):
 # End of extrapolate_plaw()
 # ------------------------------------------------------------------------------
 
-def mean_density_NFW(r, c_x, rho_mean=p.prms.rho_m):
+def mean_density_NFW(r, c_x, rho_mean):
     '''
     Return mean density inside r for halo with concentration c_x
 
@@ -286,9 +320,9 @@ def mean_density_NFW(r, c_x, rho_mean=p.prms.rho_m):
 
     return rho
 
-def rx_to_r200(x, c_x, rho_mean=p.prms.rho_m):
+def rx_to_r200(x, c_x, rho_mean):
     '''
-    Returns the radius at overdensity x in units of r_200.
+    Returns the radius at mean overdensity x in units of r_200.
 
     Parameters
     ----------
@@ -311,6 +345,7 @@ def rx_to_r200(x, c_x, rho_mean=p.prms.rho_m):
     def dens_diff(r, x, c):
         return mean_density_NFW(r, c, rho_mean) - x * rho_mean
 
+    c_x = np.array(c_x)
     rx_200 = np.array([opt.brentq(dens_diff, 1e-6, 10, args=(x, c)) for c in c_x])
 
     return rx_200
@@ -319,7 +354,7 @@ def rx_to_r200(x, c_x, rho_mean=p.prms.rho_m):
 # End of rx_to_r200()
 # ------------------------------------------------------------------------------
 
-def Mx_to_My(M_x, x, y, c_200):
+def Mx_to_My(M_x, x, y, c_200, rho_mean):
     '''
     Returns M_x, the enclosed halo mass at x overdensity, in units of M_y for a
     halo with concentration c_200.
@@ -334,6 +369,8 @@ def Mx_to_My(M_x, x, y, c_200):
       overdensity with respect to mean
     c_200 : float
       concentration of halo
+    rho_mean : float
+      mean matter density of the universe
 
     Returns
     -------
@@ -344,10 +381,10 @@ def Mx_to_My(M_x, x, y, c_200):
     --------
     Conversion factor gives 1 M_500 in units of M_200, multiplying by m_200
     gives the m_500 for the haloes with m_200
-    >>> m_500 = m_200 * Mx_to_My(1., 500, 200, c_x)
+    >>> m_500 = Mx_to_My(m_200, 500, 200, c_x, p.prms.rho_m)
     '''
-    r_x = rx_to_r200(x, c_200)
-    r_y = rx_to_r200(y, c_200)
+    r_x = rx_to_r200(x, c_200, rho_mean)
+    r_y = rx_to_r200(y, c_200, rho_mean)
     c_x = r_x * c_200
     c_y = r_y * c_200
 
