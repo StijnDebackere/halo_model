@@ -320,6 +320,10 @@ def mean_density_NFW(r, c_x, rho_mean):
 
     return rho
 
+# ------------------------------------------------------------------------------
+# End of mean_density_NFW()
+# ------------------------------------------------------------------------------
+
 def rx_to_r200(x, c_x, rho_mean):
     '''
     Returns the radius at mean overdensity x in units of r_200.
@@ -342,11 +346,14 @@ def rx_to_r200(x, c_x, rho_mean):
     gives the r_500 for the haloes with r_200
     >>> r_500 = r_200 * rx_to_ry(1., 500, c_x)
     '''
-    def dens_diff(r, x, c):
+    def dens_diff(r, x, c, rho_mean):
         return mean_density_NFW(r, c, rho_mean) - x * rho_mean
 
-    c_x = np.array(c_x)
-    rx_200 = np.array([opt.brentq(dens_diff, 1e-6, 10, args=(x, c)) for c in c_x])
+    try:
+        rx_200 = np.array([opt.brentq(dens_diff, 1e-6, 10, args=(x, c, rho_mean))
+                           for c in c_x])
+    except TypeError:
+        rx_200 = opt.brentq(dens_diff, 1e-6, 10, args=(x, c_x, rho_mean))
 
     return rx_200
 
@@ -379,20 +386,134 @@ def Mx_to_My(M_x, x, y, c_200, rho_mean):
 
     Examples
     --------
-    Conversion factor gives 1 M_500 in units of M_200, multiplying by m_200
-    gives the m_500 for the haloes with m_200
-    >>> m_500 = Mx_to_My(m_200, 500, 200, c_x, p.prms.rho_m)
+    Returns the mass m_200 in units of m_500
+    >>> m200_500 = Mx_to_My(m_200, 200, 500, c_x, p.prms.rho_m)
     '''
-    r_x = rx_to_r200(x, c_200, rho_mean)
     r_y = rx_to_r200(y, c_200, rho_mean)
-    c_x = r_x * c_200
+    r_x = rx_to_r200(x, c_200, rho_mean)
     c_y = r_y * c_200
+    c_x = r_x * c_200
 
-    M_xy = M_x * (np.log(1 + c_x) - c_x / (1 + c_x)) / \
+    M_xy = M_x *  (np.log(1 + c_x) - c_x / (1 + c_x))/ \
            (np.log(1 + c_y) - c_y / (1 + c_y))
 
     return M_xy
 
 # ------------------------------------------------------------------------------
 # End of Mx_to_My()
+# ------------------------------------------------------------------------------
+
+def M_to_c200(M_x, M_y, x, y, rho_mean):
+    '''
+    Given 2 different overdensity masses, determine the concentration of the halo
+
+    Parameters
+    ----------
+    M_x : array
+      masses at overdensity x
+    M_y : array
+      masses at overdensity y
+    x : array
+      overdensities x
+    y : array
+      overdensities y
+    rho_mean : float
+      mean matter density of the universe
+
+    Returns
+    -------
+    c_200 : array
+      concentrations of haloes
+    '''
+    def ratio(c_200, r):
+        r_y = rx_to_r200(y, c_200, rho_mean)
+        r_x = rx_to_r200(x, c_200, rho_mean)
+        c_y = r_y * c_200
+        c_x = r_x * c_200
+
+        ratio = ((np.log(1 + c_x) - c_x / (1 + c_x))/
+                (np.log(1 + c_y) - c_y / (1 + c_y)))
+
+        return ratio - r
+
+    # we have only limited range of values due to c_min & c_max
+    max_cut = Mx_to_My(1., x, y, 0.1, rho_mean)
+    min_cut = Mx_to_My(1., x, y, 100, rho_mean)
+
+    quotient = M_x / M_y
+    in_range = ((quotient <= max_cut) & (quotient >= min_cut))
+
+    try:
+        c_200 = np.array([opt.brentq(ratio, 0.1, 100, args=(r)) if in_range[idx]
+                          else -1 for idx, r in enumerate(quotient)])
+    except TypeError:
+        if in_range:
+            c_200 = opt.brentq(ratio, 0.1, 100, args=(quotient))
+        else:
+            c_200 = -1.
+
+    return c_200
+
+# ------------------------------------------------------------------------------
+# End of M_to_c200()
+# ------------------------------------------------------------------------------
+
+def r_delta(m_delta, delta, rho_mean):
+    '''
+    Return radius at overdensity delta for m_delta halo
+
+    Parameters
+    ----------
+    m_delta : array
+      halo mass
+    delta : float
+      overdensity
+    rho_mean : float
+      density wrt which m_delta is defined
+
+    Returns
+    -------
+    r_delta : array
+      radius at delta for m_delta
+    '''
+    r_delta = (3 * m_delta / (4 * np.pi * delta * rho_mean))**(1./3)
+    return r_delta
+
+# ------------------------------------------------------------------------------
+# End of r_delta()
+# ------------------------------------------------------------------------------
+
+def m_delta(r_delta, delta, rho_mean):
+    '''
+    Return mass at overdensity delta for r_delta
+
+    Parameters
+    ----------
+    r_delta : array
+      radius at delta
+    delta : float
+      overdensity
+    rho_mean : float
+      density wrt which m_delta is defined
+
+    Returns
+    -------
+    m_delta : array
+      mass at delta for r_delta
+    '''
+    m_delta = 4 * np.pi/3 * delta * rho_mean * r_delta**3
+    return m_delta
+
+# ------------------------------------------------------------------------------
+# End of m_delta()
+# ------------------------------------------------------------------------------
+
+def bins2center(bins):
+    '''
+    Return the center position of bins, with bins along axis -1.
+    '''
+    return 0.5 * (bins[...,1:] + bins[...,:-1])
+
+# ------------------------------------------------------------------------------
+# End of bins2center()
 # ------------------------------------------------------------------------------

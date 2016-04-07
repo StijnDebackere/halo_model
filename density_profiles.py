@@ -21,7 +21,7 @@ import halo.model.density as dens
 
 import pdb
 
-def c_correa(m_range,z_range,cosmology='WMAP7'):
+def c_correa(m_range,z_range,cosmology='WMAP9'):
     '''
     Returns the mass-concentration relation from Correa et al (2015c)
     through the commah code.
@@ -460,7 +460,7 @@ def profile_beta_gamma(r_range, m_x, r_x, beta, gamma, r_c):
     profile : (m,r) array
       array containing beta profile
     '''
-    m = m_range.shape[0]
+    m = m_x.shape[0]
     r = r_range.shape[-1]
 
     r_c = r_c.reshape(1,m)
@@ -514,7 +514,7 @@ def profile_beta_plaw(r_range, m_x, r_x, beta, gamma, r_c):
     profile : (m,r) array
       array containing beta profile
     '''
-    m = m_range.shape[0]
+    m = m_x.shape[0]
     r = r_range.shape[-1]
 
     r_c = r_c.reshape(1,m)
@@ -670,6 +670,18 @@ def fit_profile_beta(r_range, m_x, r_x, profile):
 # ------------------------------------------------------------------------------
 # End of fit_profile_beta()
 # ------------------------------------------------------------------------------
+def profile_b_plaw(r_range, m_x, r_x, beta, gamma, r_c):
+    # modify shapes such that we can input floats or arrays
+    c = np.array(np.array(r_c).shape)
+    r_c = r_c.reshape(list(c) + [1])
+
+    profile = (1 + (r_range/r_c)**2)**(-beta/2) * (r_range/r_c)**(-gamma)
+
+    x_idx = np.argmin(np.abs(r_range - r_x))
+    norm =  m_x / tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
+    profile *= norm
+
+    return profile
 
 def fit_profile_beta_plaw(r_range, m_x, r_x, profile, err=None):
     '''
@@ -693,19 +705,6 @@ def fit_profile_beta_plaw(r_range, m_x, r_x, profile, err=None):
     fit : array
       beta function fit to profile
     '''
-    def profile_b_plaw(r_range, m_x, r_x, beta, gamma, r_c):
-        # modify shapes such that we can input floats or arrays
-        c = np.array(np.array(r_c).shape)
-        r_c = r_c.reshape(list(c) + [1])
-
-        profile = (1 + (r_range/r_c)**2)**(-beta/2) * (r_range/r_c)**(-gamma)
-
-        x_idx = np.argmin(np.abs(r_range - r_x))
-        norm =  m_x / tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
-        profile *= norm
-
-        return profile
-
     popt, pcov = opt.curve_fit(lambda r_range, beta, gamma, r_c: \
                                profile_b_plaw(r_range, m_x, r_x,
                                                  beta, gamma, r_c),

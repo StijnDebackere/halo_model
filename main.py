@@ -157,7 +157,7 @@ def load_icl():
 
 def load_gas():
     c_x = profs.c_correa(p.prms.m_range_lin, z_range=0)
-    M500 = tools.Mx_to_My(p.prms.m_range_lin, 500, 200, c_x, prms.rho_m)
+    M500 = tools.Mx_to_My(p.prms.m_range_lin, 200, 500, c_x, prms.rho_m)
     f_gas = gas.f_gas(M500, **gas.f_gas_fit())
 
     prof_gas = profs.profile_beta_plaw(prms.r_range_lin,

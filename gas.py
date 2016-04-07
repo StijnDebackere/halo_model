@@ -3,8 +3,13 @@ import astropy.constants as const
 import astropy.units as u
 import scipy.optimize as opt
 import scipy.stats as stats
+import h5py
+import sys
 
 import matplotlib.pyplot as plt
+# allow import of plot
+sys.path.append('~/Documents/Universiteit/MR/code')
+import plot as pl
 
 import halo.parameters as p
 import halo.density_profiles as profs
@@ -58,11 +63,26 @@ def T2Mwl(T):
     '''
     M500 = 10**(13.57) * (T**1.67)
     # faulty measurement -> scale to match hydrostatic mass
-    M500 *= 1.3
+    M500 /= 1.3
     return M500
 
 # ------------------------------------------------------------------------------
 # End of T2Mwl()
+# ------------------------------------------------------------------------------
+
+def Mwl2Mgas(mwl):
+    '''
+    Return m500_gas for m500_wl
+
+        f500_gas = 0.055 * (m500_wl / 10^14)^0.21
+
+    Eq. 7 in Eckert et al. XXL XIII (2015)
+    '''
+    f_gas = 0.055 * (mwl / 10**14)**0.21
+    return f_gas * mwl
+
+# ------------------------------------------------------------------------------
+# End of Mwl2Mgas()
 # ------------------------------------------------------------------------------
 
 def rhogas_eckert():
@@ -71,11 +91,12 @@ def rhogas_eckert():
     # si : [cm^-3] -> error
     path = ddir + 'data_mccarthy/gas/ngas_profiles.txt'
     r, n1, s1, n2, s2, n3, s3, n4, s4 = np.loadtxt(path, unpack=True)
-    # rescale to hydrostatic r500_hydro/r500_wl ~ (M_hydro/M_wl)^1/3 = 1.09
+    # rescale to hydrostatic r500_wl/r500_hydro ~ (M_wl/M_hydro)^1/3 = 1.09
     r *= 1.09
     # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.25)
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
-    # n_gas = 2.25 n_H
+    # n_He = Y/(4X) n_H
+    # => n_gas = 2.25 n_H
     # seems to need an extra factor of 1/h^2 to match sun profiles?
     rho1 = 2.25 * 0.59 * const.m_p.cgs * n1 * 1/u.cm**3 # in cgs
     rho2 = 2.25 * 0.59 * const.m_p.cgs * n2 * 1/u.cm**3
@@ -91,6 +112,7 @@ def rhogas_eckert():
     mwl_bins = T2Mwl(T_bins)
     mgas_bins = T2Mgas(T_bins)
 
+    # change to ``cosmological'' coordinates
     cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
     rho = (np.vstack([rho1, rho2, rho3, rho4]) * cgs2cos).value
     s = (np.vstack([s1, s2, s3, s4]) * cgs2cos).value
@@ -112,7 +134,7 @@ def rhogas_sun():
     r500, rho_m, rho_16, rho_84 = np.loadtxt(path, unpack=True)
 
     rhogas_sun.M = 8.7e13
-    rho = rho_m * prms.rho_crit
+    rho = rho_m * prms.rho_crit ** 0.7**2
 
     return r500, rho
 
@@ -137,29 +159,26 @@ def rhogas_croston():
 # ------------------------------------------------------------------------------
 
 def m200_eckert():
-    def M2Mgas(M200, Mobs, r):
+    def M2Mgas(M200, rho, r):
         c_x = profs.c_correa(M200, z_range=0).reshape(-1)
-        M500 = tools.Mx_to_My(M200, 500, 200, c_x, p.prms.rho_m * 0.7**2)
+        M500 = tools.Mx_to_My(M200, 200, 500, c_x, p.prms.rho_m * 0.7**2)
         M_gas = f_gas(M500, **fit_prms) * M500
+        r200 = tools.r_delta(M200, 200, p.prms.rho_m * 0.7**2)
+        r500 = r200 * tools.rx_to_r200(500, c_x, p.prms.rho_m * 0.7**2)
 
-        diff = M_gas/Mobs - r**3
+        Mgas = tools.Integrate(rho, r*r500)
+        # include some way to take difference between determined and guessed
+        # mass
+        diff = Mgas - M_gas #+ mass - M500
         return diff
 
     r500, rho, s, mwl, mgas = rhogas_eckert()
     fit_prms = f_gas_fit()
 
-    idx_500 = np.argmin(np.abs(r500 - 1))
-
-    # get observed mass in profile
-    M_obs = tools.m_h(rho[:,:idx_500], r500[:idx_500].reshape(1,-1), axis=-1)
-    r_delta = (mgas/M_obs)**(1./3) # difference is r_delta^3 from integration
-
     m200 = []
-    for m_obs, r in zip(M_obs, r_delta):
-        print M2Mgas(m_obs*r**3,m_obs,r)
-        print M2Mgas(50*m_obs*r**3,m_obs,r)
-        m200.append(opt.brentq(M2Mgas, m_obs*r**3, 50*m_obs*r**3,
-                               args=(m_obs, r)))
+    for prof, mass in zip(rho, mwl):
+        m200.append(opt.brentq(M2Mgas, 1e10, 1e15,
+                               args=(prof, r500)))
 
     return np.array(m200)
 
@@ -200,11 +219,28 @@ def fit_beta_eckert():
 # ------------------------------------------------------------------------------
 
 def fit_beta_bahamas():
-    r500, rho, s, mwl, mgas = rhogas_eckert()
-    idx_500 = np.argmin(np.abs(r500 - 1))
-    norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
+    '''
+    Fit beta profiles to the bahamas bins
+    '''
+    binned = h5py.File('/Volumes/Data/stijn/Documents/Universiteit/MR/code/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500.hdf5 ', 'r')
+
+    rho = binned['PartType0/MedianDensity'][:]
+    q16 = binned['PartType0/Q16'][:]
+    q84 = binned['PartType0/Q84'][:]
+    r500_inbin = binned['PartType0/R500'][:]
+    numbin = binned['PartType0/NumBin'][:]
+    to_slice = np.concatenate([[0], numbin])
+    bin_slice = np.concatenate([np.cumsum(to_slice[:-1]).reshape(-1,1),
+                                np.cumsum(to_slice[1:]).reshape(-1,1)], axis=-1)
+    r500 = np.array([np.median(r500_inbin[sl[0]:sl[1]]) for sl in bin_slice])
+    err = np.maximum(rho - 16, q84 - rho)
+
+    r_bins = binned['RBins_R_Mean500'][:]
+    r = tools.bins2center(r_bins)
+
+    norm = tools.m_h(rho, r500.reshape(1,-1), axis=-1)
     rho_norm = rho / norm.reshape(-1,1)
-    s_norm = s / norm.reshape(-1,1)
+    err_norm = err / norm.reshape(-1,1)
 
     fit_prms = []
     covs     = []
@@ -275,14 +311,14 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
                                                    bins=n_bins)
     m500 = np.power(10, m500)
     # c_x = profs.c_correa(m_range, z_range=0).reshape(-1)
-    # m500_model = m_range * tools.Mx_to_My(1., 500, 200, c_x, p.prms.rho_m * 0.7**2)
+    # m500_model = m_range * tools.Mx_to_My(1., 200, 500, c_x, p.prms.rho_m * 0.7**2)
 
     # m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
     #                   axis=-1)
 
     centers = np.power(10, 0.5*(edges[1:] + edges[:-1]))
     popt, pcov = opt.curve_fit(f_gas, centers, f_med, sigma=f_std,
-                               bounds=([1e13, 0],[1e15, 2]))
+                               bounds=([1e10, 0],[1e15, 2]))
 
     fit_prms = {'M_trans' : popt[0],
                 'a' : popt[1]}
@@ -303,4 +339,65 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
 
 # ------------------------------------------------------------------------------
 # End of f_gas_fit()
+# ------------------------------------------------------------------------------
+
+def compare_eckert_fractions():
+    '''
+    Compare different methods to get gas fraction
+    '''
+    r_eckert, rho_eckert, s, mwl, mgas = rhogas_eckert()
+    mgas_mwl = Mwl2Mgas(mwl)
+    mgas_f = mwl * f_gas(mwl, **f_gas_fit())
+
+    pl.set_style('mark')
+    plt.plot(mwl, mgas/mwl, label=r'$M_{\mathrm{gas}}-T$')
+    plt.plot(mwl, mgas_mwl/mwl, label=r'$f_{\mathrm{gas}}-M_{\mathrm{wl}}$')
+    plt.plot(mwl, mgas_f/mwl, label=r'Observations')
+    plt.xscale('log')
+    plt.xlabel(r'$M_{\mathrm{wl},500}\,[M_\odot]$')
+    plt.ylabel(r'$f_{\mathrm{gas}}$')
+    plt.legend(loc='best')
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of compare_eckert_fractions()
+# ------------------------------------------------------------------------------
+
+def plot_eckert():
+    pl.set_style()
+    r500, rho, s, mwl, mgas = rhogas_eckert()
+    idx_500 = np.argmin(np.abs(r500 - 1))
+    norm = tools.m_h(rho[:,:idx_500+1], r500[:idx_500+1].reshape(1,-1), axis=-1)
+    rho_norm = rho / norm.reshape(-1,1)
+
+    prms, fits = fit_beta_eckert()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.set_prop_cycle(pl.cycle_mark())
+    marks = []
+    for idx, prof in enumerate(rho_norm):
+        mark, = ax.plot(r500, prof)
+        marks.append(mark)
+
+    ax.set_prop_cycle(pl.cycle_line())
+    lines = []
+    for idx, fit in enumerate(fits):
+        if idx == 0:
+            line, = ax.plot(r500[3:], fit)
+        else:
+            line, = ax.plot(r500, fit)
+        lines.append(line)
+
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel(r'$r/r_{500}$')
+    ax.set_ylabel(r'$\rho(r)/M$')
+    ax.legend([(line, mark) for line, mark in zip(lines, marks)],
+              [r'$M=10^{%.1f}$'%np.log10(c) for c in mwl])
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_eckert()
 # ------------------------------------------------------------------------------

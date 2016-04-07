@@ -126,7 +126,7 @@ class Component(dens.Profile):
                                  x=self.m_range,
                                  axis=0)
             diff = self.rho_comp - bias_int
-            # diff < 0 will cause strange features in at high k in 2 halo term
+            # diff < 0 will cause strange features at high k in 2 halo term
             # if a high m_max is chosen. This is of no importance, since 1 halo
             # term dominates there.
             if diff < 0:
