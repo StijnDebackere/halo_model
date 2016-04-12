@@ -107,7 +107,7 @@ def rhogas_eckert():
     s3 = 2.25 * 0.59 * const.m_p.cgs * s3 * 1/u.cm**3
     s4 = 2.25 * 0.59 * const.m_p.cgs * s4 * 1/u.cm**3
     # data is in temperature bins, need to convert to mass bins
-    T_bins = np.array([0.6, 2, 3, 4, 7])
+    T_bins = np.array([0.6, 2, 3, 4, 5])
     # halo mass bin edges! What are min and max mass?
     mwl_bins = T2Mwl(T_bins)
     mgas_bins = T2Mgas(T_bins)
@@ -134,7 +134,7 @@ def rhogas_sun():
     r500, rho_m, rho_16, rho_84 = np.loadtxt(path, unpack=True)
 
     rhogas_sun.M = 8.7e13
-    rho = rho_m * prms.rho_crit ** 0.7**2
+    rho = rho_m
 
     return r500, rho
 
@@ -150,7 +150,7 @@ def rhogas_croston():
     r500, rho_m, rho_16, rho_84 = np.loadtxt(path, unpack=True)
 
     rhogas_croston.M = 3e14
-    rho = rho_m * prms.rho_crit
+    rho = rho_m
 
     return r500, rho
 
@@ -363,7 +363,10 @@ def compare_eckert_fractions():
 # End of compare_eckert_fractions()
 # ------------------------------------------------------------------------------
 
-def plot_eckert():
+def plot_eckert_fits():
+    '''
+    Plot beta profile fits to Eckert profiles
+    '''
     pl.set_style()
     r500, rho, s, mwl, mgas = rhogas_eckert()
     idx_500 = np.argmin(np.abs(r500 - 1))
@@ -399,5 +402,5 @@ def plot_eckert():
     plt.show()
 
 # ------------------------------------------------------------------------------
-# End of plot_eckert()
+# End of plot_eckert_fit()
 # ------------------------------------------------------------------------------

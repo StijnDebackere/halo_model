@@ -332,14 +332,14 @@ prms = Parameters(
     k_min=-2.7,
     k_max=6.0,
     k_bins=10000,
-    # cosmology parameters
-    sigma_8=0.803,
-    H0=71.4,
-    omegab=0.0445,
-    omegac=0.2175,
-    omegav=0.738,
-    n=0.969,
-    # transfer function parameters
+    # cosmology parameters -> WMAP9
+    sigma_8=0.821,
+    H0=70.0,
+    omegab=0.0463,
+    omegac=0.233,
+    omegav=0.7207,
+    n=0.972,
+    # transfer function parameters -> change to WMAP9 as well
     z=0.,
     transfer_fit='FromFile',
     transfer_options={'fname': 'camb/wmap7_transfer_out.dat'},
@@ -350,5 +350,5 @@ prms = Parameters(
     delta_wrt='mean',
     delta_c=1.686,
     # critical density
-    rho_crit=2.7763458 * (10.0**11.0), # in M_sun*h^2/Mpc^3
+    rho_crit=2.776 * (10.0**11.0), # in M_sun*h^2/Mpc^3
 )

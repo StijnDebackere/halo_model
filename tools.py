@@ -41,7 +41,7 @@ def Integrate(y, x, axis=-1): # Simpson integration on fixed spaced data!
 # End of Integrate()
 # ------------------------------------------------------------------------------
 
-def median_slices(data, medians):
+def median_slices(data, medians, bins):
     '''
     Return slices for data such that the median of each slice returns medians
 
@@ -51,6 +51,8 @@ def median_slices(data, medians):
       array to slice
     medians : (m,) array
       medians to match
+    bins : (m,2) array
+      maximum allowed bin around median
 
     Returns
     -------
@@ -59,14 +61,14 @@ def median_slices(data, medians):
     '''
     data_sorted = np.sort(data, axis=0)
 
-    # index of matching elements
+    # index of elements matching medians
     idx_med = np.argmin(np.abs(data_sorted.reshape(-1,1) - medians.reshape(1,-1)),
                         axis=0)
-    shapes = np.array([0, data_sorted.shape[0]])
-
-    min_dist = np.min(np.abs(idx_med.reshape(-1,1) - shapes.reshape(1,-1)),
-                      axis=1)
-
+    # find matching bin indeces
+    idx_bin = np.argmin(np.abs(data_sorted.reshape(-1,1,1) - bins.reshape(1,-1,2)),
+                        axis=0)
+    # get minimum distance from bins to median -> this will be our slice
+    min_dist = np.min(np.abs(idx_med.reshape(-1,1) - idx_bin), axis=1)
     slices = np.concatenate([(idx_med - min_dist).reshape(-1,1),
                              (idx_med + min_dist).reshape(-1,1)],
                             axis=1)

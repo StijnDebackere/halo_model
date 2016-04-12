@@ -625,7 +625,15 @@ def profile_sersic(r_range, m_range, r_eff, p, q=1):
 # End of profile_sersic()
 # ------------------------------------------------------------------------------
 
-def fit_profile_beta(r_range, m_x, r_x, profile):
+def profile_b(r_range, m_x, r_x, beta, r_c):
+    profile = 1 / (1 + (r_range/r_c)**2)**(beta/2)
+    x_idx = np.argmin(np.abs(r_range - r_x))
+    norm =  m_x/tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
+    profile *= norm
+
+    return profile
+
+def fit_profile_beta(r_range, m_x, r_x, profile, err=None):
     '''
     Fit a beta profile to profile, optimize fit for beta and r_c
 
@@ -639,6 +647,8 @@ def fit_profile_beta(r_range, m_x, r_x, profile):
       x overdensity radius of halo
     profile : array
       data to fit
+    err : array
+      error on data
 
     Returns
     -------
@@ -647,19 +657,12 @@ def fit_profile_beta(r_range, m_x, r_x, profile):
     fit : array
       beta function fit to profile
     '''
-    def profile_b(r_range, m_x, r_x, beta, r_c):
-        profile = 1 / (1 + (r_range/r_c)**2)**(3*beta/2)
-        x_idx = np.argmin(np.abs(r_range - r_x))
-        norm =  m_x/tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
-        profile *= norm
-
-        return profile
-
     popt, pcov = opt.curve_fit(lambda r_range, beta, r_c: \
                                profile_b(r_range, m_x,
                                          r_x, beta,r_c),
                                r_range, profile,
-                               bounds=([0, 0], [5, r_x]))
+                               bounds=([0, 0], [5, r_x]),
+                               sigma=err)
 
     fit_prms = {'beta': popt[0],
                 'r_c' : popt[1]}
@@ -670,13 +673,9 @@ def fit_profile_beta(r_range, m_x, r_x, profile):
 # ------------------------------------------------------------------------------
 # End of fit_profile_beta()
 # ------------------------------------------------------------------------------
+
 def profile_b_plaw(r_range, m_x, r_x, beta, gamma, r_c):
-    # modify shapes such that we can input floats or arrays
-    c = np.array(np.array(r_c).shape)
-    r_c = r_c.reshape(list(c) + [1])
-
     profile = (1 + (r_range/r_c)**2)**(-beta/2) * (r_range/r_c)**(-gamma)
-
     x_idx = np.argmin(np.abs(r_range - r_x))
     norm =  m_x / tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
     profile *= norm
@@ -705,16 +704,25 @@ def fit_profile_beta_plaw(r_range, m_x, r_x, profile, err=None):
     fit : array
       beta function fit to profile
     '''
-    popt, pcov = opt.curve_fit(lambda r_range, beta, gamma, r_c: \
+    # popt, pcov = opt.curve_fit(lambda r_range, beta, gamma, r_c: \
+    #                            profile_b_plaw(r_range, m_x, r_x,
+    #                                           beta, gamma, r_c),
+    #                            r_range, profile,
+    #                            bounds=([0, 0, 0],[100, 100, r_x]),
+    #                            sigma=err)
+    popt, pcov = opt.curve_fit(lambda r_range, beta, gamma: \
                                profile_b_plaw(r_range, m_x, r_x,
-                                                 beta, gamma, r_c),
+                                                 beta, gamma, r_x),
                                r_range, profile,
-                               bounds=([0, 0, 0],[5, 5, r_x]),
+                               bounds=([0, 0],[100, 100]),
                                sigma=err)
 
+    # fit_prms = {'beta' : popt[0],
+    #             'gamma': popt[1],
+    #             'r_c'  : popt[2]}
     fit_prms = {'beta' : popt[0],
                 'gamma': popt[1],
-                'r_c'  : popt[2]}
+                'r_c'  : r_x}
 
     fit = profile_b_plaw(r_range, m_x, r_x, **fit_prms)
 
@@ -724,7 +732,15 @@ def fit_profile_beta_plaw(r_range, m_x, r_x, profile, err=None):
 # End of fit_profile_beta_plaw()
 # ------------------------------------------------------------------------------
 
-def fit_profile_beta_gamma(r_range, m_x, r_x, profile):
+def profile_b_gamma(r_range, m_x, r_x, beta, gamma, r_c):
+    profile = (1 + (r_range/r_c)**gamma)**(-beta/gamma)
+    x_idx = np.argmin(np.abs(r_range - r_x))
+    norm =  m_x/tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
+    profile *= norm
+
+    return profile
+
+def fit_profile_beta_gamma(r_range, m_x, r_x, profile, err=None):
     '''
     Fit a beta profile to profile, optimize fit for beta and r_c
 
@@ -736,6 +752,8 @@ def fit_profile_beta_gamma(r_range, m_x, r_x, profile):
       x overdensity radius
     profile : array
       data to fit
+    err : array
+      error on data
 
     Returns
     -------
@@ -744,24 +762,12 @@ def fit_profile_beta_gamma(r_range, m_x, r_x, profile):
     fit : array
       beta function fit to profile
     '''
-    def profile_b_gamma(r_range, m_x, r_x, beta, gamma, r_c):
-        # modify shapes such that we can input floats or arrays
-        c = np.array(np.array(r_c).shape)
-        r_c = r_c.reshape(list(c) + [1])
-
-        profile = (1 + (r_range/r_c)**gamma)**(-beta/gamma)
-
-        x_idx = np.argmin(np.abs(r_range - r_x))
-        norm =  m_x/tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
-        profile *= norm
-
-        return profile
-
     popt, pcov = opt.curve_fit(lambda r_range, beta, gamma, r_c: \
                                profile_b_gamma(r_range, m_x, r_x,
-                                                  beta, gamma, r_c),
+                                               beta, gamma, r_c),
                                r_range, profile,
-                               bounds=([0, 0, 0], [5, 5, r_x]))
+                               bounds=([0, 0, 0], [5, 5, r_x]),
+                               sigma=err)
 
     fit_prms = {'beta' : popt[0],
                 'gamma': popt[1],
