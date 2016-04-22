@@ -79,6 +79,66 @@ def median_slices(data, medians, bins):
 # End of median_slices()
 # ------------------------------------------------------------------------------
 
+# def mean_slices(data, means, bins):
+#     '''
+#     Return slices for data such that the mean of each slice returns means
+
+#     Parameters
+#     ----------
+#     data : (n,) array
+#       array to slice
+#     means : (m,) array
+#       means to match
+#     bins : (m,2) array
+#       maximum allowed bin around mean
+
+#     Returns
+#     -------
+#     slices : (m,2) array
+#       array containing slices for each mean
+#     '''
+#     data_sorted = np.sort(data, axis=0)
+
+#     # index of elements matching means
+#     idx_mean = np.argmin(np.abs(data_sorted.reshape(-1,1) - means.reshape(1,-1)),
+#                         axis=0)
+
+#     # find matching bin indeces
+#     idx_bin = np.argmin(np.abs(data_sorted.reshape(-1,1,1) - bins.reshape(1,-1,2)),
+#                         axis=0)
+#     # get minimum distance from bins to mean -> this will be our slice
+#     min_dist = np.min(np.abs(idx_med.reshape(-1,1) - idx_bin), axis=1)
+#     slices = np.concatenate([(idx_med - min_dist).reshape(-1,1),
+#                              (idx_med + min_dist).reshape(-1,1)],
+#                             axis=1)
+
+#     for idx, sl in enumerate(slices):
+#         print means[idx]
+#         print data[sl[0]:sl[1]].mean()
+#         print '---------'
+
+#     return slices
+
+# # ------------------------------------------------------------------------------
+# # End of mean_slices()
+# # ------------------------------------------------------------------------------
+
+# def running_mean(x, N):
+#     cumsum = np.cumsum(np.insert(x, 0, 0))
+#     return (cumsum[N:] - cumsum[:-N]) / N
+
+# # ------------------------------------------------------------------------------
+# # End of running_mean()
+# # ------------------------------------------------------------------------------
+
+# def running_std(x, N):
+#     cumsum = np.cumsum(np.insert(x, 0, 0)**2)
+#     return np.sqrt((cumsum[N:] - cumsum[:-N]) / N)
+
+# # ------------------------------------------------------------------------------
+# # End of running_mean()
+# # ------------------------------------------------------------------------------
+
 def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
     '''
     Calculate the mass of the density profile between over r_range, or between
@@ -326,7 +386,7 @@ def mean_density_NFW(r, c_x, rho_mean):
 # End of mean_density_NFW()
 # ------------------------------------------------------------------------------
 
-def rx_to_r200(x, c_x, rho_mean):
+def rx_to_r200(x, c_200, rho_mean):
     '''
     Returns the radius at mean overdensity x in units of r_200.
 
@@ -334,7 +394,7 @@ def rx_to_r200(x, c_x, rho_mean):
     ----------
     x : float
       overdensity with respect to mean
-    c_x : array
+    c_200 : array
       concentration of halo
 
     Returns
@@ -346,16 +406,16 @@ def rx_to_r200(x, c_x, rho_mean):
     --------
     Conversion factor gives 1 r_500 in units of r_200, multiplying by r_200
     gives the r_500 for the haloes with r_200
-    >>> r_500 = r_200 * rx_to_ry(1., 500, c_x)
+    >>> r_500 = r_200 * rx_to_ry(1., 500, c_200)
     '''
     def dens_diff(r, x, c, rho_mean):
         return mean_density_NFW(r, c, rho_mean) - x * rho_mean
 
     try:
         rx_200 = np.array([opt.brentq(dens_diff, 1e-6, 10, args=(x, c, rho_mean))
-                           for c in c_x])
+                           for c in c_200])
     except TypeError:
-        rx_200 = opt.brentq(dens_diff, 1e-6, 10, args=(x, c_x, rho_mean))
+        rx_200 = opt.brentq(dens_diff, 1e-6, 10, args=(x, c_200, rho_mean))
 
     return rx_200
 

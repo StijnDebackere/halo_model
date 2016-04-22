@@ -390,7 +390,7 @@ def profile_beta(r_range, m_x, r_x, beta, r_c):
     Returns a beta profile for m_range along axis 0 and r_range along
     axis 1.
 
-        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + (r/r_c)^2)^(3 * beta / 2)
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + (r/r_c)^2)^(beta / 2)
 
     rho_c is determined by the mass of the profile.
 
@@ -412,17 +412,19 @@ def profile_beta(r_range, m_x, r_x, beta, r_c):
     profile : (m,r) array
       array containing beta profile
     '''
-    m = m_range.shape[0]
+    m = m_x.shape[0]
     r = r_range.shape[-1]
 
-    r_c = r_c.reshape(1,m)
-    beta = beta.reshape(1,m)
-    r_x = r_x.reshape(1,m)
-    m_x = m_x.reshape(1,m)
+    r_c = r_c.reshape(m,1)
+    beta = beta.reshape(m,1)
+    r_x = r_x.reshape(m,1)
+    m_x = m_x.reshape(m,1)
 
-    profile = 1. / (1 + (r_range/r_c)**2)**(3*beta/2)
+    profile = 1. / (1 + (r_range/r_c)**2)**(beta/2)
     x_idx = np.argmin(np.abs(r_range - r_x), axis=-1)
-    norm =  m_x/tools.m_h(profile[:,:x_idx+1], r_range[:,:x_idx+1])
+    masses = np.array([tools.m_h(profile[i,:idx+1], r_range[i,:idx+1])
+                       for i, idx in enumerate(x_idx)]).reshape(m,1)
+    norm =  m_x/masses
     profile *= norm
 
     return profile
@@ -704,25 +706,25 @@ def fit_profile_beta_plaw(r_range, m_x, r_x, profile, err=None):
     fit : array
       beta function fit to profile
     '''
-    # popt, pcov = opt.curve_fit(lambda r_range, beta, gamma, r_c: \
-    #                            profile_b_plaw(r_range, m_x, r_x,
-    #                                           beta, gamma, r_c),
-    #                            r_range, profile,
-    #                            bounds=([0, 0, 0],[100, 100, r_x]),
-    #                            sigma=err)
-    popt, pcov = opt.curve_fit(lambda r_range, beta, gamma: \
+    popt, pcov = opt.curve_fit(lambda r_range, beta, gamma, r_c: \
                                profile_b_plaw(r_range, m_x, r_x,
-                                                 beta, gamma, r_x),
+                                              beta, gamma, r_c),
                                r_range, profile,
-                               bounds=([0, 0],[100, 100]),
+                               bounds=([0, 0, 0],[100, 100, r_x]),
                                sigma=err)
+    # popt, pcov = opt.curve_fit(lambda r_range, beta, gamma: \
+    #                            profile_b_plaw(r_range, m_x, r_x,
+    #                                              beta, gamma, r_x),
+    #                            r_range, profile,
+    #                            bounds=([0, 0],[100, 100]),
+    #                            sigma=err)
 
-    # fit_prms = {'beta' : popt[0],
-    #             'gamma': popt[1],
-    #             'r_c'  : popt[2]}
     fit_prms = {'beta' : popt[0],
                 'gamma': popt[1],
-                'r_c'  : r_x}
+                'r_c'  : popt[2]}
+    # fit_prms = {'beta' : popt[0],
+    #             'gamma': popt[1],
+    #             'r_c'  : r_x}
 
     fit = profile_b_plaw(r_range, m_x, r_x, **fit_prms)
 

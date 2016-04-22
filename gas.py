@@ -120,7 +120,7 @@ def rhogas_eckert():
     mwl = 0.5 * (mwl_bins[1:] + mwl_bins[:-1])
     mgas = 0.5 * (mgas_bins[1:] + mgas_bins[:-1])
 
-    return r, rho, s, mwl, mgas
+    return  r, rho, s, mwl, mgas
 
 # ------------------------------------------------------------------------------
 # End of rhogas_eckert()
@@ -135,8 +135,9 @@ def rhogas_sun():
 
     rhogas_sun.M = 8.7e13
     rho = rho_m
+    err = np.array([rho_m - rho_16, rho_84 - rho_m])
 
-    return r500, rho
+    return r500, rho, err
 
 # ------------------------------------------------------------------------------
 # End of rhogas_sun()
@@ -151,8 +152,9 @@ def rhogas_croston():
 
     rhogas_croston.M = 3e14
     rho = rho_m
+    err = np.array([rho_m - rho_16, rho_84 - rho_m])
 
-    return r500, rho
+    return r500, rho, err
 
 # ------------------------------------------------------------------------------
 # End of rhogas_croston()
@@ -403,4 +405,159 @@ def plot_eckert_fits():
 
 # ------------------------------------------------------------------------------
 # End of plot_eckert_fit()
+# ------------------------------------------------------------------------------
+
+def fit_sun_profile():
+    r500, rho, err = rhogas_sun()
+    rho *= p.prms.rho_crit * 0.7**2
+
+    # bin profile
+    r500 = r500.reshape(-1,4).mean(axis=1)
+    rho = rho.reshape(-1,4).mean(axis=1)
+    err = 1./2 * np.sqrt(np.sum(err.reshape(2,-1,4)**2, axis=-1))
+
+    # match mass at r500c
+    idx_500 = np.argmin(np.abs(r500 - 1))
+    norm = tools.m_h(rho[:idx_500+1], r500[:idx_500+1])
+
+    rho_norm = rho / norm
+    err = err / norm
+    sigma = np.maximum(err[0], err[1])
+
+    fit_plaw = profs.fit_profile_beta_plaw(r500, 1, r500[idx_500], rho_norm, sigma)
+    fit_beta = profs.fit_profile_beta(r500, 1, r500[idx_500], rho_norm, sigma)
+
+    M = rhogas_sun.M
+    r200m = m500c_to_r200m(M)
+    m200m = tools.radius_to_mass(r200m, 200 * p.prms.rho_m * 0.7**2)
+    r500c = tools.mass_to_radius(M, 500 * p.prms.rho_crit * 0.7**2)
+    r_range = np.logspace(-4, np.log10(r200m / r500c), 100)
+    u_beta = profs.profile_b(r_range, 1, 1, **fit_beta[0])
+    u_plaw = profs.profile_b_plaw(r_range, 1, 1, **fit_plaw[0])
+
+    prof_beta = (f_gas(M, **f_gas_fit()) * M * u_beta)
+    prof_plaw = (f_gas(M, **f_gas_fit()) * M * u_plaw)
+
+    pl.set_style()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.set_prop_cycle(pl.cycle_mark())
+    ax.errorbar(r500, rho, yerr=[err[0], err[1]], fmt='o',
+                label=r'Sun+2009')
+
+    ax.set_prop_cycle(pl.cycle_line())
+    ax.plot(r_range, prof_plaw, label=r'$\beta$ + power law')
+    ax.plot(r_range, prof_beta, label=r'$\beta$')
+    ax.axvline(x=r200m/r500c, c='k', ls='--')
+
+    ax.set_xlim([0.9*r500.min(), 1.1*r500.max()])
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel(r'$r/r_{500}$')
+    ax.set_ylabel(r'$u(r)$')
+    ax.legend(loc='best', numpoints=1)
+    plt.show()
+
+    return fit_plaw[:-1], fit_beta[:-1]
+
+# ------------------------------------------------------------------------------
+# End of fit_sun_profile()
+# ------------------------------------------------------------------------------
+
+def fit_croston_profile():
+    r500, rho, err = rhogas_croston()
+    rho *= p.prms.rho_crit * 0.7**2
+
+    r500 = r500[:-1]
+    rho = rho[:-1]
+    err = err[:,:-1]
+
+    # match mass at r500c
+    idx_500 = np.argmin(np.abs(r500 - 1))
+    norm = tools.m_h(rho[:idx_500+1], r500[:idx_500+1])
+
+    rho_norm = rho / norm
+    err = err / norm
+    sigma = np.maximum(err[0], err[1])
+
+    fit_plaw = profs.fit_profile_beta_plaw(r500, 1, r500[idx_500], rho_norm, sigma)
+    fit_beta = profs.fit_profile_beta(r500, 1, r500[idx_500], rho_norm, sigma)
+
+    M = rhogas_croston.M
+    r200m = m500c_to_r200m(M)
+    m200m = tools.radius_to_mass(r200m, 200 * p.prms.rho_m * 0.7**2)
+    r500c = tools.mass_to_radius(M, 500 * p.prms.rho_crit * 0.7**2)
+    r_range = np.logspace(-4, np.log10(r200m / r500c), 100)
+    u_beta = profs.profile_b(r_range, 1, 1, **fit_beta[0])
+    u_plaw = profs.profile_b_plaw(r_range, 1, 1, **fit_plaw[0])
+
+    prof_beta = (f_gas(M, **f_gas_fit()) * M * u_beta)
+    prof_plaw = (f_gas(M, **f_gas_fit()) * M * u_plaw)
+
+    pl.set_style()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.set_prop_cycle(pl.cycle_mark())
+    ax.errorbar(r500, rho, yerr=[err[0], err[1]], fmt='o',
+                label=r'Croston+2008')
+
+    ax.set_prop_cycle(pl.cycle_line())
+    ax.plot(r_range, prof_plaw, label=r'$\beta$ + power law')
+    ax.plot(r_range, prof_beta, label=r'$\beta$')
+    ax.axvline(x=r200m/r500c, c='k', ls='--')
+
+    ax.set_xlim([0.9*r_range.min(), 1.2*r_range.max()])
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel(r'$r/r_{500}$')
+    ax.set_ylabel(r'$u(r)$')
+    ax.legend(loc='best', numpoints=1)
+    plt.show()
+
+    return fit_plaw[:-1], fit_beta[:-1]
+
+# ------------------------------------------------------------------------------
+# End of fit_croston_profile()
+# ------------------------------------------------------------------------------
+
+def massdiff(m200m, m500c):
+    '''
+    Integrate an NFW halo with m200m up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    r500c = (m500c / (4./3 * np.pi * 500 * p.prms.rho_crit * 0.7**2))**(1./3)
+    r_range = np.logspace(-4, np.log10(r500c), 1000)
+
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
+    dens = profs.profile_NFW(r_range, np.array([m200m]),
+                             profs.c_correa(m200m, 0).reshape(-1),
+                             r200m, p.prms.rho_m * 0.7**2)
+    mass_int = tools.m_h(dens, r_range)
+
+    return mass_int - m500c
+
+def m500c_to_r200m(m500c):
+    '''
+    Give the halo mass for the halo corresponding to M500c
+
+    Parameters
+    ----------
+    m500c : float
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    r200m : float
+      corresponding halo model halo virial radius
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200m = opt.brentq(massdiff, 1e10, 1e19, args=(m500c))
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
+
+    return r200m
+
+# ------------------------------------------------------------------------------
+# End of m500c_to_r200m()
 # ------------------------------------------------------------------------------

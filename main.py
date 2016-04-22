@@ -156,14 +156,24 @@ def load_icl():
 # ------------------------------------------------------------------------------
 
 def load_gas():
-    c_x = profs.c_correa(p.prms.m_range_lin, z_range=0)
-    M500 = tools.Mx_to_My(p.prms.m_range_lin, 200, 500, c_x, prms.rho_m)
-    f_gas = gas.f_gas(M500, **gas.f_gas_fit())
+    c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
+    m500 = tools.Mx_to_My(p.prms.m_range_lin, 200, 500, c_x, prms.rho_crit * 0.7**2)
+    r500 = tools.rx_to_r200(500, c_x, prms.rho_crit * 0.7**2)
+    f_gas = gas.f_gas(m500, **gas.f_gas_fit())
 
-    prof_gas = profs.profile_beta_plaw(prms.r_range_lin,
-                                       prms.m_range_lin,
-                                       r_x=prms.r_range_lin[:,-1],
-                                       beta=fit_prms[0,0],r_c=fit_prms[0,1])
+    r_range = prms.r_range_lin/r500.reshape(-1,1)
+
+    idx_500 = np.argmin(np.abs(r_range - 1.), axis=-1)
+    r_x = np.array([r_range[i, idx] for i, idx in enumerate(idx_500)])
+
+    beta = 3/2. * np.ones_like(m500)
+    r_c = .1 * np.ones_like(m500)
+
+    prof_gas = profs.profile_beta(r_range,
+                                  prms.m_range_lin,
+                                  r_x=r_x,
+                                  beta=beta, r_c=r_c)
+
     gas_extra = {'profile': prof_gas,
                  'profile_f': None}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
