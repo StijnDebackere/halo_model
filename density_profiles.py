@@ -781,3 +781,13 @@ def fit_profile_beta_gamma(r_range, m_x, r_x, profile, err=None):
 # ------------------------------------------------------------------------------
 # End of fit_profile_beta_gamma()
 # ------------------------------------------------------------------------------
+
+def profile_beta_extra(r_range, prof, r_x, a):
+    x_idx = np.argmin(np.abs(r_range - r_x.reshape(-1,1)), axis=-1)
+
+    for idx, p in enumerate(prof):
+        tail = p[x_idx[idx]] * (r_range[idx,x_idx[idx]:] /
+                                r_range[idx, x_idx[idx]])**(-a)
+        prof[idx, x_idx[idx]:] = tail
+
+    return prof

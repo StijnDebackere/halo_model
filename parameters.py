@@ -326,12 +326,12 @@ prms = Parameters(
     m_bins=101,
     # r parameters
     r_min=-4.0,
-    r_bins=10000,
+    r_bins=1000,
     # k parameters
     # k_min=-11.,
     k_min=-2.7,
     k_max=6.0,
-    k_bins=10000,
+    k_bins=1000,
     # cosmology parameters -> WMAP9
     sigma_8=0.821,
     H0=70.0,
@@ -342,7 +342,7 @@ prms = Parameters(
     # transfer function parameters -> change to WMAP9 as well
     z=0.,
     transfer_fit='FromFile',
-    transfer_options={'fname': 'camb/wmap7_transfer_out.dat'},
+    transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
     # mass function parameters
     mf_fit='Tinker10',
     cut_fit=False,

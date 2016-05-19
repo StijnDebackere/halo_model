@@ -6,6 +6,7 @@ import halo.stars as stars
 import halo.gas as gas
 import halo.bias as bias
 import halo.parameters as p
+import halo.tools as tools
 import halo.model.density as dens
 import halo.model.component as comp
 import halo.model.power as power
@@ -24,12 +25,16 @@ profile_kwargs = {'r_range': prms.r_range_lin,
 
 # ------------------------------------------------------------------------------
 def load_dm():
-    # concentration and virial radius -> needed for profile_NFW
-    c_x = profs.c_correa(prms.m_range_lin, z_range=0.)
-    r_x = prms.r_h
-
     # Fit NFW profile with c(z,M) relation from Correa et al (2015c)
     f_dm = 1 - prms.omegab/prms.omegam * np.ones_like(prms.m_range_lin)
+
+    # concentration and virial radius -> needed for profile_NFW
+    ############################################################################
+    # c_x = profs.c_correa(f_dm * prms.m_range_lin, z_range=0.)
+    c_x = profs.c_correa(prms.m_range_lin, z_range=0.)
+    ############################################################################
+    r_x = prms.r_h
+
     # DM profile
     # specific dm extra kwargs
     dm_extra = {'profile': profs.profile_NFW,
@@ -59,7 +64,7 @@ def load_dm():
 # ------------------------------------------------------------------------------
 
 def load_sat():
-    f_sat = stars.f_s(p.prms.m_range_lin)
+    f_sat = stars.f_s(prms.m_range_lin)
     # Satellite profile
     # generalized NFW profile determined by van der Burg, Hoekstra et al. (2015)
     prof_sat = profs.profile_gNFW(prms.r_range_lin, c_x=0.64*np.ones(prms.m_bins),
@@ -85,7 +90,7 @@ def load_sat():
 # ------------------------------------------------------------------------------
 
 def load_bcg():
-    f_cen = stars.f_c(p.prms.m_range_lin)
+    f_cen = stars.f_c(prms.m_range_lin)
 
     # # BCG profile
     # # Kravtsov (2014) -> r1/2 = 0.015 r200
@@ -108,8 +113,8 @@ def load_bcg():
                                        p=4)
     prof_bcg = np.concatenate([prof_bcg_n1, prof_bcg_n4], axis=0)
 
-    # prof_bcg = profs.profile_delta(p.prms.r_range_lin, p.prms.m_range_lin)
-    # prof_bcg_f = profs.profile_delta_f(p.prms.k_range_lin, p.prms.m_range_lin)
+    # prof_bcg = profs.profile_delta(prms.r_range_lin, prms.m_range_lin)
+    # prof_bcg_f = profs.profile_delta_f(prms.k_range_lin, prms.m_range_lin)
     bcg_extra = {'profile': prof_bcg,
                  'profile_f' : None}
                  # 'profile_f': prof_bcg_f}
@@ -132,7 +137,7 @@ def load_bcg():
 # ------------------------------------------------------------------------------
 
 def load_icl():
-    f_cen = stars.f_c(p.prms.m_range_lin)
+    f_cen = stars.f_c(prms.m_range_lin)
     # ICL profile
     prof_icl = profs.profile_ICL(prms.r_range_lin, prms.m_range_lin,
                                  r_half=0.015*prms.r_range_lin[:,-1], n=5)
@@ -156,34 +161,79 @@ def load_icl():
 # ------------------------------------------------------------------------------
 
 def load_gas():
-    c_x = profs.c_correa(p.prms.m_range_lin, z_range=0).reshape(-1)
-    m500 = tools.Mx_to_My(p.prms.m_range_lin, 200, 500, c_x, prms.rho_crit * 0.7**2)
-    r500 = tools.rx_to_r200(500, c_x, prms.rho_crit * 0.7**2)
-    f_gas = gas.f_gas(m500, **gas.f_gas_fit())
+    c_x = profs.c_correa(prms.m_range_lin, z_range=0).reshape(-1)
+    m500c = np.array([gas.m200m_to_m500c(m) for m in prms.m_range_lin])
+    r500c = tools.mass_to_radius(m500c, 500*prms.rho_crit * 0.7**2)
 
-    r_range = prms.r_range_lin/r500.reshape(-1,1)
+    r_range = prms.r_range_lin/r500c.reshape(-1,1)
 
     idx_500 = np.argmin(np.abs(r_range - 1.), axis=-1)
     r_x = np.array([r_range[i, idx] for i, idx in enumerate(idx_500)])
 
-    beta = 3/2. * np.ones_like(m500)
-    r_c = .1 * np.ones_like(m500)
+    def beta_fit(m_range, m_c, alpha):
+        return 1 + 2. / (1 + (m_c/m_range)**alpha)
 
+    def rc_fit(m_range, m_c, alpha):
+        return 0.4 / (1 + (m_c/m_range)**alpha)
+
+    # Values for profile
+    beta_m = 305484041479805.88
+    beta_a = 1.0817928922531508
+    beta = beta_fit(m500c, beta_m, beta_a)
+
+    r_c_m = 556798173789358.31
+    r_c_a = 0.64336173115208184
+    r_c = rc_fit(m500c, r_c_m, r_c_a)
+
+    # # Values for q16
+    # beta_m = 305484041479805.88
+    # beta_a = 1.0817928922531508
+    # beta = beta_fit(m500c, beta_m, beta_a)
+
+    # r_c_m = 556798173789358.31
+    # r_c_a = 0.64336173115208184
+    # r_c = rc_fit(m500c, r_c_m, r_c_a)
+
+    # # Values for q84
+    # beta_m = 305484041479805.88
+    # beta_a = 1.0817928922531508
+    # beta = beta_fit(m500c, beta_m, beta_a)
+
+    # r_c_m = 556798173789358.31
+    # r_c_a = 0.64336173115208184
+    # r_c = rc_fit(m500c, r_c_m, r_c_a)
+
+    # print beta
+    # print r_c
+
+    # correct for mass integration with x=r/r500c
     prof_gas = profs.profile_beta(r_range,
-                                  prms.m_range_lin,
+                                  m500c/r500c**3,
                                   r_x=r_x,
                                   beta=beta, r_c=r_c)
+
+    # prof_gas = profs.profile_beta_extra(r_range, prof_gas, r_x=r_x, a=3)
+    m200_prof = tools.m_h(prof_gas, prms.r_range_lin, axis=-1)
+    norm = prms.m_range_lin / m200_prof
+
+    # profile has to integrate to m200m
+    prof_gas *= norm.reshape(-1,1)
+
+    # gas fraction has to coincide with m500c
+    m500_prof = np.array([tools.m_h(prof[:idx_500[idx]+1],
+                                    prms.r_range_lin[idx, :idx_500[idx]+1],
+                                    axis=-1) for idx, prof in enumerate(prof_gas)])
+
+    # def massdiff(a, ):
+    #     pass
+
+    f_gas = m500c / m500_prof
+    # f_gas = np.ones_like(m500c)
+    print f_gas
 
     gas_extra = {'profile': prof_gas,
                  'profile_f': None}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-
-    # TODO:
-    # - Look at FT of gas profile
-    #   -> for smallest mass, we get almost flat profile -> sinc as FT
-    #      mass dependence in core radius should be added?
-    #   -> extrapolate highest mass gas profile, also gives contributions at
-    #      largest scales, but not negative there, compensates small M
 
     comp_gas_kwargs = {'name': 'gas',
                        'm_fn': prms.m_fn,
