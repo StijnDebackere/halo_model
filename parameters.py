@@ -73,12 +73,14 @@ class Parameters(Cache):
       log10m mass interval for mass function
 
     '''
-    def __init__(self, m_min=8.5, m_max=13.5, m_bins=100,
-                 r_min=-4.0, r_bins=10000,
-                 k_min=-2.7, k_max=6.0, k_bins=10000,
-                 sigma_8=0.803, H0=71.4, omegab=0.0445, omegac=0.2175,
-                 omegav=0.738, n=0.969,
-                 transfer_fit='EH', transfer_options=None, z=0.,
+    def __init__(self, m_min=10, m_max=15, m_bins=101,
+                 r_min=-4.0, r_bins=1000,
+                 k_min=-2.7, k_max=2.7, k_bins=1000,
+                 sigma_8=0.821, H0=70.0, omegab=0.0463, omegac=0.233,
+                 omegav=0.7207, n=0.972,
+                 transfer_fit='FromFile',
+                 transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
+                 z=0.,
                  mf_fit='Tinker10', cut_fit=False, delta_h=200.,
                  delta_wrt='mean', delta_c=1.686,
                  rho_crit=2.7763458 * (10.0**11.0)):
@@ -286,6 +288,9 @@ class Parameters(Cache):
     @cached_property('m_range_lin', 'm_fn_prms')
     def rho_m(self):
         return tools.Integrate(self.m_fn.dndlnm, self.m_range_lin)
+    # @cached_property('omegab', 'omegac', 'rho_crit', 'h')
+    # def rho_m(self):
+    #     return (self.omegab + self.omegac) * self.rho_crit
 
     @cached_property('omegab', 'omegac')
     def f_dm(self):
@@ -308,6 +313,9 @@ class Parameters(Cache):
     def r_range_lin(self):
         return np.power(10, self.r_range)
 
+    @cached_property('H0')
+    def h(self):
+        return self.H0 / 100.
 
 # ------------------------------------------------------------------------------
 # End of Parameters()
@@ -316,39 +324,13 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms = Parameters(
-    # mass parameters
-    m_min=10.,
-    m_max=15.,
-    # # min chosen so that satellite fraction is nonzero
-    # m_min=10,
-    # m_max=13.5,
-    m_bins=101,
-    # r parameters
-    r_min=-4.0,
-    r_bins=1000,
-    # k parameters
-    # k_min=-11.,
-    k_min=-2.7,
-    k_max=6.0,
-    k_bins=1000,
-    # cosmology parameters -> WMAP9
-    sigma_8=0.821,
-    H0=70.0,
-    omegab=0.0463,
-    omegac=0.233,
-    omegav=0.7207,
-    n=0.972,
-    # transfer function parameters -> change to WMAP9 as well
-    z=0.,
-    transfer_fit='FromFile',
-    transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
-    # mass function parameters
-    mf_fit='Tinker10',
-    cut_fit=False,
-    delta_h=200.,
-    delta_wrt='mean',
-    delta_c=1.686,
-    # critical density
-    rho_crit=2.776 * (10.0**11.0), # in M_sun*h^2/Mpc^3
-)
+prms1 = Parameters(m_min=10., m_max=15.)
+prms2 = Parameters(m_min=11., m_max=15.)
+prms3 = Parameters(m_min=12., m_max=15.)
+prms4 = Parameters(m_min=13., m_max=15.)
+prms5 = Parameters(m_min=14., m_max=15.)
+prms = Parameters(m_min=6.5, m_max=15.5)
+prms_hm = Parameters(m_min=0., m_max=16., )
+
+# Power spectrum converges for lower cutoff m_min = 6.5
+# Power spectrum converges for upper cutoff m_max = 15.5

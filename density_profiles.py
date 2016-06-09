@@ -184,8 +184,8 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     c_x = c_x.reshape([m,1] + list(z))
     # (m,1,z) array
     new_shape = [m,1] + list(z/z)
-    prefactor = 4 * np.pi * rho_s * r_s**3 / m_range.reshape(new_shape)
 
+    prefactor = 4 * np.pi * rho_s * r_s**3 / m_range.reshape(new_shape)
     # (1,k,1) array
     k_range = k_range.reshape([1,k] + list(z/z))
     K = k_range * r_s
@@ -303,7 +303,62 @@ def profile_gNFW(r_range, c_x, alpha, r_x, m_s):
     return profile
 
 # ------------------------------------------------------------------------------
-# End of profile_NFW()
+# End of profile_gNFW()
+# ------------------------------------------------------------------------------
+
+def profile_plaws(r_range, m_x, r_x, a, b, r_s):
+    x = r_range / r_s
+    idx_a = (x <= 1.)
+    profile = x**(-a)
+    profile[~idx_a] = x[~idx_a]**(-b)
+
+    # profile needs to have mass m_x at r_x
+    x_idx = np.argmin(np.abs(r_range - r_x))
+    norm =  m_x/tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
+
+    profile *= norm
+    return profile
+
+def fit_profile_plaws(r_range, m_x, r_x, profile, err=None):
+    '''
+    Fit a gNFW profile to profile, optimize fit for alpha and r_s
+
+    Parameters
+    ----------
+    r_range : array
+      radius corresponding to profile density
+    m_x : array
+      mass enclosed at x overdensity
+    r_x : array
+      x overdensity radius of halo
+    profile : array
+      data to fit
+    err : array
+      error on data
+
+    Returns
+    -------
+    fit_prms : (m,2) array
+      (beta, r_c) for each fit
+    fit : array
+      gnfw function fit to profile
+    '''
+    popt, pcov = opt.curve_fit(lambda r_range, a, b, r_s: \
+                               profile_plaws(r_range, m_x,
+                                             r_x, a, b, r_s),
+                               r_range, profile,
+                               bounds=([0, 0, 0], [5, 5, r_x]),
+                               sigma=err)
+
+    fit_prms = {'a': popt[0],
+                'b': popt[1],
+                'r_s' : popt[2]}
+    fit = profile_plaws(r_range, m_x, r_x, **fit_prms)
+
+    return fit_prms, pcov, fit
+
+# ------------------------------------------------------------------------------
+# End of fit_profile_gnfw()
 # ------------------------------------------------------------------------------
 
 def profile_BCG(r_range, m_range, r_half):
@@ -614,8 +669,13 @@ def profile_sersic(r_range, m_range, r_eff, p, q=1):
     rho = np.ones_like(r_range)
 
     s = r_range / r_eff.reshape(m,1)
+
+    # nu = lum(s[-1])
+
     # luminosity density nu(r), following Baes & Gentile (2010)
-    nu = lum(s[-1])
+    nu = np.empty_like(s)
+    for idx, si in enumerate(s):
+        nu[idx] = lum(si)
 
     for idx, r in enumerate(r_range):
         nu2rho = m_range[idx] / (4*np.pi * tools.Integrate(nu * r**2, r))
@@ -625,6 +685,63 @@ def profile_sersic(r_range, m_range, r_eff, p, q=1):
 
 # ------------------------------------------------------------------------------
 # End of profile_sersic()
+# ------------------------------------------------------------------------------
+
+def profile_plaw(r_range, m_x, r_x, r_eff, a, b):
+    r = r_range / r_eff
+    profile = r**(-a) * np.exp(-r**b)
+
+    x_idx = np.argmin(np.abs(r_range - r_x))
+    norm =  m_x/tools.m_h(profile[:x_idx+1], r_range[:x_idx+1])
+
+    profile *= norm
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_plaw()
+# ------------------------------------------------------------------------------
+
+def fit_profile_plaw(r_range, m_x, r_x, profile, err=None):
+    '''
+    Fit an ... profile to profile, optimize fit for r_eff and a
+
+    Parameters
+    ----------
+    r_range : array
+      radius corresponding to profile density
+    m_x : array
+      mass enclosed at x overdensity
+    r_x : array
+      x overdensity radius of halo
+    profile : array
+      data to fit
+    err : array
+      error on data
+
+    Returns
+    -------
+    fit_prms : (m,2) array
+      (r_eff, a) for each fit
+    fit : array
+      beta function fit to profile
+    '''
+    popt, pcov = opt.curve_fit(lambda r_range, r_eff, a, b: \
+                               profile_plaw(r_range, m_x,
+                                               r_x, r_eff, a, b),
+                               r_range, profile,
+                               bounds=([0, 0, 0], [r_x, 3, 5]),
+                               sigma=err)
+
+    fit_prms = {'r_eff': popt[0],
+                'a': popt[1],
+                'b': popt[2]}
+    fit = profile_plaw(r_range, m_x, r_x, **fit_prms)
+
+    return fit_prms, pcov, fit
+
+# ------------------------------------------------------------------------------
+# End of fit_profile_plaw()
 # ------------------------------------------------------------------------------
 
 def profile_b(r_range, m_x, r_x, beta, r_c):

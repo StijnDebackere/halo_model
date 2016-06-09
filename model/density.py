@@ -1,6 +1,7 @@
 '''
 TO-DO -> add z_range support to profile as new axis
 '''
+from __future__ import print_function
 import multiprocessing
 
 import numpy as np
@@ -342,16 +343,18 @@ class Profile(Cache):
         indeces[indeces == 0] = k
         for idx, idx_max in enumerate(indeces):
             u[idx,idx_max:] = np.nan
-            if idx_max != k:
-                u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
+            # if idx_max != k:
+            #     u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
 
-        # normalize spectrum so that u[k=0] = 1, otherwise we get a small
-        # systematic offset, while we know that theoretically u[k=0] = 1
+        # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
+        # # systematic offset, while we know that theoretically u[k=0] = 1
         # if (np.abs(u[:,0]) - 1. > 1.e-2).any():
         #     print('-------------------------------------------------',
         #           '! Density profile mass does not match halo mass !',
-        #           '-------------------------------------------------')
+        #           '-------------------------------------------------',
+        #           sep='\n')
 
-        # u = u / u[:,0].reshape(m,1)
+        # nonnil = (u[:,0] != 0)
+        # u[nonnil] = u[nonnil] / u[nonnil,0].reshape(-1,1)
 
         return u

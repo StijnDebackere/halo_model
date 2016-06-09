@@ -51,6 +51,7 @@ class Power(Cache):
         f_comp_2 = comp_2.f_comp.reshape(m,1)
 
         prefactor = 1./(comp_1.rho_comp * comp_2.rho_comp)
+        # prefactor = 1./(p.prms.rho)
         result = Integrate(y=dndlnm * f_comp_1 * comp_1.rho_k *
                            f_comp_2 * comp_2.rho_k * m_range,
                            x=m_range,

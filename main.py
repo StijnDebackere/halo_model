@@ -1,4 +1,11 @@
 import numpy as np
+import scipy.optimize as opt
+import matplotlib.pyplot as plt
+import sys
+
+# allow import of plot
+sys.path.append('~/Documents/Universiteit/MR/code')
+import plot as pl
 
 import halo.tools as tools
 import halo.density_profiles as profs
@@ -26,12 +33,14 @@ profile_kwargs = {'r_range': prms.r_range_lin,
 # ------------------------------------------------------------------------------
 def load_dm():
     # Fit NFW profile with c(z,M) relation from Correa et al (2015c)
+    # f_dm = 1. * np.ones_like(prms.m_range_lin)
     f_dm = 1 - prms.omegab/prms.omegam * np.ones_like(prms.m_range_lin)
 
     # concentration and virial radius -> needed for profile_NFW
+    # c_correa want [M_sun], not [M_sun/h]
     ############################################################################
     # c_x = profs.c_correa(f_dm * prms.m_range_lin, z_range=0.)
-    c_x = profs.c_correa(prms.m_range_lin, z_range=0.)
+    c_x = profs.c_correa(prms.m_range_lin / prms.h, z_range=0.)
     ############################################################################
     r_x = prms.r_h
 
@@ -161,14 +170,16 @@ def load_icl():
 # ------------------------------------------------------------------------------
 
 def load_gas():
-    c_x = profs.c_correa(prms.m_range_lin, z_range=0).reshape(-1)
-    m500c = np.array([gas.m200m_to_m500c(m) for m in prms.m_range_lin])
-    r500c = tools.mass_to_radius(m500c, 500*prms.rho_crit * 0.7**2)
+    c_x = profs.c_correa(prms.m_range_lin / 0.7, z_range=0).reshape(-1)
+    m500c = np.array([gas.m200m_to_m500c(m / 0.7) for m in prms.m_range_lin])
+    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * 0.7**2)
 
-    r_range = prms.r_range_lin/r500c.reshape(-1,1)
+    r_range = prms.r_range_lin / (0.7 * r500c.reshape(-1,1))
 
     idx_500 = np.argmin(np.abs(r_range - 1.), axis=-1)
     r_x = np.array([r_range[i, idx] for i, idx in enumerate(idx_500)])
+
+    f_gas500 = gas.f_gas(m500c, **gas.f_gas_fit())
 
     def beta_fit(m_range, m_c, alpha):
         return 1 + 2. / (1 + (m_c/m_range)**alpha)
@@ -206,30 +217,47 @@ def load_gas():
     # print beta
     # print r_c
 
-    # correct for mass integration with x=r/r500c
+    # correct for mass integration with x=r/r500c -> profile integrates to m500_gas
     prof_gas = profs.profile_beta(r_range,
-                                  m500c/r500c**3,
+                                  f_gas500 * m500c/r500c**3,
                                   r_x=r_x,
                                   beta=beta, r_c=r_c)
 
     # prof_gas = profs.profile_beta_extra(r_range, prof_gas, r_x=r_x, a=3)
     m200_prof = tools.m_h(prof_gas, prms.r_range_lin, axis=-1)
+    m500_prof = np.array([tools.m_h(prof_gas[idx, :i_500+1],
+                                    prms.r_range_lin[idx, :i_500+1] / 0.7)
+                          for idx, i_500 in enumerate(idx_500)])
+    # correct gas mass!
     norm = prms.m_range_lin / m200_prof
 
     # profile has to integrate to m200m
     prof_gas *= norm.reshape(-1,1)
 
-    # gas fraction has to coincide with m500c
-    m500_prof = np.array([tools.m_h(prof[:idx_500[idx]+1],
-                                    prms.r_range_lin[idx, :idx_500[idx]+1],
-                                    axis=-1) for idx, prof in enumerate(prof_gas)])
+    m500_new = np.array([tools.m_h(prof_gas[idx, :i_500+1],
+                                   prms.r_range_lin[idx, :i_500+1] / 0.7)
+                         for idx, i_500 in enumerate(idx_500)])
 
-    # def massdiff(a, ):
-    #     pass
+    # but f_gas needs to make sure we still match observations at r500c
+    f_gas = m500_prof / (m500_new)
 
-    f_gas = m500c / m500_prof
-    # f_gas = np.ones_like(m500c)
-    print f_gas
+    # plt.clf()
+    # pl.set_style('line')
+    # fig = plt.figure()
+    # ax1 = fig.add_subplot(111)
+    # l1, = ax1.plot(m500c, f_gas500, ls='-')
+    # ax2 = ax1.twiny()
+    # l2, = ax2.plot(prms.m_range_lin, f_gas, ls='--')
+    # ax1.set_xlim([m500c.min(), m500c.max()])
+    # ax2.set_xlim([prms.m_range_lin.min(), prms.m_range_lin.max()])
+    # ax1.set_xscale('log')
+    # ax2.set_xscale('log')
+    # ax1.set_xlabel(r'$m_{500c} \, [M_\odot]$')
+    # ax2.set_xlabel(r'$m_{200m} \, [M_\odot]$', labelpad=5)
+    # ax1.set_ylabel(r'$f_{\mathrm{gas}}$')
+    # ax1.legend([l1, l2], [r'$f_{500c}$', r'$f_{200m}$'], loc=2)
+    # plt.show()
+
 
     gas_extra = {'profile': prof_gas,
                  'profile_f': None}
@@ -243,6 +271,7 @@ def load_gas():
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
     comp_gas = comp.Component(**gas_kwargs)
+
     return comp_gas
 
 # ------------------------------------------------------------------------------

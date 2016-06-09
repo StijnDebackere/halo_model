@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import numpy as np
 import hmf
-
+import scipy.special as spec
 import halo.density_profiles as profs
 from halo.tools import Integrate
 import halo.model.density as dens
@@ -46,7 +46,7 @@ class Component(dens.Profile):
     Delta_tot: (k,) array
       dimensionless power spectrum
     '''
-    def __init__(self, name, m_fn, f_comp, bias_fn, bias_fn_args,
+    def __init__(self, name, m_fn, f_comp, bias_fn, bias_fn_args, k_c,
                  **profile_kwargs):
         super(Component, self).__init__(**profile_kwargs)
         # self.dndlnm = m_fn.dndlnm
@@ -56,6 +56,7 @@ class Component(dens.Profile):
         self.f_comp = f_comp
         self.bias_fn = bias_fn
         self.bias_fn_args = bias_fn_args
+        self.k_c = k_c
 
     #===========================================================================
     # Parameters
@@ -91,6 +92,9 @@ class Component(dens.Profile):
     def bias_fn_args(self, val):
         return val
 
+    @parameter
+    def k_c(self, val):
+        return val
     #===========================================================================
     # Methods
     #===========================================================================
@@ -173,7 +177,7 @@ class Component(dens.Profile):
                                    self.r_range,
                                    axis=1)
 
-    @cached_property('m_range', 'k_range', 'm_fn', 'rho_comp', 'rho_k')
+    @cached_property('m_range', 'k_range', 'm_fn', 'rho_comp', 'rho_k', 'k_c')
     def P_1h(self):
         '''
         Compute the 1-halo term of the power spectrum.
@@ -186,12 +190,23 @@ class Component(dens.Profile):
         m_range = self.m_range.reshape(m,1)
         f_comp = self.f_comp.reshape(m,1)
 
-        prefactor = 1./self.rho_comp**2
+        prefactor = 1./self.rho_comp**2 #* spec.erf(self.k_range / self.k_c)
         result = Integrate(y=dndlnm * f_comp**2 * np.abs(self.rho_k)**2
                            * m_range,
                            x=m_range,
                            axis=0)
         result *= prefactor
+
+        # m_range = self.m_range.reshape(m,1)
+        # f_comp = self.f_comp.reshape(m,1)
+        # r_x = self.r_range[:,-1].reshape(m,1)
+
+        # f_nu = self.m_fn.fsigma.reshape(m,1)
+        # nu = np.sqrt(self.m_fn.nu)
+        # prefactor = 4./3 * np.pi * 200
+        # result = Integrate(y=f_nu * f_comp**2 * np.abs(self.rho_k)**2 * r_x**3,
+        #                    x=nu,
+        #                    axis=0)
 
         return result
 
@@ -209,12 +224,14 @@ class Component(dens.Profile):
         f_comp = self.f_comp.reshape(m,1)
         bias = self.bias.reshape(m,1)
 
-        prefactor = np.exp(self.m_fn.power)
-        result = 1./self.rho_comp**2 * (Integrate(y=dndlnm * f_comp *
-                                                  self.rho_k * bias,
-                                                  x=m_range,
-                                                  axis=0))**2
-        result *= prefactor
+        # prefactor = np.exp(self.m_fn.power)
+        # result = 1./self.rho_comp**2 * (Integrate(y=dndlnm * f_comp *
+        #                                           self.rho_k * bias,
+        #                                           x=m_range,
+        #                                           axis=0))**2
+        # result *= prefactor
+        result = np.exp(self.m_fn.power)
+
 
         return result
 

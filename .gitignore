@@ -1,3 +1,6 @@
+*.dat
+*.npy
+*.hdf5
 *~
 *.pyc
 /main_old.py

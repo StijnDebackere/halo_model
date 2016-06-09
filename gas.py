@@ -93,6 +93,7 @@ def rhogas_eckert():
     T_bins = np.array([0.6, 2, 3, 4, 5])
     # halo mass bin edges! What are min and max mass?
     mwl_bins = T2Mwl(T_bins)
+    print mwl_bins
     mgas_bins = T2Mgas(T_bins)
 
     # change to ``cosmological'' coordinates
@@ -224,7 +225,7 @@ def fit_beta_bahamas():
 # End of fit_beta_bahamas()
 # ------------------------------------------------------------------------------
 
-def f_gas(M_halo, M_trans, a):
+def f_gas(M_halo, M_trans, a, f_0):
     '''
     Returns parametrization for gas fraction.
 
@@ -238,6 +239,8 @@ def f_gas(M_halo, M_trans, a):
       Mass of transition in units of M_500
     a : float
       power law slope of sigmoid
+    f_0 : float
+      limiting fraction for M->0
 
     Returns
     -------
@@ -246,7 +249,7 @@ def f_gas(M_halo, M_trans, a):
     '''
     # baryon fraction
     f_b = p.prms.omegab / p.prms.omegam
-    return f_b / (1 + (M_trans/M_halo)**a)
+    return f_0 + (f_b - f_0) / (1 + (M_trans/M_halo)**a)
 
 # ------------------------------------------------------------------------------
 # End of f_gas()
@@ -275,11 +278,11 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
 
     centers = np.power(10, 0.5*(edges[1:] + edges[:-1]))
     popt, pcov = opt.curve_fit(f_gas, centers, f_med, sigma=f_std,
-                               bounds=([1e10, 0],[1e15, 2]))
+                               bounds=([1e10, 0, 0],[1e15, 2, 0.1]))
 
     fit_prms = {'M_trans' : popt[0],
-                'a' : popt[1]}
-                # 'f_0' : popt[2]}
+                'a' : popt[1],
+                'f_0' : popt[2]}
     fit = f_gas(centers, **fit_prms)
 
     # plt.plot(m500, f, label=r'data', lw=0, marker='o')
@@ -363,8 +366,8 @@ def fit_sun_profile():
 
     # M = 2.5e14
     M = rhogas_sun.M
-    r200m = m500c_to_r200m(M)
-    m200m = tools.radius_to_mass(r200m, 200 * p.prms.rho_m * 0.7**2)
+    m200m = m500c_to_m200m(M)
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
     r500c = tools.mass_to_radius(M, 500 * p.prms.rho_crit * 0.7**2)
 
     print 'r200m: ', r200m
@@ -373,9 +376,13 @@ def fit_sun_profile():
 
     r_range = np.logspace(-4, np.log10(r200m / r500c), 100)
     u_beta = profs.profile_b(r_range, 1, 1, **fit_beta[0])
-    # u_beta = profs.profile_beta_extra(r_range, u_beta, 1, 3)
+    # u_beta = profs.profile_beta_extra(r_range.reshape(1,-1),
+    #                                   u_beta.reshape(1,-1),
+    #                                   np.array([1]), 3).reshape(-1)
     u_plaw = profs.profile_b_plaw(r_range, 1, 1, **fit_plaw[0])
-    # u_plaw = profs.profile_beta_extra(r_range, u_plaw, 1, 3)
+    # u_plaw = profs.profile_beta_extra(r_range.reshape(1,-1),
+    #                                   u_plaw.reshape(1,-1),
+    #                                   np.array([1]), 3).reshape(-1)
 
     # need to divide out r500c to match observed profiles
     prof_beta = (f_gas(M, **f_gas_fit()) * M * u_beta / r500c**3)
@@ -446,9 +453,13 @@ def fit_croston_profile():
 
     r_range = np.logspace(-4, np.log10(r200m / r500c), 100)
     u_beta = profs.profile_b(r_range, 1, 1, **fit_beta[0])
-    # u_beta = profs.profile_beta_extra(r_range, u_beta, 1, 3)
+    # u_beta = profs.profile_beta_extra(r_range.reshape(1,-1),
+    #                                   u_beta.reshape(1,-1),
+    #                                   np.array([1]), 3).reshape(-1)
     u_plaw = profs.profile_b_plaw(r_range, 1, 1, **fit_plaw[0])
-    # u_plaw = profs.profile_beta_extra(r_range, u_plaw, 1, 3)
+    # u_plaw = profs.profile_beta_extra(r_range.reshape(1,-1),
+    #                                   u_plaw.reshape(1,-1),
+    #                                   np.array([1]), 3).reshape(-1)
 
     # need to divide out r500c to match observed profiles
     prof_beta = (f_gas(M, **f_gas_fit()) * M * u_beta / r500c**3)
@@ -564,5 +575,88 @@ def m200m_to_m500c(m200m):
     return m500c
 
 # ------------------------------------------------------------------------------
-# End of m500c_to_m200m()
+# End of m200m_to_m500c()
+# ------------------------------------------------------------------------------
+
+def massdiff_cm(m200c, m200m):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    r200c = (m200c / (4./3 * np.pi * 200 * p.prms.rho_crit * 0.7**2))**(1./3)
+    r_range = np.logspace(-4, np.log10(r200c), 1000)
+
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
+    dens = profs.profile_NFW(r_range, np.array([m200m]),
+                             profs.c_correa(m200m, 0).reshape(-1),
+                             r200m, p.prms.rho_m * 0.7**2, Delta=200)
+    mass_int = tools.m_h(dens, r_range)
+
+    return mass_int - m200c
+
+
+def massdiff_mc(m200m, m200c):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    r200c = (m200c / (4./3 * np.pi * 200 * p.prms.rho_crit * 0.7**2))**(1./3)
+    r_range = np.logspace(-4, np.log10(r200c), 1000)
+
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
+    dens = profs.profile_NFW(r_range, np.array([m200m]),
+                             profs.c_correa(m200m, 0).reshape(-1),
+                             r200m, p.prms.rho_m * 0.7**2, Delta=200)
+    mass_int = tools.m_h(dens, r_range)
+
+    return mass_int - m200c
+
+# ------------------------------------------------------------------------------
+# End of m200m_to_m200c()
+# ------------------------------------------------------------------------------
+
+def m200c_to_m200m(m200c):
+    '''
+    Give the virial mass for the halo corresponding to m200c
+
+    Parameters
+    ----------
+    m200c : float
+      halo mass at 200 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200m = opt.brentq(massdiff_mc, 1e10, 1e19, args=(m200c))
+
+    return m200m
+
+# ------------------------------------------------------------------------------
+# End of m200c_to_m200m()
+# ------------------------------------------------------------------------------
+
+def m200m_to_m200c(m200m):
+    '''
+    Give m200c for the an m200m virial mass halo
+
+    Parameters
+    ----------
+    m200m : float
+      halo virial mass
+
+    Returns
+    -------
+    m200c : float
+      halo mass at 200 times the universe critical density
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200c = opt.brentq(massdiff_cm, 1e8, 1e19, args=(m200m))
+
+    return m200c
+
+# ------------------------------------------------------------------------------
+# End of m200m_to_m200c()
 # ------------------------------------------------------------------------------
