@@ -176,16 +176,17 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 
     # (m,z) array
     r_s = r_x.reshape([m] + list(z))/c_x.reshape([m] + list(z))
-    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    # rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
 
     # reshape to match up with k range
     r_s = r_s.reshape([m,1] + list(z))
-    rho_s = rho_s.reshape([m,1] + list(z))
+    # rho_s = rho_s.reshape([m,1] + list(z))
     c_x = c_x.reshape([m,1] + list(z))
     # (m,1,z) array
     new_shape = [m,1] + list(z/z)
 
-    prefactor = 4 * np.pi * rho_s * r_s**3 / m_range.reshape(new_shape)
+    # prefactor = 4 * np.pi * rho_s * r_s**3 / m_range.reshape(new_shape)
+    prefactor = 1./(np.log(1+c_x) - c_x/(1+c_x))
     # (1,k,1) array
     k_range = k_range.reshape([1,k] + list(z/z))
     K = k_range * r_s
@@ -204,7 +205,7 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 
     # normalize spectrum so that u[k=0] = 1, otherwise we get a small
     # systematic offset, while we know that theoretically u[k=0] = 1
-    profile_f = profile_f / profile_f[:,0].reshape(m,1)
+    # profile_f = profile_f / profile_f[:,0].reshape(m,1)
 
     return profile_f
 

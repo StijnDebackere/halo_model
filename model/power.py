@@ -45,15 +45,18 @@ class Power(Cache):
         m = comp_1.m_range.shape[0]
         k = comp_1.k_range.shape[0]
 
-        dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
+        # dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
+        nu = comp_1.nu.reshape(m,1)
+        fnu = comp_1.fnu.reshape(m,1)
+        r_x = comp_1.r_range[:,-1].reshape(m,1)
         m_range = comp_1.m_range.reshape(m,1)
         f_comp_1 = comp_1.f_comp.reshape(m,1)
         f_comp_2 = comp_2.f_comp.reshape(m,1)
 
-        prefactor = 1./(comp_1.rho_comp * comp_2.rho_comp)
+        prefactor = 4./3 * np.pi * 200.
         # prefactor = 1./(p.prms.rho)
-        result = Integrate(y=dndlnm * f_comp_1 * comp_1.rho_k *
-                           f_comp_2 * comp_2.rho_k * m_range,
+        result = Integrate(y=fnu * f_comp_1 * comp_1.rho_k *
+                           f_comp_2 * comp_2.rho_k * r_x**3,
                            x=m_range,
                            axis=0)
         result *= prefactor
@@ -70,20 +73,21 @@ class Power(Cache):
         m = comp_1.m_range.shape[0]
         k = comp_1.k_range.shape[0]
 
-        dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
-        m_range = comp_1.m_range.reshape(m,1)
+        # dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
+        nu = comp_1.nu.reshape(m,1)
+        fnu = comp_1.fnu.reshape(m,1)
+
         f_comp_1 = comp_1.f_comp.reshape(m,1)
         f_comp_2 = comp_2.f_comp.reshape(m,1)
         bias_1 = comp_1.bias.reshape(m,1)
         bias_2 = comp_2.bias.reshape(m,1)
 
-        prefactor = (1./(comp_1.rho_comp * comp_2.rho_comp) *
-                     np.exp(comp_1.m_fn.power))
-        result = (Integrate(y=dndlnm * f_comp_1 * comp_1.rho_k * bias_1,
-                            x=m_range,
+        prefactor = comp_1.p_lin
+        result = (Integrate(y=fnu * f_comp_1 * comp_1.rho_k * bias_1,
+                            x=nu,
                             axis=0) *
-                  Integrate(y=dndlnm * f_comp_2 * comp_2.rho_k * bias_2,
-                            x=m_range,
+                  Integrate(y=fnu * f_comp_2 * comp_2.rho_k * bias_2,
+                            x=nu,
                             axis=0))
         result *= prefactor
 
@@ -139,19 +143,15 @@ class Power(Cache):
         P_tot = 0.
         for key, comp in self.comps.iteritems():
             k_range = comp.k_range
-            rho_c = comp.rho_comp
 
-            P = rho_c**2/rho**2 * comp.P_tot
-            P_tot += P
+            P_tot += comp.P_tot
 
         for key, cross_comp in self.cross_P.iteritems():
             c1, c2 = key.split('-')
 
             k_range = self.comps[c1].k_range
-            rho_c1 = self.comps[c1].rho_comp
-            rho_c2 = self.comps[c2].rho_comp
 
-            P_cross = 2 * (rho_c1 * rho_c2) / rho**2 * cross_comp
+            P_cross = 2 * cross_comp
             P_tot += P_cross
 
         return P_tot
@@ -161,23 +161,14 @@ class Power(Cache):
         '''
         Return total dimensionless power including correlations
         '''
-        rho = p.prms.rho_m
         D_tot = 0.
         for key, comp in self.comps.iteritems():
-            k_range = comp.k_range
-            rho_c = comp.rho_comp
-
-            D = rho_c**2/rho**2 * comp.Delta_tot
-            D_tot += D
+            D_tot += comp.Delta_tot
 
         for key, cross_comp in self.cross_delta.iteritems():
             c1, c2 = key.split('-')
 
-            k_range = self.comps[c1].k_range
-            rho_c1 = self.comps[c1].rho_comp
-            rho_c2 = self.comps[c2].rho_comp
-
-            D_cross = 2 * (rho_c1 * rho_c2) / rho**2 * cross_comp
+            D_cross = 2 * cross_comp
             D_tot += D_cross
 
         return D_tot

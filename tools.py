@@ -34,6 +34,7 @@ def Integrate(y, x, axis=-1): # Simpson integration on fixed spaced data!
     '''
 	y_new = np.nan_to_num(y)
 	result = scipy.integrate.simps(y=y_new, x=x, axis=axis, even='first')
+	# result = np.trapz(y=y_new, x=x, axis=axis)
 
 	return result
 

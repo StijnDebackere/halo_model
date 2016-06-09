@@ -75,8 +75,9 @@ def load_dm(prms):
     r_x = prms.r_h
 
     # Test BAHAMAS fit
-    rs = b.dm_rs_fit(prms.m_range_lin / prms.h, **r_prms) * prms.h
-    c_x = r_x / rs
+    # rs = b.dm_rs_fit(prms.m_range_lin, **r_prms)
+    # c_x = r_x / rs
+    c_x = b.dm_c_fit(prms.m_range_lin, **c_prms)
     # dc = b.dm_dc_fit(prms.m_range_lin / prms.h, **d_prms) / prms.h**2
     # f_dm = b.dm_f_fit(prms.m_range_lin / prms.h, **f_prms)
 
@@ -85,10 +86,10 @@ def load_dm(prms):
                 'profile_f': profs.profile_NFW_f,
                 'profile_args': {'c_x': c_x,
                                  'r_x': r_x,
-                                 'rho_mean': prms.rho_m},
+                                 'rho_mean': 1.},
                 'profile_f_args': {'c_x': c_x,
                                    'r_x': r_x,
-                                   'rho_mean': prms.rho_m}}
+                                   'rho_mean': 1.}}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
 
     # bahamas self consistent
@@ -97,11 +98,13 @@ def load_dm(prms):
 
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
-                      'm_fn': prms.m_fn,
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,
+                      # 'm_fn': prms.m_fn,
                       'f_comp': f_dm,
-                      'bias_fn': bias.bias_Tinker10,
-                      'bias_fn_args': {'m_fn': prms.m_fn},
-                      'k_c': 0.1}
+                      'bias_fn': bias.bias_SMT,
+                      'bias_fn_args': {'nu': prms.nu}}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
 
@@ -153,8 +156,7 @@ def load_gas(prms):
                      'm_fn': prms.m_fn,
                      'f_comp': f_w,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn},
-                      'k_c': 0.1}
+                     'bias_fn_args': {'m_fn': prms.m_fn}}
     w_kwargs = tools.merge_dicts(w_kwargs, comp_w_kwargs)
     comp_w = comp.Component(**w_kwargs)
 
@@ -176,8 +178,7 @@ def load_gas(prms):
                      'm_fn': prms.m_fn,
                      'f_comp': fc_h,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn},
-                     'k_c': 0.1}
+                     'bias_fn_args': {'m_fn': prms.m_fn}}
     c_kwargs = tools.merge_dicts(c_kwargs, comp_c_kwargs)
     comp_c = comp.Component(**c_kwargs)
 
@@ -200,8 +201,7 @@ def load_gas(prms):
                      'm_fn': prms.m_fn,
                      'f_comp': fs_h,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn},
-                     'k_c': 0.1}
+                     'bias_fn_args': {'m_fn': prms.m_fn}}
     s_kwargs = tools.merge_dicts(s_kwargs, comp_s_kwargs)
     comp_s = comp.Component(**s_kwargs)
 
