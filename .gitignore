@@ -1,3 +1,6 @@
+*.txt
+*.pdf
+*.csv
 *.dat
 *.npy
 *.hdf5
