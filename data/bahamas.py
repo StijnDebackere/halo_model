@@ -20,229 +20,6 @@ import pdb
 
 cm2mpc = 3.2407788498994389e-25
 
-def load_data(ptypes=[0,1,4]):
-    ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/halo/data/'
-    # prof = ddir + 'BAHAMAS/eagle_subfind_particles_032_profiles.hdf5'
-    bins = ddir + 'BAHAMAS/eagle_subfind_particles_032_profiles_binned.hdf5'
-    # profs = h5py.File(ddir + prof, 'r')
-    binned = h5py.File(bins, 'r')
-
-    rho_med = []
-    rho_mean = []
-    std = []
-    q16 = []
-    q84 = []
-    mass_med = []
-    mass_mean = []
-    m200 = []
-    m500 = []
-    nbin = []
-    for ptype in ptypes:
-        rho_med.append(binned['PartType%i/MedianDensity'%ptype][:])
-        rho_mean.append(binned['PartType%i/MeanDensity'%ptype][:])
-        std.append(binned['PartType%i/StD'%ptype][:])
-        q16.append(binned['PartType%i/Q16'%ptype][:])
-        q84.append(binned['PartType%i/Q84'%ptype][:])
-        mass_med.append(binned['PartType%i/MedianM200'%ptype][:])
-        mass_mean.append(binned['PartType%i/MeanM200'%ptype][:])
-        m200.append(binned['PartType%i/M200'%ptype][:])
-        m500.append(binned['PartType%i/M500'%ptype][:])
-        nbin.append(binned['PartType%i/NumBin'%ptype][:])
-
-    m_bins = binned['MBins_M_Mean200'][:]
-    r_bins = binned['RBins_R_Mean200'][:]
-    binned.close()
-
-    data = {'rho_med' : np.array(rho_med),
-            'rho_mean' : np.array(rho_mean),
-            'std' : np.array(std),
-            'q16' : np.array(q16),
-            'q84' : np.array(q84),
-            'm_med' : np.array(mass_med),
-            'm_mean' : np.array(mass_mean),
-            'm200' : np.array(m200),
-            'm500' : np.array(m500),
-            'nbin' : np.array(nbin),
-            'm_bins' : m_bins,
-            'r_bins' : r_bins}
-
-    return data
-
-# ------------------------------------------------------------------------------
-# End of load_data()
-# ------------------------------------------------------------------------------
-
-def compare_method_eckert():
-    '''
-    Compare different gas mass derivations consistency with m500
-    '''
-    r_eckert, rho_eckert, s, mwl, mgas = gas.rhogas_eckert()
-    # only integrate up to 1 r500
-    m_x = tools.m_h(rho_eckert[:,:-1], r_eckert[:-1].reshape(1,-1), axis=-1)
-    mgas_f = mwl * gas.f_gas(mwl, **gas.f_gas_fit())
-
-    # get r500 from ratio between r & x=r/r500 integration
-    r500_f_eckert = (mgas_f / m_x)**(1./3)
-    r500_eckert = (mgas/m_x)**(1./3)
-
-    m500_f_eckert = tools.m_delta(r500_f_eckert, 500, p.prms.rho_crit * 0.7**2)
-    m500_eckert = tools.m_delta(r500_eckert, 500, p.prms.rho_crit * 0.7**2)
-
-    print 'm500 from f_gas : ', m500_f_eckert
-    print 'ratio wrt mwl   : ', m500_f_eckert / mwl
-    print 'f_gas determined: ', mgas_f / m500_f_eckert
-    print 'f_gas actual    : ', mgas_f / mwl
-    print 'm500 from T_gas : ', m500_eckert
-    print 'ratio wrt mwl   : ', m500_eckert / mwl
-    print 'f_gas determined: ', mgas / m500_eckert
-    print 'f_gas actual    : ', mgas / mwl
-
-# ------------------------------------------------------------------------------
-# End of compare_eckert()
-# ------------------------------------------------------------------------------
-
-def m_bins_eckert():
-    '''
-    Return m_bins to be used in profiles to slice BAHAMAS data as to reproduce
-    the Eckert masses
-    '''
-    # bahamas data
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_500_crit.hdf5', 'r')
-
-    m500 = np.sort(profiles['PartType0/M500'][:])
-    profiles.close()
-
-    # eckert data
-    data = np.loadtxt('halo/data/data_mccarthy/gas/xxl_table.csv',
-                      delimiter=',', unpack=True)
-    z, T300, r500, Mgas_500, Yx_500, fgas_500, used = data
-    # r500 is in kpc, rho_crit in Mpc
-    M500 = 4./3 * np.pi * 500 * p.prms.rho_crit * 0.7**2 * (0.001 * r500)**3
-    M500 /= 1.3 # faulty weak lensing mass determination
-    m_bins = []
-    m_bins.append(M500[T300 < 2].mean())
-    m_bins.append(M500[(2 < T300) & (T300 < 3)].mean())
-    m_bins.append(M500[(3 < T300) & (T300 < 4)].mean())
-    m_bins.append(M500[4 < T300].mean())
-    m_bins = np.array(m_bins)
-
-    # medians coincide approximately with means (double checked this)
-    slices = tools.median_slices(m500, m_bins,
-                                 m_bins.reshape(-1,1) *
-                                 np.array([0.75, 1.25]).reshape(-1,2))
-
-    m_bins_eckert = m500[slices]
-
-    return m_bins_eckert, m_bins
-
-# ------------------------------------------------------------------------------
-# End of m_bins_eckert()
-# ------------------------------------------------------------------------------
-
-def m_bins_sun():
-    '''
-    Return m_bins to be used in profiles to slice BAHAMAS data as to reproduce
-    the Sun mass
-    '''
-    # bahamas data
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_500_crit.hdf5', 'r')
-
-    m500 = np.sort(profiles['PartType0/M500'][:])
-    profiles.close()
-
-    # sun data
-    r500, rho, err = gas.rhogas_sun()
-    M_sun = gas.rhogas_sun.M
-
-    slices = tools.median_slices(m500, np.array([M_sun]),
-                                 np.array([0.75, 1.25]) * M_sun)
-    m_bins_sun = np.array([m500[s] for s in slices])
-    return m_bins_sun
-
-# ------------------------------------------------------------------------------
-# End of m_bins_sun()
-# ------------------------------------------------------------------------------
-
-def m_bins_croston():
-    '''
-    Return m_bins to be used in profiles to slice BAHAMAS data as to reproduce
-    the Croston mass
-    '''
-    # bahamas data
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_500_crit.hdf5', 'r')
-
-    m500 = np.sort(profiles['PartType0/M500'][:])
-    profiles.close()
-
-    # croston data
-    r500, rho, err = gas.rhogas_croston()
-    M_croston = gas.rhogas_croston.M
-
-    slices = tools.median_slices(m500, np.array([M_croston]),
-                                 np.array([0.75, 1.25]) * M_croston)
-    m_bins_croston = np.array([m500[s] for s in slices])
-    return m_bins_croston
-
-# ------------------------------------------------------------------------------
-# End of m_bins_croston()
-# ------------------------------------------------------------------------------
-
-def compare_med_mean(ptype, sliced=slice(None,None)):
-    '''
-    Compare the median and mean profiles in the BAHAMAS simulations.
-    '''
-    data = load_data(ptypes=[ptype])
-    r = tools.bins2center(data['r_bins'])
-    # m = tools.bins2center(data['m_bins'])
-
-    pl.set_style()
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    meds = data['rho_med'][0][sliced]
-    q16 = data['q16'][0][sliced]
-    q84 = data['q84'][0][sliced]
-    m_med = data['m_med'][0][sliced]
-    mean = data['rho_mean'][0][sliced]
-    std = data['std'][0][sliced]
-    m_mean = data['m_mean'][0][sliced]
-    lines = []
-    fills = []
-    for idx, med in enumerate(meds):
-        l_med, = ax.plot(r, med)
-        f_med = ax.fill_between(r, q16[idx], q84[idx],
-                                facecolor=l_med.get_color(),
-                                alpha=0.2,
-                                linewidth=0)
-        l_mean, = ax.plot(r, mean[idx])
-        f_mean = ax.fill_between(r, mean[idx] - std[idx], mean[idx] + std[idx],
-                                 facecolor=l_mean.get_color(),
-                                 alpha=0.2,
-                                 linewidth=0)
-        lines.extend([l_med, l_mean])
-        fills.extend([f_med, f_mean])
-
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel(r'$r/r_{200}$')
-    ax.set_ylabel(r'$\rho(r)$ in $M_\odot/$Mpc$^3$')
-
-    masses = np.empty((m_med.size + m_mean.size))
-    masses[0::2] = m_med
-    masses[1::2] = m_mean
-    ax.legend([(line, fill) for line,fill in zip(lines, fills)],
-              [r'$M_{\mathrm{med}}=10^{%.2f}M_\odot$'%np.log10(m)
-               if idx%2 == 0 else
-               r'$M_{\mathrm{mean}}=10^{%.2f}M_\odot$'%np.log10(m)
-               for idx, m in enumerate(masses)])
-
-    plt.show()
-
-# ------------------------------------------------------------------------------
-# End of compare_med_mean()
-# ------------------------------------------------------------------------------
-
 def plot_fgas_bahamas():
     '''
     Plot gas fraction in BAHAMAS vs our observed relation
@@ -352,437 +129,6 @@ def plot_fgas_bahamas():
 # End of plot_fgas_bahamas()
 # ------------------------------------------------------------------------------
 
-def plot_cM_bahamas():
-    '''
-    Plot concentration mass relation in BAHAMAS
-    '''
-    pl.set_style()
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles.hdf5', 'r')
-
-    m500 = profiles['PartType1/M500'][:]
-    m200 = profiles['PartType1/M200'][:]
-    numpart = profiles['PartType1/NumPartGroup'][:]
-    grnr = profiles['PartType1/GroupNumber'][:]
-    relaxed = profiles['PartType1/Relaxed'][:]
-    # r500 = profiles['PartType1/R500'][::100]
-    idx = ((numpart[grnr] >= 1e4) & relaxed)
-
-    m500 = m500[idx]
-    m200 = m200[idx]
-
-    c_x = tools.M_to_c200(m200, m500, 200, 500, p.prms.rho_m * 0.7**2)
-    np.save('halo/data/BAHAMAS/c_x.npy', c_x)
-    m_range = np.logspace(np.log10(m200).min(), np.log10(m200).max(), 100)
-    c_cor = profs.c_correa(m_range, 0).reshape(-1)
-
-    m_bins = np.logspace(np.log10(m200).min(), np.log10(m200).max(), 20)
-    m = tools.bins2center(m_bins)
-    m_bin_idx = np.digitize(m200, m_bins)
-    c_med = np.array([np.median(c_x[m_bin_idx == m_bin])
-                                for m_bin in np.arange(1, len(m_bins))])
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    img = ax.hexbin(np.log10(m200), np.log10(c_x), cmap='magma',
-                    bins='log')
-    ax.plot(np.log10(m_range), np.log10(c_cor), c='w',
-            label=r'$c_{\mathrm{correa}}$')
-    ax.plot(np.log10(m), np.log10(c_med), c='w', label=r'$c_{\mathrm{med}}$')
-    ax.set_xlabel(r'$M_{200} \, [\log_{10}M_\odot]$')
-    ax.set_ylabel(r'$\log_{10} c_{200}$')
-    ax.set_xlim([np.log10(m).min(), np.log10(m).max()])
-
-    for line in ax.xaxis.get_ticklines():
-        line.set_color('w')
-    for line in ax.yaxis.get_ticklines():
-        line.set_color('w')
-
-    leg = ax.legend(loc='best')
-    for text in leg.get_texts():
-        plt.setp(text, color='w')
-
-    cb = fig.colorbar(img)
-    cb.set_label(r'$\log_{10} N_{\mathrm{bin}}$', rotation=270, labelpad=25)
-
-    plt.show()
-
-    profiles.close()
-
-# ------------------------------------------------------------------------------
-# End of plot_cM_bahamas()
-# ------------------------------------------------------------------------------
-
-def compare_individual_binned():
-    '''
-    Compare the median mass obtained via the median of the individual profile
-    masses with the median for the median binned profile mass.
-    '''
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_500.hdf5', 'r')
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500.hdf5', 'r')
-
-    r_bins = profiles['RBins_R_Mean500'][:]
-    r = tools.bins2center(r_bins)
-    m_bins = binned['MBins_M_Mean500'][:]
-    m = tools.bins2center(m_bins).reshape(-1)
-
-    rho_i = profiles['PartType0/Densities'][:]
-    r500_i = profiles['PartType0/R500'][:] * cm2mpc
-    m500_i = profiles['PartType0/M500'][:]
-    mgas_i = tools.m_h(rho_i, r.reshape(1,-1) * r500_i.reshape(-1,1), axis=-1)
-    m_med_i = np.array([np.median(mgas_i[(m_bin[0] <= m500_i) &
-                                         (m500_i <= m_bin[1])])
-                        for m_bin in m_bins])
-
-    rho = binned['PartType0/MedianDensity'][:]
-    r500_inbin = binned['PartType0/R500'][:]
-    numbin = binned['PartType0/NumBin'][:]
-    to_slice = np.concatenate([[0], numbin])
-    bin_slice = np.concatenate([np.cumsum(to_slice[:-1]).reshape(-1,1),
-                                np.cumsum(to_slice[1:]).reshape(-1,1)], axis=-1)
-    r500 = np.array([np.median(r500_inbin[sl[0]:sl[1]]) for sl in bin_slice])
-    m_med = tools.m_h(rho, r.reshape(1,-1) * r500.reshape(-1,1), axis=-1)
-
-    # compare actual mass in simulation to mass extrapolated from f_gas
-    f_gas = gas.f_gas(m, **gas.f_gas_fit())
-    m_x = tools.m_h(rho, r.reshape(1,-1), axis=-1)
-    r500_f = (((f_gas * m)/m_x)**(1./3))
-    mgas_f = tools.m_h(rho, r.reshape(1,-1) * r500_f.reshape(-1,1), axis=-1)
-
-    pl.set_style('mark')
-    plt.plot(m, m_med_i, label=r'Individual')
-    plt.plot(m, m_med, label=r'Binned')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel(r'$M_{500} \, [M_\odot]$')
-    plt.ylabel(r'$M_{\mathrm{gas},500} \, [M_\odot]$')
-    plt.legend(loc='best')
-    plt.show()
-
-    pl.set_style('mark')
-    plt.plot(m, m_med_i/m, label=r'Individual')
-    plt.plot(m, m_med/m, label=r'Binned')
-    plt.plot(m, f_gas, label=r'Observations')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel(r'$M_{500} \, [M_\odot]$')
-    plt.ylabel(r'$f_{\mathrm{gas},500} \, [M_\odot]$')
-    plt.legend(loc='best')
-    plt.show()
-
-    pl.set_style('mark')
-    plt.plot(m, mgas_f, label=r'$M_{\mathrm{gas,obs}}$')
-    plt.plot(m, m_med, label=r'$M_{\mathrm{gas,sim}}$')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel(r'$M_{500}\,[M_\odot]$')
-    plt.ylabel(r'$M_{\mathrm{gas}}\,[M_\odot]$')
-    plt.legend(loc='best')
-    plt.show()
-
-    profiles.close()
-    binned.close()
-
-# ------------------------------------------------------------------------------
-# End of compare_individual_binned()
-# ------------------------------------------------------------------------------
-
-def fit_beta_bahamas():
-    '''
-    Fit beta profiles to the bahamas bins
-    '''
-    # bahamas data
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_Tgt1e65_5r500c.hdf5', 'r')
-
-    rho = binned['PartType0/MedianDensity'][:]
-    q16 = binned['PartType0/Q16'][:]
-    q84 = binned['PartType0/Q84'][:]
-    r500_inbin = binned['PartType0/R500'][:]
-    numbin = binned['PartType0/NumBin'][:]
-
-    to_slice = np.concatenate([[0], numbin])
-    bin_slice = np.concatenate([np.cumsum(to_slice[:-1]).reshape(-1,1),
-                                np.cumsum(to_slice[1:]).reshape(-1,1)], axis=-1)
-
-    r500 = np.array([np.median(r500_inbin[sl[0]:sl[1]]) for sl in bin_slice])
-    err = np.maximum(rho - q16, q84 - rho)
-
-    r_bins = binned['RBins_R_Crit500'][:]
-    r = tools.bins2center(r_bins)
-    # idx_500 = np.argmin(np.abs(r - 1))
-    idx_500 = r.shape[0] - 1
-    m_bins = binned['MBins_M_Crit500'][:]
-
-    norm = tools.m_h(rho[:,:idx_500 + 1], r[:idx_500 + 1].reshape(1,-1), axis=-1)
-    rho_norm = rho / norm.reshape(-1,1)
-    q16_norm = q16 / norm.reshape(-1,1)
-    q84_norm = q84 / norm.reshape(-1,1)
-    err_norm = err / norm.reshape(-1,1)
-
-    binned.close()
-
-    fit_prms_p = []
-    covs_p     = []
-    profiles_p = []
-    fit_prms_b = []
-    covs_b     = []
-    profiles_b = []
-    for idx, profile in enumerate(rho_norm):
-        sl = ((r >= 0.05) & (r <= r[idx_500]) & (profile > 0))
-        fit_p, cov_p, prof_p = profs.fit_profile_beta_plaw(r[sl], 1,
-                                                           r[idx_500],
-                                                           profile[sl],
-                                                           err=err_norm[idx][sl])
-        fit_b, cov_b, prof_b = profs.fit_profile_beta(r[sl], 1,
-                                                      r[idx_500],
-                                                      profile[sl],
-                                                      err=err_norm[idx][sl])
-        fit_prms_p.append(fit_p)
-        covs_p.append(cov_p)
-        profiles_p.append(prof_p)
-        fit_prms_b.append(fit_b)
-        covs_b.append(cov_b)
-        profiles_b.append(prof_b)
-
-        # print fit_b['r_c']
-        # plt.plot(r, profile)
-        # plt.plot(r[sl], prof_b)
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.show()
-
-    return fit_prms_p, fit_prms_b, covs_p, covs_b, profiles_p, profiles_b
-
-# ------------------------------------------------------------------------------
-# End of fit_beta_bahamas()
-# ------------------------------------------------------------------------------
-
-def plot_beta_bahamas():
-    '''
-    Plot beta profile fits and profiles for mass bins
-    '''
-    fit_p, fit_b, covs_p, covs_b, profiles_p, profiles_b = fit_beta_bahamas()
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_Tgt1e65_5r500c.hdf5', 'r')
-
-    rho = binned['PartType0/MedianDensity'][:]
-    q16 = binned['PartType0/Q16'][:]
-    q84 = binned['PartType0/Q84'][:]
-    r500_inbin = binned['PartType0/R500'][:]
-    numbin = binned['PartType0/NumBin'][:]
-    to_slice = np.concatenate([[0], numbin])
-    bin_slice = np.concatenate([np.cumsum(to_slice[:-1]).reshape(-1,1),
-                                np.cumsum(to_slice[1:]).reshape(-1,1)], axis=-1)
-    r500 = np.array([np.median(r500_inbin[sl[0]:sl[1]]) for sl in bin_slice])
-    err = np.maximum(rho - q16, q84 - rho)
-
-    r_bins = binned['RBins_R_Crit500'][:]
-    r = tools.bins2center(r_bins)
-    idx_500 = np.argmin(np.abs(r - 1))
-    m_bins = binned['MBins_M_Crit500'][:]
-    m = tools.bins2center(m_bins)
-
-    norm = tools.m_h(rho[:,:idx_500 + 1], r[:idx_500 + 1].reshape(1,-1), axis=-1)
-    rho_norm = rho / norm.reshape(-1,1)
-    q16_norm = q16 / norm.reshape(-1,1)
-    q84_norm = q84 / norm.reshape(-1,1)
-    err_norm = err / norm.reshape(-1,1)
-
-    binned.close()
-    pl.set_style()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    ax.set_prop_cycle(pl.cycle_line())
-    lines = []
-    # for idx, prms in enumerate(fit_p):
-    #     prof = profs.profile_b_plaw(r[r>=0.05], 1., r[idx_500], **prms)
-    #     prof = profs.profile_beta_extra(r[r>=0.05], prof, r[idx_500], 3.)
-    #     line, = ax.plot(r[r>=0.05], prof * m[idx])
-    #     lines.append(line)
-
-    for idx, prms in enumerate(fit_b):
-        prof = profs.profile_b(r[r>=0.05], 1., r[idx_500], **prms)
-        # prof = profs.profile_beta_extra(r[r>=0.05], prof, r[idx_500], 3.)
-        line, = ax.plot(r[r>=0.05], prof * m[idx])
-        lines.append(line)
-
-    ax.set_prop_cycle(pl.cycle_mark())
-    marks = []
-    for idx, prof in enumerate(rho_norm):
-        mark, = ax.plot(r[r>=0.05], prof[r>=0.05] * m[idx])
-        marks.append(mark)
-
-    ax.set_xlim([0.9*r[r>=0.05].min(), 1.1*r[r>=0.05].max()])
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel(r'$r/r_{500}$')
-    ax.set_ylabel(r'$M u(r)$')
-
-    # Shrink current axis by 20%
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    # Put a legend to the right of the current axis
-    ax.legend([(line, mark) for line, mark in zip(lines, marks)],
-              [r'$M=10^{%.1f}$'%np.log10(c) for c in m],
-              loc='center left', bbox_to_anchor=(1, 0.5))
-
-    plt.show()
-
-# ------------------------------------------------------------------------------
-# End of plot_beta_bahamas()
-# ------------------------------------------------------------------------------
-
-def plot_gas_bahamas():
-    '''
-    Plot profiles for mass bins
-    '''
-    # binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_5r500c.hdf5', 'r')
-
-    # rho = binned['PartType0/MedianDensity'][:]
-    # q16 = binned['PartType0/Q16'][:]
-    # q84 = binned['PartType0/Q84'][:]
-    # r500_inbin = binned['PartType0/R500'][:]
-    # numbin = binned['PartType0/NumBin'][:]
-    # to_slice = np.concatenate([[0], numbin])
-    # bin_slice = np.concatenate([np.cumsum(to_slice[:-1]).reshape(-1,1),
-    #                             np.cumsum(to_slice[1:]).reshape(-1,1)], axis=-1)
-    # r500 = np.array([np.median(r500_inbin[sl[0]:sl[1]]) for sl in bin_slice])
-    # err = np.maximum(rho - q16, q84 - rho)
-
-    # r_bins = binned['RBins_R_Crit500'][:]
-    # r = tools.bins2center(r_bins)
-    # idx_500 = np.argmin(np.abs(r - 1))
-    # m_bins = binned['MBins_M_Crit500'][:]
-    # m = tools.bins2center(m_bins)
-
-    # norm = tools.m_h(rho, r.reshape(1,-1), axis=-1)
-    # rho_norm = rho / norm.reshape(-1,1)
-    # q16_norm = q16 / norm.reshape(-1,1)
-    # q84_norm = q84 / norm.reshape(-1,1)
-    # err_norm = err / norm.reshape(-1,1)
-
-    # binned.close()
-
-    # pl.set_style()
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-
-    # ax.set_prop_cycle(pl.cycle_line())
-
-    # lines = []
-    # for idx, prof in enumerate(rho_1[::2]):
-    #     line, = ax.plot(r[r>=0.05], prof[r>=0.05] * m[::2][idx])
-    #     fill = ax.fill_between(r[r>=0.05],
-    #                            q16_norm[::2][idx][r>=0.05] * m[::2][idx],
-    #                            q84_norm[::2][idx][r>=0.05] * m[::2][idx],
-    #                            facecolor=line.get_color(), alpha=0.3,
-    #                            edgecolor='none')
-    #     lines.append((line, fill))
-
-    # ax.set_xlim([0.9*r[r>=0.05].min(), 1.1*r[r>=0.05].max()])
-    # ax.set_xscale('log')
-    # ax.set_yscale('log')
-    # ax.set_xlabel(r'$r/r_{500}$')
-    # ax.set_ylabel(r'$M u(r)$')
-
-    # # Shrink current axis by 20%
-    # box = ax.get_position()
-    # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    # # Put a legend to the right of the current axis
-    # ax.legend([(line) for line in lines],
-    #           [r'$M=10^{%.1f}$'%np.log10(c) for c in m[::2]],
-    #           loc='center left', bbox_to_anchor=(1, 0.5))
-
-    # plt.show()
-
-    T1 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_Tlt1e45_5r500c_M11_13.hdf5', 'r')
-    T2 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_T1e45_1e65_5r500c_M11_13.hdf5', 'r')
-    T3 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_Tgt1e65_5r500c_M11_13.hdf5', 'r')
-
-    # get density profiles
-    rho_1 = T1['PartType0/MedianDensity'][:]
-    rho_2 = T2['PartType0/MedianDensity'][:]
-    rho_3 = T3['PartType0/MedianDensity'][:]
-
-    # m200 = T1['PartType0/M200'][:]
-    # r200 = T1['PartType0/R200'][:] * cm2mpc
-
-    r_bins = T1['RBins_R_Crit500'][:]
-    r = tools.bins2center(r_bins)
-    m_bins = T1['MBins_M_Crit500'][:]
-    m = tools.bins2center(m_bins)
-    print m_bins
-
-    T1.close()
-    T2.close()
-    T3.close()
-
-    # set color cycle
-    cycle_color = palettable.colorbrewer.qualitative.Set1_3.mpl_colors
-    cycle_ls = ['--', '-.', ':']
-    cycle_lw = [1,2,3]
-    cycle_tot = (cycler('ls', cycle_ls) *
-                 (cycler('color', cycle_color) + cycler('lw', cycle_lw)))
-
-    pl.set_style('line')
-    # fig = plt.figure(figsize=(18,6))
-    # ax_m1 = fig.add_subplot(131)
-    # ax_m2 = fig.add_subplot(132)
-    # ax_m3 = fig.add_subplot(133)
-    # ax_m1.set_prop_cycle(cycle_tot)
-    # ax_m2.set_prop_cycle(cycle_tot)
-    # ax_m3.set_prop_cycle(cycle_tot)
-
-    masses = np.array([r'$10^{%.2f}<\mathrm{m_{200}/M_\odot}<10^{%.2f}$'%(np.log10(i), np.log10(j)) for i, j in m_bins])
-
-    # axes = [ax_m1, ax_m2, ax_m3]
-    for idx, mass in enumerate(masses):
-        prof_1 = rho_1[idx]
-        prof_2 = rho_2[idx]
-        prof_3 = rho_3[idx]
-        # prof_t = rho_t[idx]
-
-        tot = prof_1 + prof_2 + prof_3
-        tot[tot == 0] = np.nan
-        prof_1[prof_1 == 0] = np.nan
-        prof_2[prof_2 == 0] = np.nan
-        prof_3[prof_3 == 0] = np.nan
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        # prof_t[prof_t == 0] = np.nan
-        # l0, = ax.plot(r, tot * r**2)
-        # l1, = ax.plot(r, prof_1 * r**2)
-        # l2, = ax.plot(r, prof_2 * r**2)
-        # l3, = ax.plot(r, prof_3 * r**2)
-        l0, = ax.plot(r, tot, c='k', lw=4, ls='-', label='Total')
-        l1, = ax.plot(r, prof_1)
-        l2, = ax.plot(r, prof_2)
-        l3, = ax.plot(r, prof_3)
-        ax.set_xlim([0.9 * r.min(), 1.1 * r.max()])
-        # ax.set_ylim([1e9, 1e13])
-        ax.set_ylim([1e9, 1e16])
-
-        lines = [l0, l3, l2, l1]
-
-        ax.set_title(masses[idx])
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-        ax.set_xlabel(r'$r/r_{500}$')
-        # ax.set_ylabel(r'$\rho(r)(r/r_{500})^2$ in $M_\odot/$Mpc$^{3}$')
-        ax.set_ylabel(r'$\rho(r)$ in $M_\odot/$Mpc$^{3}$')
-
-        temps = np.array([r'Total', r'$T/\mathrm{K}>10^{6.5}$',
-                          r'$10^{4.5} < T/\mathrm{K}<10^{6.5}$',
-                          r'$T/\mathrm{K}<10^{4.5}$'])
-
-
-        ax.legend(lines, temps, loc='best')
-
-        plt.show()
-
-# ------------------------------------------------------------------------------
-# End of plot_gas_bahamas()
-# ------------------------------------------------------------------------------
-
 def plot_dm_bahamas():
     '''
     Plot profiles for mass bins
@@ -872,76 +218,6 @@ def plot_dm_bahamas():
 # End of plot_dm_bahamas()
 # ------------------------------------------------------------------------------
 
-def plot_dm_ratio_bahamas():
-    '''
-    Plot profiles for mass bins
-    '''
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned.hdf5', 'r')
-    dmonly = h5py.File('halo/data/BAHAMAS/DMONLY/eagle_subfind_particles_032_profiles_binned.hdf5', 'r')
-
-    rho = binned['PartType1/MedianDensity'][:]
-    q16 = binned['PartType1/Q16'][:]
-    q84 = binned['PartType1/Q84'][:]
-    r200 = binned['PartType1/MedianR200'][:]
-
-    dmo_rho = dmonly['PartType1/MedianDensity'][:]
-    dmo_q16 = dmonly['PartType1/Q16'][:]
-    dmo_q84 = dmonly['PartType1/Q84'][:]
-    dmo_r200 = dmonly['PartType1/MedianR200'][:]
-
-    r_bins = binned['RBins_R_Mean200'][:]
-    r = tools.bins2center(r_bins)
-    m_bins = binned['MBins_M_Mean200'][:]
-    m = tools.bins2center(m_bins)
-
-    norm = tools.m_h(rho, r200.reshape(-1,1) * r.reshape(1,-1), axis=-1)
-    rho_norm = rho / norm.reshape(-1,1)
-    q16_norm = q16 / norm.reshape(-1,1)
-    q84_norm = q84 / norm.reshape(-1,1)
-
-    dmo_norm = tools.m_h(dmo_rho, dmo_r200.reshape(-1,1) * r.reshape(1,-1), axis=-1)
-    dmo_rho_norm = dmo_rho / dmo_norm.reshape(-1,1)
-    dmo_q16_norm = dmo_q16 / dmo_norm.reshape(-1,1)
-    dmo_q84_norm = dmo_q84 / dmo_norm.reshape(-1,1)
-
-    binned.close()
-    dmonly.close()
-
-    pl.set_style()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    ax.set_prop_cycle(pl.cycle_line())
-
-    lines = []
-    for idx, prof in enumerate(rho_norm[::4]):
-        dmo_prof = dmo_rho_norm[::4][idx]
-        line, = ax.plot(r * r200[::4][idx], prof/dmo_prof)
-        lines.append((line,))
-
-    ax.axhline(y=1, c='k', ls='--')
-    ax.set_xlim([(0.9*r*r200[0]).min(), (1.1*r*r200[::4][idx]).max()])
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel(r'$r \, [\mathrm{Mpc}/h]$')
-    ax.set_ylabel(r'$u_{\mathrm{AGN}}(r) / u_{\mathrm{DMO}}(r)$')
-
-    # Shrink current axis by 20%
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    # Put a legend to the right of the current axis
-    labels = np.array([r'$M=10^{%.1f}$'%np.log10(c)
-                       for c in m[::4]]).reshape(-1)
-    ax.legend([handle for handle in lines],
-              [lab for lab in labels],
-              loc='center left', bbox_to_anchor=(1, 0.5))
-
-    plt.show()
-
-# ------------------------------------------------------------------------------
-# End of plot_dm_ratio_bahamas()
-# ------------------------------------------------------------------------------
-
 def plot_stars_bahamas():
     '''
     Plot profiles for mass bins
@@ -1003,135 +279,209 @@ def plot_stars_bahamas():
 # End of plot_stars_bahamas()
 # ------------------------------------------------------------------------------
 
-def compare_bahamas_eckert(r_bins=np.logspace(-2.5, 0.1, 20),
-                           m_bins=np.logspace(13, 15, 20)):
+def compare_individual_binned():
     '''
-    Plot median profiles for BAHAMAS and mean profiles from Eckert
+    Compare the median mass obtained via the median of the individual profile
+    masses with the median for the median binned profile mass.
     '''
-    # get gas profiles
-    r_eckert, rho_eckert, s, mwl, mgas = gas.rhogas_eckert()
-    m_eckert = mwl
+    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_500.hdf5', 'r')
+    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500.hdf5', 'r')
 
-    m_bins_e, m_bins = m_bins_eckert()
-
-    # bahamas data
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_eckert.hdf5', 'r')
-
-    r_bins = binned['RBins_R_Crit500'][:]
+    r_bins = profiles['RBins_R_Mean500'][:]
     r = tools.bins2center(r_bins)
+    m_bins = binned['MBins_M_Mean500'][:]
+    m = tools.bins2center(m_bins).reshape(-1)
 
-    m500 = binned['PartType0/M500'][:]
+    rho_i = profiles['PartType0/Densities'][:]
+    r500_i = profiles['PartType0/R500'][:] * cm2mpc
+    m500_i = profiles['PartType0/M500'][:]
+    mgas_i = tools.m_h(rho_i, r.reshape(1,-1) * r500_i.reshape(-1,1), axis=-1)
+    m_med_i = np.array([np.median(mgas_i[(m_bin[0] <= m500_i) &
+                                         (m500_i <= m_bin[1])])
+                        for m_bin in m_bins])
+
+    rho = binned['PartType0/MedianDensity'][:]
+    r500_inbin = binned['PartType0/R500'][:]
     numbin = binned['PartType0/NumBin'][:]
+    to_slice = np.concatenate([[0], numbin])
+    bin_slice = np.concatenate([np.cumsum(to_slice[:-1]).reshape(-1,1),
+                                np.cumsum(to_slice[1:]).reshape(-1,1)], axis=-1)
+    r500 = np.array([np.median(r500_inbin[sl[0]:sl[1]]) for sl in bin_slice])
+    m_med = tools.m_h(rho, r.reshape(1,-1) * r500.reshape(-1,1), axis=-1)
 
-    numbin = np.concatenate([[0], numbin])
-    bin_slice = np.concatenate([np.cumsum(numbin[:-1]).reshape(-1,1),
-                                np.cumsum(numbin[1:]).reshape(-1,1)], axis=-1)
+    # compare actual mass in simulation to mass extrapolated from f_gas
+    f_gas = gas.f_gas(m, **gas.f_gas_fit())
+    m_x = tools.m_h(rho, r.reshape(1,-1), axis=-1)
+    r500_f = (((f_gas * m)/m_x)**(1./3))
+    mgas_f = tools.m_h(rho, r.reshape(1,-1) * r500_f.reshape(-1,1), axis=-1)
 
-    m = np.array([np.mean(m500[sl[0]:sl[1]]) for sl in bin_slice])
-
-    rho_bah = binned['PartType0/MedianDensity'][:]
-
-    binned.close()
-    pl.set_style()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    marks = []
-    lines = []
-    ax.set_prop_cycle(pl.cycle_mark())
-    for idx, prof in enumerate(rho_eckert):
-        mark = ax.errorbar(r_eckert, prof, yerr=s[idx], fmt='o')
-        marks.append(mark)
-
-    ax.set_prop_cycle(pl.cycle_line())
-    for prof in rho_bah:
-        line, = ax.plot(r, prof)
-        lines.append(line)
-
-    ax.set_xlim([0.9*r_eckert.min(), 1.1*r_eckert.max()])
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel(r'$r/r_{500}$')
-    ax.set_ylabel(r'$\rho(r)$ in $M_\odot/$Mpc$^3$')
-    ax.legend([(line, mark) for line, mark in zip(lines, marks)],
-              [r'$M_{\mathrm{mean},b}=10^{%.2f}M_\odot, \, M_{\mathrm{mean},e}=10^{%.2f}M_\odot$'%(np.log10(mass), np.log10(m_bins[idx]))
-               for idx, mass in enumerate(m)])
+    pl.set_style('mark')
+    plt.plot(m, m_med_i, label=r'Individual')
+    plt.plot(m, m_med, label=r'Binned')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel(r'$M_{500} \, [M_\odot]$')
+    plt.ylabel(r'$M_{\mathrm{gas},500} \, [M_\odot]$')
+    plt.legend(loc='best')
     plt.show()
 
-# ------------------------------------------------------------------------------
-# End of compare_bahamas_eckert()
-# ------------------------------------------------------------------------------
-
-def compare_bahamas_sun_croston():
-    '''
-    Compare BAHAMAS profiles binned to reproduce median mass in Sun & Croston
-    samples.
-    '''
-    r500_sun, rho_sun, err_sun = gas.rhogas_sun()
-    r500_sun = r500_sun.reshape(-1,4).mean(axis=1)
-    rho_sun = rho_sun.reshape(-1,4).mean(axis=1)
-    err_sun = 1./2 * np.sqrt(np.sum(err_sun.reshape(2,-1,4)**2, axis=-1))
-
-    r500_croston, rho_croston, err_croston = gas.rhogas_croston()
-
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_T1e6_papercut.hdf5', 'r')
-
-    r_bins = binned['RBins_R_Crit500'][:]
-    r = tools.bins2center(r_bins)
-
-    m500 = binned['PartType0/M500'][:]
-    numbin = binned['PartType0/NumBin'][:]
-    m = np.array([np.median(m500[:numbin[0]]),
-                  np.median(m500[numbin[0]:])])
-
-    rho_bah = binned['PartType0/MedianDensity'][:]
-
-    binned.close()
-    pl.set_style()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    ax.set_prop_cycle(pl.cycle_mark())
-    marks = []
-    # mark = ax.errorbar(r500_sun, rho_sun * r500_sun**2,
-    #                    yerr=[err_sun[0] * r500_sun**2,
-    #                          err_sun[1] * r500_sun**2],
-    #                    fmt='o')
-    mark = ax.errorbar(r500_sun, rho_sun,
-                       yerr=[err_sun[0],
-                             err_sun[1]],
-                       fmt='o')
-    marks.append(mark)
-    # mark = ax.errorbar(r500_croston, rho_croston * r500_croston**2,
-    #                    yerr=[err_croston[0] * r500_croston**2,
-    #                          err_croston[1] * r500_croston**2],
-    #                    fmt='o')
-    mark = ax.errorbar(r500_croston, rho_croston,
-                       yerr=[err_croston[0],
-                             err_croston[1]],
-                       fmt='o')
-    marks.append(mark)
-
-    ax.set_prop_cycle(pl.cycle_line())
-    lines = []
-    for idx, prof in enumerate(rho_bah):
-        # line, = ax.plot(r, r**2 * prof/(p.prms.rho_crit * 0.7**2))#*1.3)
-        line, = ax.plot(r, prof/(p.prms.rho_crit * 0.7**2))
-        lines.append(line)
-
-    ax.set_xlim([0.9*r500_croston.min(), 1.1*r500_croston.max()])
-    ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.set_xlabel(r'$r/r_{500}$')
-    # ax.set_ylabel(r'$\rho(r)/\rho_{\mathrm{crit}} (r/r_{500})^2$')
-    ax.set_ylabel(r'$\rho(r)/\rho_{\mathrm{crit}}$')
-    ax.legend([(line, mark) for line, mark in zip(lines, marks)],
-              [r'$M_{\mathrm{med}}=10^{%.1f}M_\odot$'%np.log10(c) for c in m])
+    pl.set_style('mark')
+    plt.plot(m, m_med_i/m, label=r'Individual')
+    plt.plot(m, m_med/m, label=r'Binned')
+    plt.plot(m, f_gas, label=r'Observations')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel(r'$M_{500} \, [M_\odot]$')
+    plt.ylabel(r'$f_{\mathrm{gas},500} \, [M_\odot]$')
+    plt.legend(loc='best')
     plt.show()
 
+    pl.set_style('mark')
+    plt.plot(m, mgas_f, label=r'$M_{\mathrm{gas,obs}}$')
+    plt.plot(m, m_med, label=r'$M_{\mathrm{gas,sim}}$')
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel(r'$M_{500}\,[M_\odot]$')
+    plt.ylabel(r'$M_{\mathrm{gas}}\,[M_\odot]$')
+    plt.legend(loc='best')
+    plt.show()
+
+    profiles.close()
+    binned.close()
+
 # ------------------------------------------------------------------------------
-# End of compare_bahamas_sun_croston()
+# End of compare_individual_binned()
 # ------------------------------------------------------------------------------
+
+# def compare_bahamas_eckert(r_bins=np.logspace(-2.5, 0.1, 20),
+#                            m_bins=np.logspace(13, 15, 20)):
+#     '''
+#     Plot median profiles for BAHAMAS and mean profiles from Eckert
+#     '''
+#     # get gas profiles
+#     r_eckert, rho_eckert, s, mwl, mgas = gas.rhogas_eckert()
+#     m_eckert = mwl
+
+#     m_bins_e, m_bins = m_bins_eckert()
+
+#     # bahamas data
+#     binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_eckert.hdf5', 'r')
+
+#     r_bins = binned['RBins_R_Crit500'][:]
+#     r = tools.bins2center(r_bins)
+
+#     m500 = binned['PartType0/M500'][:]
+#     numbin = binned['PartType0/NumBin'][:]
+
+#     numbin = np.concatenate([[0], numbin])
+#     bin_slice = np.concatenate([np.cumsum(numbin[:-1]).reshape(-1,1),
+#                                 np.cumsum(numbin[1:]).reshape(-1,1)], axis=-1)
+
+#     m = np.array([np.mean(m500[sl[0]:sl[1]]) for sl in bin_slice])
+
+#     rho_bah = binned['PartType0/MedianDensity'][:]
+
+#     binned.close()
+#     pl.set_style()
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111)
+
+#     marks = []
+#     lines = []
+#     ax.set_prop_cycle(pl.cycle_mark())
+#     for idx, prof in enumerate(rho_eckert):
+#         mark = ax.errorbar(r_eckert, prof, yerr=s[idx], fmt='o')
+#         marks.append(mark)
+
+#     ax.set_prop_cycle(pl.cycle_line())
+#     for prof in rho_bah:
+#         line, = ax.plot(r, prof)
+#         lines.append(line)
+
+#     ax.set_xlim([0.9*r_eckert.min(), 1.1*r_eckert.max()])
+#     ax.set_xscale('log')
+#     ax.set_yscale('log')
+#     ax.set_xlabel(r'$r/r_{500}$')
+#     ax.set_ylabel(r'$\rho(r)$ in $M_\odot/$Mpc$^3$')
+#     ax.legend([(line, mark) for line, mark in zip(lines, marks)],
+#               [r'$M_{\mathrm{mean},b}=10^{%.2f}M_\odot, \, M_{\mathrm{mean},e}=10^{%.2f}M_\odot$'%(np.log10(mass), np.log10(m_bins[idx]))
+#                for idx, mass in enumerate(m)])
+#     plt.show()
+
+# # ------------------------------------------------------------------------------
+# # End of compare_bahamas_eckert()
+# # ------------------------------------------------------------------------------
+
+# def compare_bahamas_sun_croston():
+#     '''
+#     Compare BAHAMAS profiles binned to reproduce median mass in Sun & Croston
+#     samples.
+#     '''
+#     r500_sun, rho_sun, err_sun = gas.rhogas_sun()
+#     r500_sun = r500_sun.reshape(-1,4).mean(axis=1)
+#     rho_sun = rho_sun.reshape(-1,4).mean(axis=1)
+#     err_sun = 1./2 * np.sqrt(np.sum(err_sun.reshape(2,-1,4)**2, axis=-1))
+
+#     r500_croston, rho_croston, err_croston = gas.rhogas_croston()
+
+#     binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_T1e6_papercut.hdf5', 'r')
+
+#     r_bins = binned['RBins_R_Crit500'][:]
+#     r = tools.bins2center(r_bins)
+
+#     m500 = binned['PartType0/M500'][:]
+#     numbin = binned['PartType0/NumBin'][:]
+#     m = np.array([np.median(m500[:numbin[0]]),
+#                   np.median(m500[numbin[0]:])])
+
+#     rho_bah = binned['PartType0/MedianDensity'][:]
+
+#     binned.close()
+#     pl.set_style()
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111)
+
+#     ax.set_prop_cycle(pl.cycle_mark())
+#     marks = []
+#     # mark = ax.errorbar(r500_sun, rho_sun * r500_sun**2,
+#     #                    yerr=[err_sun[0] * r500_sun**2,
+#     #                          err_sun[1] * r500_sun**2],
+#     #                    fmt='o')
+#     mark = ax.errorbar(r500_sun, rho_sun,
+#                        yerr=[err_sun[0],
+#                              err_sun[1]],
+#                        fmt='o')
+#     marks.append(mark)
+#     # mark = ax.errorbar(r500_croston, rho_croston * r500_croston**2,
+#     #                    yerr=[err_croston[0] * r500_croston**2,
+#     #                          err_croston[1] * r500_croston**2],
+#     #                    fmt='o')
+#     mark = ax.errorbar(r500_croston, rho_croston,
+#                        yerr=[err_croston[0],
+#                              err_croston[1]],
+#                        fmt='o')
+#     marks.append(mark)
+
+#     ax.set_prop_cycle(pl.cycle_line())
+#     lines = []
+#     for idx, prof in enumerate(rho_bah):
+#         # line, = ax.plot(r, r**2 * prof/(p.prms.rho_crit * 0.7**2))#*1.3)
+#         line, = ax.plot(r, prof/(p.prms.rho_crit * 0.7**2))
+#         lines.append(line)
+
+#     ax.set_xlim([0.9*r500_croston.min(), 1.1*r500_croston.max()])
+#     ax.set_xscale('log')
+#     ax.set_yscale('log')
+#     ax.set_xlabel(r'$r/r_{500}$')
+#     # ax.set_ylabel(r'$\rho(r)/\rho_{\mathrm{crit}} (r/r_{500})^2$')
+#     ax.set_ylabel(r'$\rho(r)/\rho_{\mathrm{crit}}$')
+#     ax.legend([(line, mark) for line, mark in zip(lines, marks)],
+#               [r'$M_{\mathrm{med}}=10^{%.1f}M_\odot$'%np.log10(c) for c in m])
+#     plt.show()
+
+# # ------------------------------------------------------------------------------
+# # End of compare_bahamas_sun_croston()
+# # ------------------------------------------------------------------------------
 
 def compare_temperature():
     '''
@@ -1257,8 +607,8 @@ def compare_temperature_censat(r2=True):
     rho_2_s = T1e65['PartType0/SatMedianDensity'][:]
     rho_3_s = Tgt1e65['PartType0/SatMedianDensity'][:]
     # rho_t = Tot['PartType0/MedianDensity'][:]
-    # rho_c = binned['PartType4/CenMedianDensity'][:]
-    # rho_s = binned['PartType4/SatMedianDensity'][:]
+    rho_c = binned['PartType4/CenMedianDensity'][:]
+    rho_s = binned['PartType4/SatMedianDensity'][:]
 
     # want to know hot gas mass wrt halo mass
     r500 = Tgt1e65['PartType0/R500'][:]
@@ -1267,13 +617,18 @@ def compare_temperature_censat(r2=True):
     r500_med = np.array([np.median([r500[cum_index[idx]:cum_index[idx+1]]])
                          for idx in range(cum_index.shape[0] - 1)])
 
+    m500c = tools.radius_to_mass(r500_med, 500 * p.prms.rho_crit * p.prms.h**2)
+    m200m = np.array([gas.m500c_to_m200m(i) for i in m500c])
+    r200 = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.h**2 *
+                                p.prms.omegab)
     # get radial range
-    # r_bins = Tlt1e45['RBins_R_Crit500'][:]
-    r_bins = Tlt1e45['RBins_R_Mean200'][:]
+    r_bins = Tlt1e45['RBins_R_Crit500'][:]
+    # r_bins = Tlt1e45['RBins_R_Mean200'][:]
     r = tools.bins2center(r_bins)
 
     # get mass range
     m_bins = Tlt1e45['MBins_M_Crit500'][:]
+    m_bins[-1,-1] = 1e16
     m = tools.bins2center(m_bins)
 
     Tlt1e45.close()
@@ -1304,7 +659,7 @@ def compare_temperature_censat(r2=True):
     ax_m5.set_prop_cycle(cycle_tot)
     ax_m6.set_prop_cycle(cycle_tot)
 
-    masses = np.array([r'$10^{%.2f}<\mathrm{m_{200}/M_\odot}<10^{%.2f}$'%(np.log10(i), np.log10(j)) for i, j in m_bins])
+    masses = np.array([r'$10^{%.1f}<\mathrm{m_{500\mathrm{c}}/M_\odot}<10^{%.1f}$'%(np.log10(i), np.log10(j)) for i, j in m_bins])
 
 
     axes = [ax_m1, ax_m2, ax_m3, ax_m4, ax_m5, ax_m6]
@@ -1315,8 +670,8 @@ def compare_temperature_censat(r2=True):
         prof_1_s = rho_1_s[idx]
         prof_2_s = rho_2_s[idx]
         prof_3_s = rho_3_s[idx]
-        # prof_c  = rho_c[idx]
-        # prof_s  = rho_s[idx]
+        prof_c  = rho_c[idx]
+        prof_s  = rho_s[idx]
 
         tot_c = prof_1_c + prof_2_c + prof_3_c
         tot_s = prof_1_s + prof_2_s + prof_3_s
@@ -1334,6 +689,7 @@ def compare_temperature_censat(r2=True):
         prof_3_s[prof_3_s == 0] = np.nan
         prof_c[prof_c == 0] = np.nan
         prof_s[prof_s == 0] = np.nan
+        ax.axvline(x=r200[idx]/r500_med[idx], c='k', ls='--')
         if r2:
             l0, = ax.plot(r, tot * r**2, c='k', lw=4, ls='-', label='Total')
             l1_c, = ax.plot(r, prof_1_c * r**2)
@@ -1344,11 +700,11 @@ def compare_temperature_censat(r2=True):
             l3_s, = ax.plot(r, prof_3_s * r**2)
             if idx in [0,1,2]:
                 ratio = prof_1_c[~np.isnan(prof_1_c)] / prof_c[~np.isnan(prof_1_c)]
-                print idx
-                print ratio
-                print np.mean(ratio)
-                print np.median(ratio)
-                print '-----------------------'
+                # print idx
+                # print ratio
+                # print np.mean(ratio)
+                # print np.median(ratio)
+                # print '-----------------------'
                 l_sc, = ax.plot(r, prof_c * r**2, lw=1, marker='*', c=c_stars,
                                 label='Stars')
                 # l_ss, = ax.plot(r, prof_s * r**2, lw=1, ls='--', c=c_stars)
@@ -1400,7 +756,7 @@ def compare_temperature_censat(r2=True):
             titletxt = ax.set_title(masses[idx])
             title_props = titletxt.get_fontproperties()
         else:
-            ax.text(0.5, 0.89, masses[idx], ha='center', transform=ax.transAxes,
+            ax.text(0.5, 0.9, masses[idx], ha='center', transform=ax.transAxes,
                     fontproperties=title_props)
 
         ax.set_xscale('log')
@@ -1412,12 +768,19 @@ def compare_temperature_censat(r2=True):
             ax.xaxis.set_ticklabels([])
         if idx >= 3:
             ax.xaxis.set_ticks_position('bottom')
-            text = ax.set_xlabel(r'$r/r_{500}$')
+            text = ax.set_xlabel(r'$r/r_{500\mathrm{c}}$')
             font_properties = text.get_fontproperties()
+
+        # add annotation to virial radius
+        ax.annotate(r'$r_{200\mathrm{m}}$',
+                    xy=(r200[idx]/r500_med[idx], ax.get_ylim()[0]),
+                    xytext=(r200[idx]/r500_med[idx] * 1.2,
+                            ax.get_ylim()[0] * 2),
+                    fontproperties=title_props)
 
     if r2:
         fig.text(0.005, 0.5,
-                 r'$\rho(r)(r/r_{500})^2 \, [\mathrm{M_\odot}/\mathrm{Mpc}^{3}]$',
+                 r'$\rho(r) \cdot (r/r_{500\mathrm{c}})^2 \, [\mathrm{M_\odot}/\mathrm{Mpc}^{3}]$',
                  va='center', rotation='vertical', fontproperties=font_properties)
     else:
         fig.text(0.005, 0.5,
@@ -1432,22 +795,37 @@ def compare_temperature_censat(r2=True):
 # End of compare_temperature_censat()
 # ------------------------------------------------------------------------------
 
-def compare_censat(ptype, r2=True):
+def compare_censat(r2=True):
     '''
     Compare central vs satellite profiles
     '''
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_500_crit_5r500c.hdf5', 'r')
+    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_500_crit_5r500c_M10_16.hdf5', 'r')
+    # binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_M10_16.hdf5', 'r')
 
     # get density profiles
-    rho_c = binned['PartType%i/CenMedianDensity'%ptype][:]
-    rho_s = binned['PartType%i/SatMedianDensity'%ptype][:]
+    rho_c = binned['PartType4/CenMedianDensity'][:]
+    rho_s = binned['PartType4/SatMedianDensity'][:]
 
     # get radial range
     r_bins = binned['RBins_R_Crit500'][:]
+    # r_bins = binned['RBins_R_Mean200'][:]
     r = tools.bins2center(r_bins)
+
+    # want to know hot gas mass wrt halo mass
+    r500 = binned['PartType4/R500'][:]
+    numbin = binned['PartType4/NumBin'][:]
+    cum_index = np.cumsum(np.concatenate([[0], numbin]))
+    r500_med = np.array([np.median([r500[cum_index[idx]:cum_index[idx+1]]])
+                         for idx in range(1, cum_index.shape[0] - 1)])
+
+    m500c = tools.radius_to_mass(r500_med, 500 * p.prms.rho_crit * p.prms.h**2)
+    m200m = np.array([gas.m500c_to_m200m(i) for i in m500c])
+    r200 = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.h**2 *
+                                p.prms.omegab)
 
     # get mass range
     m_bins = binned['MBins_M_Crit500'][:]
+    # m_bins = binned['MBins_M_Mean200'][:]
     m = tools.bins2center(m_bins)
 
     binned.close()
@@ -1472,7 +850,7 @@ def compare_censat(ptype, r2=True):
     ax_m5.set_prop_cycle(cycle_tot)
     ax_m6.set_prop_cycle(cycle_tot)
 
-    masses = np.array([r'$10^{%.2f}<\mathrm{m_{200}/M_\odot}<10^{%.2f}$'%(np.log10(i), np.log10(j)) for i, j in m_bins])
+    masses = np.array([r'$10^{%.1f}<\mathrm{m_{500\mathrm{c}}/M_\odot}<10^{%.1f}$'%(np.log10(i), np.log10(j)) for i, j in m_bins])
 
     axes = [ax_m1, ax_m2, ax_m3, ax_m4, ax_m5, ax_m6]
     for idx, ax in enumerate(axes):
@@ -1482,6 +860,8 @@ def compare_censat(ptype, r2=True):
         tot[tot == 0] = np.nan
         prof_1[prof_1 == 0] = np.nan
         prof_2[prof_2 == 0] = np.nan
+        if idx > 0:
+            ax.axvline(x=r200[idx-1]/r500_med[idx-1], c='k', ls='--')
         if r2:
             l0, = ax.plot(r, tot * r**2, lw=3, c='k')
             l1, = ax.plot(r, prof_1 * r**2, lw=2)
@@ -1515,7 +895,6 @@ def compare_censat(ptype, r2=True):
 
         ax.set_xscale('log')
         ax.set_yscale('log')
-
         # remove unnecessary labels
         if not idx in [0, 3]:
             ax.yaxis.set_ticklabels([])
@@ -1523,16 +902,24 @@ def compare_censat(ptype, r2=True):
             ax.xaxis.set_ticklabels([])
         if idx >= 3:
             ax.xaxis.set_ticks_position('bottom')
-            text = ax.set_xlabel(r'$r/r_{500}$')
+            text = ax.set_xlabel(r'$r/r_{500\mathrm{c}}$')
             font_properties = text.get_fontproperties()
+
+        # add annotation to virial radius
+        if idx > 0:
+            ax.annotate(r'$r_{200\mathrm{m}}$',
+                        xy=(r200[idx-1]/r500_med[idx-1], ax.get_ylim()[0]),
+                        xytext=(r200[idx-1]/r500_med[idx-1] * 1.2,
+                                ax.get_ylim()[0] * 2),
+                        fontproperties=title_props)
 
     if r2:
         fig.text(0.005, 0.5,
-                 r'$\rho(r)(r/r_{500})^2 \, [\mathrm{M_\odot}/\mathrm{Mpc}^{3}]$',
+                 r'$\rho(r) \cdot (r/r_{500\mathrm{c}})^2 \, [\mathrm{M_\odot}/\mathrm{Mpc}^{3}]$',
                  va='center', rotation='vertical', fontproperties=font_properties)
     else:
         fig.text(0.005, 0.5,
-                 r'$\rho(r)\, [\mathrm{M_\odot}/\mathrm{Mpc}^{3}]$',
+                 r'$\rho(r) \, [\mathrm{M_\odot}/\mathrm{Mpc}^{3}]$',
                  va='center', rotation='vertical', fontproperties=font_properties)
 
     labs = np.array(['Total', 'Central', 'Satellites'])
@@ -1545,288 +932,364 @@ def compare_censat(ptype, r2=True):
 # End of compare_censat()
 # ------------------------------------------------------------------------------
 
-# def fit_beta_parameters():
-#     '''
-#     Fit the mass dependence of the different fit parameters
-#     '''
-#     fit_p, fit_b, covs_p, covs_b, profs_p, profs_b = fit_beta_bahamas()
-#     fit_p_sun, fit_b_sun = gas.fit_sun_profile()
-#     fit_p_croston, fit_b_croston = gas.fit_croston_profile()
-#     M_sun = gas.rhogas_sun.M
-#     M_croston = gas.rhogas_croston.M
-
-#     m_bins = np.logspace(13, 15, 20)
-#     m = tools.bins2center(m_bins)
-
-#     beta = np.array([i['beta'] for i in fit_b])
-#     r_c = np.array([i['r_c'] for i in fit_b])
-
-#     beta_sun = fit_b_sun[0]['beta']
-#     r_c_sun = fit_b_sun[0]['r_c']
-#     beta_croston = fit_b_croston[0]['beta']
-#     r_c_croston = fit_b_croston[0]['r_c']
-
-#     idx_sun = np.searchsorted(m, M_sun)
-#     idx_croston = np.searchsorted(m, M_croston)
-#     m_new = np.insert(m, [idx_sun, idx_croston], [M_sun, M_croston])
-#     beta_new = np.insert(m, [idx_sun, idx_croston], [beta_sun, beta_croston])
-#     r_c_new = np.insert(m, [idx_sun, idx_croston], [r_c_sun, r_c_croston])
-
-#     # force fit through measurements
-#     sigma = np.ones_like(m)
-#     sigma = np.insert(sigma, [idx_sun, idx_croston], [1e-100, 1e-100])
-
-#     # define function for beta fit
-#     def beta_fit(m_range, m_c, alpha):
-#         return 1 + 2. / (1 + (m_c/m_range)**alpha)
-
-#     beta_prms, cov = opt.curve_fit(beta_fit, m_new, beta_new,
-#                                    bounds=([1e13, 0], [1e15, 5]),
-#                                    sigma=sigma)
-#     beta_prms = {'m_c': beta_prms[0],
-#                  'alpha': beta_prms[1]}
-
-#     # define function for r_c fit
-#     def rc_fit(m_range, m_c, alpha):
-#         return 0.4 / (1 + (m_c/m_range)**alpha)
-
-#     rc_prms, cov = opt.curve_fit(rc_fit, m_new, r_c_new,
-#                                  bounds=([1e13, 0], [1e15, 5]),
-#                                  sigma=sigma)
-#     rc_prms = {'m_c': rc_prms[0],
-#                'alpha': rc_prms[1]}
-
-#     pl.set_style('mark')
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111)
-
-#     ax.plot(m, beta)
-#     ax.plot(M_sun, fit_b_sun[0]['beta'])
-#     ax.plot(M_croston, fit_b_croston[0]['beta'])
-#     ax.set_prop_cycle(pl.cycle_line())
-#     ax.plot(m_new, beta_fit(m_new, **beta_prms))
-#     ax.set_xscale('log')
-#     ax.set_xlabel(r'$m_{500c} \, [M_\odot]$')
-#     ax.set_ylabel(r'$\beta$')
-#     plt.show()
-
-#     pl.set_style('mark')
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111)
-
-#     ax.plot(m, r_c)
-#     ax.plot(M_sun, fit_b_sun[0]['r_c'])
-#     ax.plot(M_croston, fit_b_croston[0]['r_c'])
-#     ax.set_prop_cycle(pl.cycle_line())
-#     ax.plot(m_new, rc_fit(m_new, **rc_prms))
-#     ax.set_xscale('log')
-#     ax.set_xlabel(r'$m_{500c} \, [M_\odot]$')
-#     ax.set_ylabel(r'$r_c$')
-#     plt.show()
-
-#     return beta_prms, rc_prms
-
-# # ------------------------------------------------------------------------------
-# # End of fit_beta_parameters()
-# # ------------------------------------------------------------------------------
-
-# def fit_plaw_parameters():
-#     '''
-#     Fit the mass dependence of the different fit parameters
-#     '''
-#     fit_p, fit_b, covs_p, covs_b, profs_p, profs_b = fit_beta_bahamas()
-#     fit_p_sun, fit_b_sun = gas.fit_sun_profile()
-#     fit_p_croston, fit_b_croston = gas.fit_croston_profile()
-#     M_sun = gas.rhogas_sun.M
-#     M_croston = gas.rhogas_croston.M
-
-#     m_bins = np.logspace(13, 15, 20)
-#     m = tools.bins2center(m_bins)
-
-#     beta = np.array([i['beta'] for i in fit_p])
-#     gamma = np.array([i['gamma'] for i in fit_p])
-#     r_c = np.array([i['r_c'] for i in fit_p])
-
-#     beta_sun = fit_p_sun[0]['beta']
-#     gamma_sun = fit_p_sun[0]['gamma']
-#     r_c_sun = fit_p_sun[0]['r_c']
-#     beta_croston = fit_p_croston[0]['beta']
-#     gamma_croston = fit_p_croston[0]['gamma']
-#     r_c_croston = fit_p_croston[0]['r_c']
-
-#     idx_sun = np.searchsorted(m, M_sun)
-#     idx_croston = np.searchsorted(m, M_croston)
-#     m_new = np.insert(m, [idx_sun, idx_croston], [M_sun, M_croston])
-#     beta_new = np.insert(m, [idx_sun, idx_croston], [beta_sun, beta_croston])
-#     gamma_new = np.insert(m, [idx_sun, idx_croston], [gamma_sun, gamma_croston])
-#     r_c_new = np.insert(m, [idx_sun, idx_croston], [r_c_sun, r_c_croston])
-
-#     # force fit through measurements
-#     sigma = np.ones_like(m)
-#     sigma = np.insert(sigma, [idx_sun, idx_croston], [1e-100, 1e-100])
-
-#     # define function for beta fit
-#     def beta_fit(m_range, m_c, alpha):
-#         return 1 + 2. / (1 + (m_c/m_range)**alpha)
-
-#     beta_prms, cov = opt.curve_fit(beta_fit, m_new, beta_new,
-#                                    bounds=([1e13, 0], [1e15, 5]),
-#                                    sigma=sigma)
-#     beta_prms = {'m_c': beta_prms[0],
-#                  'alpha': beta_prms[1]}
-
-#     # define function for gamma fit
-#     def gamma_fit(m_range, m_c, alpha):
-#         return 1 + 2. / (1 + (m_c/m_range)**alpha)
-
-#     gamma_prms, cov = opt.curve_fit(gamma_fit, m_new, gamma_new,
-#                                    bounds=([1e13, 0], [1e15, 5]),
-#                                    sigma=sigma)
-#     gamma_prms = {'m_c': gamma_prms[0],
-#                  'alpha': gamma_prms[1]}
-
-#     # define function for r_c fit
-#     def rc_fit(m_range, m_c, alpha):
-#         return 0.4 / (1 + (m_c/m_range)**alpha)
-
-#     rc_prms, cov = opt.curve_fit(rc_fit, m_new, r_c_new,
-#                                  bounds=([1e13, 0], [1e15, 5]),
-#                                  sigma=sigma)
-#     rc_prms = {'m_c': rc_prms[0],
-#                'alpha': rc_prms[1]}
-
-#     pl.set_style('mark')
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111)
-
-#     ax.plot(m, beta)
-#     ax.plot(M_sun, fit_p_sun[0]['beta'])
-#     ax.plot(M_croston, fit_p_croston[0]['beta'])
-#     ax.set_prop_cycle(pl.cycle_line())
-#     ax.plot(m_new, beta_fit(m_new, **beta_prms))
-#     ax.set_xscale('log')
-#     ax.set_xlabel(r'$m_{500c} \, [M_\odot]$')
-#     ax.set_ylabel(r'$\beta$')
-#     plt.show()
-
-#     pl.set_style('mark')
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111)
-
-#     ax.plot(m, gamma)
-#     ax.plot(M_sun, fit_p_sun[0]['gamma'])
-#     ax.plot(M_croston, fit_p_croston[0]['gamma'])
-#     ax.set_prop_cycle(pl.cycle_line())
-#     ax.plot(m_new, gamma_fit(m_new, **gamma_prms))
-#     ax.set_xscale('log')
-#     ax.set_xlabel(r'$m_{500c} \, [M_\odot]$')
-#     ax.set_ylabel(r'$\gamma$')
-#     plt.show()
-
-#     pl.set_style('mark')
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111)
-
-#     ax.plot(m, r_c)
-#     ax.plot(M_sun, fit_p_sun[0]['r_c'])
-#     ax.plot(M_croston, fit_p_croston[0]['r_c'])
-#     ax.set_prop_cycle(pl.cycle_line())
-#     ax.plot(m_new, rc_fit(m_new, **rc_prms))
-#     ax.set_xscale('log')
-#     ax.set_xlabel(r'$m_{500c} \, [M_\odot]$')
-#     ax.set_ylabel(r'$r_c$')
-#     plt.show()
-
-#     return beta_prms, gamma_prms, rc_prms
-
-# # ------------------------------------------------------------------------------
-# # End of fit_plaw_parameters()
-# # ------------------------------------------------------------------------------
-
-def prof_stars(x, a, b, m200, r200):
-    profile = (b*x)**(a)
+def prof_stars_s(x, a, b, m, r200):
+    '''lognormal'''
+    profile = np.exp(-(np.log10(x) - np.log10(a))**2/b)
     mass = tools.m_h(profile, x * r200)
-    profile *= m200/mass
+    profile *= m/mass
 
     return profile
 
+def prof_stars_c(x, a, b, c, m, r200):
+    profile = (1 + (x/a)**b)**(-1) * np.exp(-(x/c))
+    # profile = (np.exp(-(x/a)**b) + np.exp(-x/c)) * np.exp(-(x/d))
+    mass = tools.m_h(profile, x * r200)
+    profile *= m/mass
+
+    return profile
+
+def stars_mc_fit(m, a, b, mc):
+    # can also try x / (1 + x^2)
+    # return a / (1 + b * np.log10(m/mc)**2) + 0.005
+    plaw = (m/mc)**a * (0.5 + 0.5*(m/mc)**2)**(-a/2.)
+    sigm = 10**(b/(1+(mc/m)**1))
+    return plaw * sigm
+
+def stars_ms_fit(m, a, b, mc):
+    return b * (m/mc)**a / (1 + (m/mc)**a)
+
 def fit_stars_bahamas():
     '''
-    Fit gNFW profiles to the bahamas bins
+    Fit profiles to the bahamas stellar bins
     '''
     # bahamas data
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles.hdf5', 'r')
-    rho = profiles['PartType4/Densities'][:]
-    m200 = profiles['PartType4/M200'][:]
-    r200 = profiles['PartType4/R200'][:]
+    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_M11_15p5.hdf5', 'r')
+
+    rho_c = profiles['PartType4/CenMedianDensity'][:]
+    rho_s = profiles['PartType4/SatMedianDensity'][:]
+    rho_g = profiles['PartType1/CenMedianDensity'][:]
+    m200 = profiles['PartType4/MedianM200'][:]
+    r200 = profiles['PartType4/MedianR200'][:]
     r_range = tools.bins2center(profiles['RBins_R_Mean200'][:])
-    numpart = profiles['PartType4/NumPartGroup'][:]
-    grnr = profiles['PartType4/GroupNumber'][:].astype(int)
-    relaxed = profiles['PartType4/Relaxed'][:]
     profiles.close()
 
-    sl = ((numpart[grnr] > 1e3) & relaxed)
+    a_s = -1 * np.ones_like(m200)
+    b_s = -1 * np.ones_like(m200)
+    a_s_err = -1 * np.ones_like(m200)
+    b_s_err = -1 * np.ones_like(m200)
+    r0_s = -1 * np.ones_like(m200)
+    a_c = -1 * np.ones_like(m200)
+    b_c = -1 * np.ones_like(m200)
+    c_c = -1 * np.ones_like(m200)
+    a_c_err = -1 * np.ones_like(m200)
+    b_c_err = -1 * np.ones_like(m200)
+    c_c_err = -1 * np.ones_like(m200)
+    m_c = -1 * np.ones_like(m200)
+    m_s = -1 * np.ones_like(m200)
+    for idx, profs in enumerate(zip(rho_c, rho_s)):
+        cen = profs[0]
+        sat = profs[1]
 
-    rho = rho[sl]
+        slc = (cen > 0)
+        sls = (sat > 0)
+
+        if sls.sum() > 5:
+            ms = tools.m_h(sat[sls], r_range[sls] * r200[idx])
+            sopt, scov = opt.curve_fit(lambda r_range, a, b: \
+                                       prof_stars_s(r_range, a, b,
+                                                    ms, r200[idx]),
+                                       r_range[sls], sat[sls],
+                                       bounds=([0.02, 0],
+                                               [1, 1]))
+            a_s[idx] = sopt[0]
+            b_s[idx] = sopt[1]
+            a_s_err[idx] = np.sqrt(np.diag(scov))[0]
+            b_s_err[idx] = np.sqrt(np.diag(scov))[1]
+            r0_s[idx] = r_range[sls][0]
+            m_s[idx] = ms
+
+            # plt.plot(r_range, r_range**2 * sat)
+            # plt.plot(r_range[sls], r_range[sls]**2 *
+            #          prof_stars_s(r_range[sls], a_s[idx], b_s[idx],m_s[idx],
+            #                       r200[idx]))
+
+        if slc.sum() > 0:
+            mc = tools.m_h(cen[slc], r_range[slc] * r200[idx])
+            copt, ccov = opt.curve_fit(lambda r_range, a, b, c: \
+                                       prof_stars_c(r_range, a, b, c,
+                                                    mc, r200[idx]),
+                                       r_range[slc], cen[slc],
+                                       bounds=([0, 0, 0],
+                                               [1, 4, 5]))
+
+            a_c[idx] = copt[0]
+            b_c[idx] = copt[1]
+            c_c[idx] = copt[2]
+            a_c_err[idx] = np.sqrt(np.diag(ccov))[0]
+            b_c_err[idx] = np.sqrt(np.diag(ccov))[1]
+            c_c_err[idx] = np.sqrt(np.diag(ccov))[1]
+            m_c[idx] = mc
+            # plt.plot(r_range[slc], r_range[slc]**2 * cen[slc])
+            # plt.plot(r_range[slc], r_range[slc]**2 *
+            #          prof_stars_c(r_range[slc], a_c[idx], b_c[idx], c_c[idx],
+            #                       m_c[idx], r200[idx]))
+            # plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
+            # plt.ylim(ymin=(cen[slc]).min())
+            # plt.xscale('log')
+            # plt.yscale('log')
+            # plt.show()
+
+    cen_cut = (a_c >= 0)
+    sat_cut = (a_s >= 0)
+    sl = (m200 > 0)
+    a_s = a_s[sl]
+    b_s = b_s[sl]
+    a_s_err = a_s_err[sl]
+    b_s_err = b_s_err[sl]
+    r0_s = r0_s[sl]
+    a_c = a_c[sl]
+    b_c = b_c[sl]
+    c_c = c_c[sl]
+    a_c_err = a_c_err[sl]
+    b_c_err = b_c_err[sl]
+    c_c_err = c_c_err[sl]
+    m_s = m_s[sl]
+    m_c = m_c[sl]
     m200 = m200[sl]
-    r200 = r200[sl] * cm2mpc
-
-    a = np.empty_like(m200)
-    b = np.empty_like(m200)
-
-    pl.set_style('line')
-
-    for idx, prof in enumerate(rho):
-        sl = (prof > 0)
-        if sl.sum() > 0:
-            popt, pcov = opt.curve_fit(lambda r_range, a, b: \
-                                       prof_stars(r_range, a, b,
-                                                  m200[idx], r200[idx]),
-                                       r_range[sl],
-                                       prof[sl])
-            a[idx] = popt[0]
-            b[idx] = popt[1]
-
-            plt.plot(r_range[sl], prof[sl])
-            plt.plot(r_range, prof_stars(r_range, popt[0], popt[1],
-                                         m200[idx], r200[idx]))
-            plt.xscale('log')
-            plt.yscale('log')
-            plt.show()
-        else:
-            a[idx] = np.nan
-            b[idx] = np.nan
-
-
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # img = ax.hexbin(np.log10(m200), np.log10(c), cmap='magma',
-    #                 bins='log')
-    # # ax.plot(np.log10(m_range), np.log10(c_cor), c='w',
-    # #         label=r'$c_{\mathrm{correa}}$')
-    # # ax.plot(np.log10(m), np.log10(c_med), c='w', label=r'$c_{\mathrm{med}}$')
-    # ax.set_xlabel(r'$M_{200} \, [\log_{10}M_\odot]$')
-    # ax.set_ylabel(r'$\log_{10} c_{200}$')
-    # ax.set_xlim([np.log10(m200).min(), np.log10(m200).max()])
-
-    # # for line in ax.xaxis.get_ticklines():
-    # #     line.set_color('w')
-    # # for line in ax.yaxis.get_ticklines():
-    # #     line.set_color('w')
-
-    # # leg = ax.legend(loc='best')
-    # # for text in leg.get_texts():
-    # #     plt.setp(text, color='w')
-
-    # cb = fig.colorbar(img)
-    # cb.set_label(r'$\log_{10} N_{\mathrm{bin}}$', rotation=270, labelpad=25)
-
+    # pl.set_style('mark')
+    # # plt.errorbar(m200[cen_cut], b_c[cen_cut], yerr=b_c_err[cen_cut], marker='o')
+    # # plt.plot(m200[cen_cut], m_c[cen_cut]/m200[cen_cut], marker='o')
+    # # plt.errorbar(m200[sat_cut], b_s[sat_cut], yerr=b_s_err[sat_cut], marker='o')
+    # plt.plot(m200[sat_cut], m_s[sat_cut]/m200[sat_cut], marker='o')
+    # plt.xscale('log')
+    # plt.yscale('log')
     # plt.show()
 
-    return a, b
+    return a_s, a_s_err, b_s, b_s_err, r0_s, m_s, a_c, a_c_err, b_c, b_c_err, c_c, c_c_err, m_c, m200
 
 # ------------------------------------------------------------------------------
 # End of fit_stars_bahamas()
+# ------------------------------------------------------------------------------
+
+def plot_stars_fit_bahamas_median():
+    '''Fit median relations to stars fitting functions'''
+    a_s, a_s_err, b_s, b_s_err, r0_s, m_s, a_c, a_c_err, b_c, b_c_err, c_c, c_c_err, m_c, m200 = fit_stars_bahamas()
+
+    # centrals
+    cen_cut = ((a_c >= 0) & (m200>0))
+    acopt, accov = opt.curve_fit(dm_plaw_fit, m200[cen_cut],
+                                 a_c[cen_cut], sigma=a_c_err[cen_cut])
+    ac_prms = {'a': acopt[0], 'b': acopt[1]}
+    bcopt, bccov = opt.curve_fit(dm_plaw_fit, m200[cen_cut],
+                                 b_c[cen_cut], sigma=b_c_err[cen_cut])
+    bc_prms = {'a': bcopt[0], 'b': bcopt[1]}
+    cc_cut = (c_c[cen_cut] < 4)
+    ccopt, cccov = opt.curve_fit(dm_plaw_fit, m200[cen_cut][cc_cut],
+                                 c_c[cen_cut][cc_cut],
+                                 sigma=c_c_err[cen_cut][cc_cut])
+    cc_prms = {'a': ccopt[0], 'b': ccopt[1]}
+    mc_cut = ((m_c/m200)[cen_cut] < 0.28)
+    mcopt, mccov = opt.curve_fit(stars_mc_fit, m200[cen_cut][mc_cut],
+                                 (m_c/m200)[cen_cut][mc_cut],
+                                 bounds=([0, -5, 1e8],
+                                         [5, 0, 1e15]))
+                                 # bounds=([0, -5, 0, 1e8],
+                                 #         [5, 0, 3, 1e15]))
+    mc_prms = {'a': mcopt[0],
+               'b': mcopt[1],
+               # 'c': mcopt[2],
+               # 'mc': mcopt[3]}
+               'mc': mcopt[2]}
+
+    # fig = plt.figure(figsize=(14,6))
+    # axc = fig.add_subplot(131)
+    # axs = fig.add_subplot(132)
+    # axm = fig.add_subplot(133)
+
+    # axc.set_prop_cycle(pl.cycle_mark())
+    # axc.errorbar(m200[cen_cut], a_c[cen_cut], yerr=a_c_err[cen_cut],
+    #              marker='o', label=r'$r_c/r_{200\mathrm{m}}$')
+    # axc.errorbar(m200[cen_cut], b_c[cen_cut], yerr=b_c_err[cen_cut],
+    #              marker='x', label=r'$\beta_c$')
+    # axc.errorbar(m200[cen_cut], c_c[cen_cut], yerr=c_c_err[cen_cut],
+    #              marker='x', label=r'$r_x/r_{200\mathrm{m}}$')
+    # axc.set_prop_cycle(pl.cycle_line())
+    # axc.plot(m200, dm_plaw_fit(m200, **ac_prms))
+    # axc.plot(m200, dm_plaw_fit(m200, **bc_prms))
+    # axc.plot(m200, dm_plaw_fit(m200, **cc_prms))
+    # axc.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+    # axc.set_ylim(ymin=1e-4)
+    # axc.legend(loc=2)
+    # axc.set_xscale('log')
+    # axc.set_yscale('log')
+    # axc.set_title('Central galaxies')
+
+    # satellites
+    sat_cut = (a_s >= 0)
+    asopt, accov = opt.curve_fit(dm_plaw_fit, m200[sat_cut],
+                                 a_s[sat_cut], sigma=a_s_err[sat_cut])
+    as_prms = {'a': asopt[0], 'b': asopt[1]}
+    bsopt, bccov = opt.curve_fit(dm_plaw_fit, m200[sat_cut],
+                                 b_s[sat_cut], sigma=b_s_err[sat_cut])
+    bs_prms = {'a': bsopt[0], 'b': bsopt[1]}
+    ropt, rcov = opt.curve_fit(dm_plaw_fit, m200[sat_cut], r0_s[sat_cut])
+    r0_prms = {'a': ropt[0], 'b': ropt[1]}
+    msopt, mccov = opt.curve_fit(stars_ms_fit, m200[sat_cut],
+                                 (m_s/m200)[sat_cut],
+                                 bounds=([0, 0, 1e11],
+                                         [3, 3, 1e15]))
+    ms_prms = {'a': msopt[0],
+               'b': msopt[1],
+               'mc': msopt[2]}
+
+    # axs.set_prop_cycle(pl.cycle_mark())
+    # axs.errorbar(m200[sat_cut], a_s[sat_cut], yerr=a_s_err[sat_cut],
+    #              marker='o', label=r'$r_s/r_{200\mathrm{m}}$')
+    # axs.errorbar(m200[sat_cut], b_s[sat_cut], yerr=b_s_err[sat_cut],
+    #              marker='x', label=r'$\beta_s$')
+    # axs.set_prop_cycle(pl.cycle_line())
+    # axs.plot(m200, dm_plaw_fit(m200, **as_prms))
+    # axs.plot(m200, dm_plaw_fit(m200, **bs_prms))
+    # axs.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+    # axs.legend(loc='best')
+    # axs.set_xscale('log')
+    # axs.set_yscale('log')
+    # axs.set_title('Satellite galaxies')
+
+    # # mass contributions
+    # axm.set_prop_cycle(pl.cycle_mark())
+    # axm.plot(m200[cen_cut], (m_c/m200)[cen_cut],
+    #          label=r'$m_{\mathrm{cen}}/m_{200\mathrm{m}}$')
+    # axm.plot(m200[sat_cut], (m_s/m200)[sat_cut],
+    #          label=r'$m_{\mathrm{sat}}/m_{200\mathrm{m}}$')
+    # axm.set_prop_cycle(pl.cycle_line())
+    # axm.plot(m200, stars_mc_fit(m200, **mc_prms))
+    # axm.plot(m200, stars_ms_fit(m200, **ms_prms))
+    # axm.yaxis.tick_right()
+    # axm.yaxis.set_ticks_position('both')
+    # axm.yaxis.set_label_position("right")
+    # axm.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+    # axm.set_ylabel(r'$m/m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$', rotation=270,
+    #                 labelpad=20)
+    # axm.legend(loc='best')
+    # axm.set_xscale('log')
+    # axm.set_yscale('log')
+    # axm.set_title('Mass contribution')
+
+    # plt.show()
+
+    return as_prms, bs_prms, r0_prms, ms_prms, ac_prms, bc_prms, cc_prms, mc_prms
+
+# ------------------------------------------------------------------------------
+# End of plot_stars_fit_bahamas_median()
+# ------------------------------------------------------------------------------
+
+def compare_fit_stars_bahamas():
+    '''
+    Compare how the fit performs for binned profiles
+    '''
+    # binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_M10_16.hdf5', 'r')
+    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_M11_15p5.hdf5', 'r')
+
+    # rho = binned['PartType4/MedianDensity'][:][[1,3,4,5]]
+    # q16 = binned['PartType4/Q16'][:][[1,3,4,5]]
+    # q84 = binned['PartType4/Q84'][:][[1,3,4,5]]
+    # r200 = binned['PartType4/MedianR200'][:][[1,3,4,5]]
+    # m200 = binned['PartType4/MedianM200'][:][[1,3,4,5]]
+    rho = binned['PartType4/MedianDensity'][:]
+    q16 = binned['PartType4/Q16'][:]
+    q84 = binned['PartType4/Q84'][:]
+    r200 = binned['PartType4/MedianR200'][:]
+    m200 = binned['PartType4/MedianM200'][:]
+
+    # r_bins = binned['RBins_R_Mean200'][:]
+    # r = tools.bins2center(r_bins).reshape(-1)
+    # m_bins = binned['MBins_M_Mean200'][:][[1,3,4,5]]
+    r_bins = binned['RBins_R_Mean200'][:]
+    r = tools.bins2center(r_bins).reshape(-1)
+    m_bins = binned['MBins_M_Mean200'][:]
+
+    binned.close()
+
+    as_prms, bs_prms, r0_prms, ms_prms, ac_prms, bc_prms, cc_prms, mc_prms = plot_stars_fit_bahamas_median()
+
+    a_s = dm_plaw_fit(m200, **as_prms)
+    b_s = dm_plaw_fit(m200, **bs_prms)
+    r0_s = dm_plaw_fit(m200, **r0_prms)
+    ms = m200 * stars_ms_fit(m200, **ms_prms)
+
+    a_c = dm_plaw_fit(m200, **ac_prms)
+    b_c = dm_plaw_fit(m200, **bc_prms)
+    c_c = dm_plaw_fit(m200, **cc_prms)
+    mc = m200 * stars_mc_fit(m200, **mc_prms)
+
+    pl.set_style()
+    fig = plt.figure(figsize=(20,6))
+    ax1 = fig.add_axes([0.1, 0.1, 0.2, 0.8])
+    ax2 = fig.add_axes([0.3, 0.1, 0.2, 0.8])
+    ax3 = fig.add_axes([0.5, 0.1, 0.2, 0.8])
+    ax4 = fig.add_axes([0.7, 0.1, 0.2, 0.8])
+
+    masses = np.array([1e12, 1e13, 1e14, 1e15])
+    axes = [ax1, ax2, ax3, ax4]
+
+    for idx, mass in enumerate(masses):
+        # find closest matching halo
+        idx_match = np.argmin(np.abs(m200 - mass))
+        prof = rho[idx_match]
+        m_prof = tools.m_h(prof, r * r200[idx_match])
+
+        prof_s = np.zeros_like(r)
+        # get satellite profile
+        sls = (r > r0_s[idx_match])
+        if sls.sum() > 1:
+            prof_s[sls] = prof_stars_s(r[sls], a_s[idx_match], b_s[idx_match],
+                                       ms[idx_match], r200[idx_match])
+
+        # get central profile
+        prof_c = prof_stars_c(r, a_c[idx_match], b_c[idx_match], c_c[idx_match],
+                              mc[idx_match], r200[idx_match])
+
+        prof_t = prof_s + prof_c
+        mass3 = tools.m_h(prof_t, r * r200[idx_match])
+        scale = m_prof / mass3
+
+        prof[prof == 0] = np.nan
+        prof_c[prof_c == 0] = np.nan
+        prof_s[prof_s == 0] = np.nan
+        prof_t[prof_t == 0] = np.nan
+
+
+        axes[idx].plot(r, (prof * r**2),
+                       marker='o', lw=0, label='sim')
+        axes[idx].plot(r, (prof_c * r**2) * scale, label='cen')
+        axes[idx].plot(r, (prof_s * r**2) * scale, label='sat')
+        axes[idx].plot(r, (prof_t * r**2) * scale, label='tot')
+        axes[idx].set_title(r'$m_{200\mathrm{m}} = 10^{%.2f}\mathrm{M_\odot}$'
+                        %np.log10(m200[idx_match]))
+        axes[idx].set_ylim([5e9, 2e13])
+        if idx == 0:
+            text = axes[idx].set_ylabel(r'$\rho(r) \cdot (r/r_{200\mathrm{m}})^2 \, [\mathrm{M_\odot/Mpc^3}]$')
+            font_properties = text.get_fontproperties()
+        # need to set visibility to False BEFORE log scaling
+        if idx > 0:
+            ticks = axes[idx].get_xticklabels()
+            # strange way of getting correct label
+            ticks[-7].set_visible(False)
+
+        axes[idx].set_xscale('log')
+        axes[idx].set_yscale('log')
+        if idx > 0:
+            axes[idx].yaxis.set_ticklabels([])
+
+    fig.text(0.5, 0.03,
+             r'$r/r_{200\mathrm{m}}$', ha='center',
+             va='center', rotation='horizontal', fontproperties=font_properties)
+    ax1.legend(loc='best')
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of compare_fit_stars_bahamas()
 # ------------------------------------------------------------------------------
 
 def prof_gas_hot_c(x, a, b, c, m, r200):
@@ -1844,6 +1307,29 @@ def prof_gas_hot_s(x, a, b, m, r200):
     profile *= m/mass
 
     return profile
+
+def gas_hot_rc_fit(m, a, b):
+    return a * (m/1e14)**(b)
+
+def gas_hot_beta_fit(m, a, b):
+    return a * (m/1e14)**(b)
+
+def gas_hot_rs_fit(m, a, b):
+    return a * (m/1e14)**(b)
+
+def gas_hot_sigma_fit(m, a, b):
+    return a * (m/1e14)**(b)
+
+def gas_hot_mc_fit(m, mc, a, b):
+    m = m/1e14
+    return b * (m/mc)**a / (1 + (m/mc)**a)
+
+def gas_hot_ms_fit(m, ms, a, b):
+    m = m/1e14
+    return b * (m/ms)**a / (1 + (m/ms)**a)
+
+def gas_hot_r0_fit(m, a, b):
+    return a * (m/1e14)**(b)
 
 def fit_gas_hot_bahamas():
     '''
@@ -1978,29 +1464,6 @@ def fit_gas_hot_bahamas():
 # ------------------------------------------------------------------------------
 # End of fit_gas_hot_bahamas()
 # ------------------------------------------------------------------------------
-
-def gas_hot_rc_fit(m, a, b):
-    return a * (m/1e14)**(b)
-
-def gas_hot_beta_fit(m, a, b):
-    return a * (m/1e14)**(b)
-
-def gas_hot_rs_fit(m, a, b):
-    return a * (m/1e14)**(b)
-
-def gas_hot_sigma_fit(m, a, b):
-    return a * (m/1e14)**(b)
-
-def gas_hot_mc_fit(m, mc, a, b):
-    m = m/1e14
-    return b * (m/mc)**a / (1 + (m/mc)**a)
-
-def gas_hot_ms_fit(m, ms, a, b):
-    m = m/1e14
-    return b * (m/ms)**a / (1 + (m/ms)**a)
-
-def gas_hot_r0_fit(m, a, b):
-    return a * (m/1e14)**(b)
 
 def plot_gas_hot_fit_bahamas_median(m200, m_c, a_c, b_c, m_s, a_s, b_s, r_0):
     pl.set_style()
@@ -2162,6 +1625,18 @@ def prof_gas_warm(x, a, b, m, r200):
 
     return profile
 
+def gas_warm_rw_fit(m, a, b):
+    return a * (m/1e12)**(b)
+
+def gas_warm_sigma_fit(m, a, b):
+    return a * (m/1e12)**(b) # a * np.log10((m/1e12)) + b
+
+def gas_warm_mw_fit(m, a, b):
+    return a * (m/1e12)**(b) # a * np.log10((m/1e12)) + b
+
+def gas_warm_r0_fit(m, a, b):
+    return a * (m/1e12)**(b)
+
 def fit_gas_warm_bahamas():
     '''
     Fit profiles to the warm gas for 1e11<M<1e13 in bahamas
@@ -2242,206 +1717,7 @@ def fit_gas_warm_bahamas():
 # End of fit_gas_warm_bahamas()
 # ------------------------------------------------------------------------------
 
-def gas_warm_rw_fit(m, a, b):
-    return a * (m/1e12)**(b)
-
-def gas_warm_sigma_fit(m, a, b):
-    return a * (m/1e12)**(b) # a * np.log10((m/1e12)) + b
-
-def gas_warm_mw_fit(m, a, b):
-    return a * (m/1e12)**(b) # a * np.log10((m/1e12)) + b
-
-def gas_warm_r0_fit(m, a, b):
-    return a * (m/1e12)**(b)
-
-def plot_gas_warm_fit_bahamas_median(rw, sigma, rw_err, sigma_err, m_2, m):
-    '''
-    Plot best fit relation for rw and sigma as function of m
-    m = m200
-    m_2 = m_warm
-    '''
-    fig = plt.figure(1, figsize=(18,5))
-    ax_1 = fig.add_subplot(131)
-    ax_2 = fig.add_subplot(132)
-    ax_3 = fig.add_subplot(133)
-
-    rw_err[0] = rw_err[1]
-    sigma_err[0] = sigma_err[1]
-    ropt, rcov = opt.curve_fit(gas_warm_rw_fit, m, rw, sigma=rw_err)
-    rw_prms = {'a': ropt[0], 'b': ropt[1]}
-    ax_1.set_prop_cycle(pl.cycle_mark())
-    ax_1.errorbar(m, rw, marker='o', yerr=rw_err, label=r'simulation')
-    ax_1.set_prop_cycle(pl.cycle_line())
-    ax_1.plot(m, gas_warm_rw_fit(m, **rw_prms), label=r'fit')
-    ax_1.set_xscale('log')
-    ax_1.set_yscale('log')
-    ax_1.set_xlabel(r'$m_{500c}$')
-    ax_1.set_ylabel(r'$r_w/r_{500c}$')
-    ax_1.legend(loc='best')
-
-    sopt, scov = opt.curve_fit(gas_warm_sigma_fit, m, sigma, sigma=sigma_err)
-    s_prms = {'a': sopt[0], 'b': sopt[1]}
-    ax_2.set_prop_cycle(pl.cycle_mark())
-    ax_2.errorbar(m, sigma, marker='o', yerr=sigma_err, label=r'simulation')
-    ax_2.set_prop_cycle(pl.cycle_line())
-    ax_2.plot(m, gas_warm_sigma_fit(m, **s_prms), label=r'fit')
-    ax_2.set_xscale('log')
-    ax_2.set_yscale('log')
-    ax_2.set_xlabel(r'$m_{500c}$')
-    ax_2.set_ylabel(r'$\sigma_w$')
-    ax_2.legend(loc='best')
-
-    ax_3.plot(m, m_2, marker='o', label=r'simulation')
-    ax_3.set_prop_cycle(pl.cycle_line())
-    # ax_3.plot(m, gas_warm_sigma_fit(m, **s_prms), label=r'fit')
-    ax_3.set_xscale('log')
-    ax_3.set_yscale('log')
-    ax_3.set_xlabel(r'$m_{500c}$')
-    ax_3.set_ylabel(r'$m_{\mathrm{gas,warm}}$')
-    ax_3.legend(loc='best')
-
-    plt.show()
-
-    return rw_prms, s_prms
-# ------------------------------------------------------------------------------
-# End of plot_gas_warm_fit_bahamas_median()
-# ------------------------------------------------------------------------------
-
-def prof_gas_cold(x, a, b, c, m_sl, r200):
-    '''beta profile'''
-    profile = (1 + (x/a)**2)**(-b) * np.exp(-(x/c)**2)
-    mass = tools.m_h(profile[sl], x[sl] * r200)
-    profile *= m_sl/mass
-
-    return profile
-
-def fit_gas_cold_bahamas(rw):
-    '''
-    Fit profiles to the cold gas for 1e11<M<1e13 in bahamas
-    '''
-    T1 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_500_crit_Tlt1e45_5r500c_M11_13.hdf5', 'r')
-
-    # get density profiles
-    rho_1 = T1['PartType0/CenMedianDensity'][:]
-
-    # want to know hot gas mass wrt halo mass
-    r500 = T1['PartType0/R500'][:]
-    numbin = T1['PartType0/NumBin'][:]
-    cum_index = np.cumsum(np.concatenate([[0], numbin]))
-    r500_med = np.array([np.median([r500[cum_index[idx]:cum_index[idx+1]]])
-                         for idx in range(cum_index.shape[0] - 1)])
-
-    r_bins = T1['RBins_R_Crit500'][:]
-    r = tools.bins2center(r_bins)
-    m_bins = T1['MBins_M_Crit500'][:]
-    m = tools.bins2center(m_bins).reshape(-1)
-
-    T1.close()
-
-    pl.set_style('line')
-
-    a = -1 * np.ones_like(m)
-    b = -1 * np.ones_like(m)
-    a_err = -1 * np.ones_like(m)
-    b_err = -1 * np.ones_like(m)
-    m_1 = -1 * np.ones_like(m)
-    m200 = -1 * np.ones_like(m)
-    for idx, mass in enumerate(m):
-        prof_1 = rho_1[idx]
-        sl1 = (prof_1 > 0)
-        # we do not want empty slices
-        if sl1.sum() == 0:
-            continue
-        # check whether region is contiguous, otherwise can run into trouble
-        # with mass determination
-        if np.diff((sl1 == 0)[:-1]).nonzero()[0].size > 2:
-            continue
-
-        m1 = tools.m_h(prof_1[sl1], r[sl1] * r500_med[idx])
-        sl = np.ones(sl1.sum(), dtype=bool)
-        p1, c1 = opt.curve_fit(lambda r, a, b: \
-                               prof_gas_cold(r, sl, a, b,
-                                             rw[idx], m1, r500_med[idx]),
-                               r[sl1],
-                               prof_1[sl1], bounds=([0, 0],
-                                                    [1, 5]))
-        # plt.plot(r[sl1], prof_1[sl1], label='cold')
-        # plt.plot(r, prof_gas_cold(r, sl1, p1[0], p1[1], rw[idx], m1,
-        #                                r500_med[idx]),
-        #          label='cold fit')
-        # plt.ylim([1e9, 1e16])
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.title('$M=10^{%.2f}M_\odot$'%np.log10(mass))
-        # plt.legend(loc='best')
-        # plt.show()
-        # only add parameters if we have fit
-        a[idx] = p1[0]
-        b[idx] = p1[1]
-        a_err[idx] = np.sqrt(np.diag(c1))[0]
-        b_err[idx] = np.sqrt(np.diag(c1))[1]
-        m_1[idx] = tools.m_h(prof_gas_cold(r, sl1, p1[0], p1[1], rw[idx], m1,
-                                           r500_med[idx]), r)
-        m200[idx] = mass
-
-    sl = (a > 0)
-
-
-    return a[sl], b[sl], a_err[sl], b_err[sl], m_1[sl], m200[sl]
-
-# ------------------------------------------------------------------------------
-# End of fit_gas_cold_bahamas()
-# ------------------------------------------------------------------------------
-
-def gas_cold_rw_fit(m, a, b):
-    return a * (m/1e12)**(b)
-
-def gas_cold_sigma_fit(m, a, b):
-    return a * np.log10((m/1e12)) + b
-
-
-def plot_gas_cold_fit_bahamas_median(rw, sigma, rw_err, sigma_err, m_2, m):
-    '''
-    Plot best fit relation for rw and sigma as function of m
-    '''
-    fig = plt.figure(1, figsize=(15,5))
-    ax_1 = fig.add_subplot(121)
-    ax_2 = fig.add_subplot(122)
-
-    rw_err[0] = rw_err[1]
-    sigma_err[0] = sigma_err[1]
-    ropt, rcov = opt.curve_fit(gas_cold_rw_fit, m, rw, sigma=rw_err)
-    rw_prms = {'a': ropt[0], 'b': ropt[1]}
-    ax_1.set_prop_cycle(pl.cycle_mark())
-    ax_1.errorbar(m, rw, marker='o', yerr=rw_err, label=r'simulation')
-    ax_1.set_prop_cycle(pl.cycle_line())
-    ax_1.plot(m, gas_cold_rw_fit(m, **rw_prms), label=r'fit')
-    ax_1.set_xscale('log')
-    ax_1.set_yscale('log')
-    ax_1.set_xlabel(r'$m_{500c}$')
-    ax_1.set_ylabel(r'$r_w/r_{500c}$')
-    ax_1.legend(loc='best')
-
-    sopt, scov = opt.curve_fit(gas_cold_sigma_fit, m, sigma, sigma=sigma_err)
-    s_prms = {'a': sopt[0], 'b': sopt[1]}
-    ax_2.set_prop_cycle(pl.cycle_mark())
-    ax_2.errorbar(m, sigma, marker='o', yerr=sigma_err, label=r'simulation')
-    ax_2.set_prop_cycle(pl.cycle_line())
-    ax_2.plot(m, gas_cold_sigma_fit(m, **s_prms), label=r'fit')
-    ax_2.set_xscale('log')
-    ax_2.set_yscale('log')
-    ax_2.set_xlabel(r'$m_{500c}$')
-    ax_2.set_ylabel(r'$\sigma$')
-    ax_2.legend(loc='best')
-
-    plt.show()
-
-    return rw_prms, s_prms
-# ------------------------------------------------------------------------------
-# End of plot_gas_cold_fit_bahamas_median()
-# ------------------------------------------------------------------------------
-
-def plot_gas_fit_bahamas_median():
+def plot_gas_fit_bahamas_median(plot=False):
     '''Fit median relations to gas fitting functions'''
     rs_w, s_w, rsw_err, sw_err, r0_w, m_w, m200_w = fit_gas_warm_bahamas()
     m200_h, mc_h, rc_h, bc_h, rc_err, bc_err, ms_h, rs_h, s_h, rs_err, s_err, r0_h = fit_gas_hot_bahamas()
@@ -2456,25 +1732,27 @@ def plot_gas_fit_bahamas_median():
     ropt, rcov = opt.curve_fit(gas_warm_r0_fit, m200_w, r0_w)
     r0w_prms = {'a': ropt[0], 'b': ropt[1]}
 
+    if plot:
+        fig = plt.figure(figsize=(20,6))
+        ax_w = fig.add_subplot(141)
+        ax_hc = fig.add_subplot(143)
+        ax_hs = fig.add_subplot(142)
+        ax_m = fig.add_subplot(144)
+        ax_w.set_prop_cycle(pl.cycle_mark())
+        ax_w.errorbar(m200_w, rs_w, yerr=rsw_err, marker='o',
+                      label=r'$r_w/r_{200\mathrm{m}}$')
+        ax_w.errorbar(m200_w, s_w, yerr=sw_err, marker='x',
+                      label=r'$\sigma_w$')
 
-    # fig = plt.figure(figsize=(18,6))
-    # ax_w = fig.add_subplot(141)
-    # ax_hc = fig.add_subplot(142)
-    # ax_hs = fig.add_subplot(143)
-    # ax_m = fig.add_subplot(144)
-    # ax_w.set_prop_cycle(pl.cycle_mark())
-    # ax_w.errorbar(m200_w, rs_w, yerr=rsw_err, marker='o', label=r'$r_w/r_{200m}$')
-    # ax_w.errorbar(m200_w, s_w, yerr=sw_err, marker='x', label=r'$\sigma_w$')
+        ax_w.set_prop_cycle(pl.cycle_line())
+        ax_w.plot(m200_w, gas_warm_rw_fit(m200_w, **rw_prms))
+        ax_w.plot(m200_w, gas_warm_sigma_fit(m200_w, **sw_prms))
 
-    # ax_w.set_prop_cycle(pl.cycle_line())
-    # ax_w.plot(m200_w, gas_warm_rw_fit(m200_w, **rw_prms))
-    # ax_w.plot(m200_w, gas_warm_sigma_fit(m200_w, **sw_prms))
-
-    # ax_w.set_xlabel(r'$m_{200m} \, [\mathrm{M}_\odot]$')
-    # ax_w.legend(loc='best')
-    # ax_w.set_xscale('log')
-    # ax_w.set_yscale('log')
-    # ax_w.set_title('Warm gas')
+        ax_w.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+        ax_w.legend(loc='best')
+        ax_w.set_xscale('log')
+        ax_w.set_yscale('log')
+        ax_w.set_title('Warm gas')
 
     # hot central gas
     rc_err[rc_err == 0] = rc_err[(rc_err == 0).nonzero()[0] - 1]
@@ -2488,20 +1766,22 @@ def plot_gas_fit_bahamas_median():
                                sigma=bc_err[~np.isnan(bc_h)])
     b_prms = {'a': bopt[0], 'b': bopt[1]}
 
+    if plot:
+        ax_hc.set_prop_cycle(pl.cycle_mark())
+        ax_hc.errorbar(m200_h, rc_h, yerr=rc_err, marker='o',
+                       label=r'$r_c/r_{200\mathrm{m}}$')
+        ax_hc.errorbar(m200_h, bc_h, yerr=bc_err, marker='x',
+                       label=r'$\beta$')
 
-    # ax_hc.set_prop_cycle(pl.cycle_mark())
-    # ax_hc.errorbar(m200_h, rc_h, yerr=rc_err, marker='o', label=r'$r_c/r_{200m}$')
-    # ax_hc.errorbar(m200_h, bc_h, yerr=bc_err, marker='x', label=r'$\beta$')
+        ax_hc.set_prop_cycle(pl.cycle_line())
+        ax_hc.plot(m200_h, gas_hot_rc_fit(m200_h, **rc_prms))
+        ax_hc.plot(m200_h, gas_hot_beta_fit(m200_h, **b_prms))
 
-    # ax_hc.set_prop_cycle(pl.cycle_line())
-    # ax_hc.plot(m200_h, gas_hot_rc_fit(m200_h, **rc_prms))
-    # ax_hc.plot(m200_h, gas_hot_beta_fit(m200_h, **b_prms))
-
-    # ax_hc.set_xlabel(r'$m_{200m} \, [\mathrm{M}_\odot]$')
-    # ax_hc.legend(loc='best')
-    # ax_hc.set_xscale('log')
-    # ax_hc.set_yscale('log')
-    # ax_hc.set_title('Hot central gas')
+        ax_hc.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+        ax_hc.legend(loc='best')
+        ax_hc.set_xscale('log')
+        ax_hc.set_yscale('log')
+        ax_hc.set_title('Hot central gas')
 
     # hot satellite gas
     r_sl = ~np.isnan(rs_h) & (m200_h > 1e14)
@@ -2515,19 +1795,22 @@ def plot_gas_fit_bahamas_median():
     ropt, rcov = opt.curve_fit(gas_hot_r0_fit, m200_h, r0_h)
     r0s_prms = {'a': ropt[0], 'b': ropt[1]}
 
-    # ax_hs.set_prop_cycle(pl.cycle_mark())
-    # ax_hs.errorbar(m200_h, rs_h, yerr=rs_err, marker='o', label=r'$r_s/r_{200m}$')
-    # ax_hs.errorbar(m200_h, s_h, yerr=s_err, marker='x', label=r'$\sigma_s$')
+    if plot:
+        ax_hs.set_prop_cycle(pl.cycle_mark())
+        ax_hs.errorbar(m200_h, rs_h, yerr=rs_err, marker='o',
+                       label=r'$r_s/r_{200\mathrm{m}}$')
+        ax_hs.errorbar(m200_h, s_h, yerr=s_err, marker='x',
+                       label=r'$\sigma_s$')
 
-    # ax_hs.set_prop_cycle(pl.cycle_line())
-    # ax_hs.plot(m200_h, gas_hot_rs_fit(m200_h, **rs_prms))
-    # ax_hs.plot(m200_h, gas_hot_sigma_fit(m200_h, **ss_prms))
+        ax_hs.set_prop_cycle(pl.cycle_line())
+        ax_hs.plot(m200_h, gas_hot_rs_fit(m200_h, **rs_prms))
+        ax_hs.plot(m200_h, gas_hot_sigma_fit(m200_h, **ss_prms))
 
-    # ax_hs.set_xlabel(r'$m_{200m} \, [\mathrm{M}_\odot]$')
-    # ax_hs.legend(loc='best')
-    # ax_hs.set_xscale('log')
-    # ax_hs.set_yscale('log')
-    # ax_hs.set_title('Hot satellite gas')
+        ax_hs.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+        ax_hs.legend(loc='best')
+        ax_hs.set_xscale('log')
+        ax_hs.set_yscale('log')
+        ax_hs.set_title('Hot satellite gas')
 
     # mass contributions
     mwopt, mwcov = opt.curve_fit(gas_warm_mw_fit, m200_w, m_w/m200_w)
@@ -2537,68 +1820,246 @@ def plot_gas_fit_bahamas_median():
     msopt, mscov = opt.curve_fit(gas_hot_ms_fit, m200_h, ms_h/m200_h)
     ms_prms = {'ms': msopt[0], 'a': msopt[1], 'b': msopt[2]}
 
-    # ax_m.set_prop_cycle(pl.cycle_mark())
-    # ax_m.plot(m200_w, m_w/m200_w, label=r'$m_{\mathrm{warm}}$')
-    # ax_m.plot(m200_h, mc_h/m200_h, label=r'$m_{\mathrm{hot},c}$')
-    # ax_m.plot(m200_h, ms_h/m200_h, label=r'$m_{\mathrm{hot},s}$')
+    if plot:
+        ax_m.set_prop_cycle(pl.cycle_mark())
+        ax_m.plot(m200_w, m_w/m200_w, label=r'$m_{\mathrm{warm}}$')
+        ax_m.plot(m200_h, mc_h/m200_h, label=r'$m_{\mathrm{hot,c}}$')
+        ax_m.plot(m200_h, ms_h/m200_h, label=r'$m_{\mathrm{hot,s}}$')
 
-    # ax_m.set_prop_cycle(pl.cycle_line())
-    # ax_m.plot(m200_w, gas_warm_mw_fit(m200_w, **mw_prms))
-    # ax_m.plot(m200_h, gas_hot_mc_fit(m200_h, **mc_prms))
-    # ax_m.plot(m200_h, gas_hot_ms_fit(m200_h, **ms_prms))
+        ax_m.set_prop_cycle(pl.cycle_line())
+        ax_m.plot(m200_w, gas_warm_mw_fit(m200_w, **mw_prms))
+        ax_m.plot(m200_h, gas_hot_mc_fit(m200_h, **mc_prms))
+        ax_m.plot(m200_h, gas_hot_ms_fit(m200_h, **ms_prms))
 
-    # ax_m.yaxis.tick_right()
-    # ax_m.yaxis.set_ticks_position('both')
-    # ax_m.yaxis.set_label_position("right")
-    # ax_m.set_xlabel(r'$m_{200m} \, [\mathrm{M}_\odot]$')
-    # ax_m.set_ylabel(r'$m/m_{200m} \, [\mathrm{M}_\odot]$', rotation=270,
-    #                 labelpad=20)
-    # ax_m.legend(loc='best')
-    # ax_m.set_xscale('log')
-    # ax_m.set_yscale('log')
-    # ax_m.set_title('Mass contribution')
+        ax_m.yaxis.tick_right()
+        ax_m.yaxis.set_ticks_position('both')
+        ax_m.yaxis.set_label_position("right")
+        ax_m.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+        ax_m.set_ylabel(r'$m/m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$', rotation=270,
+                        labelpad=20)
+        ax_m.legend(loc='best')
+        ax_m.set_xscale('log')
+        # ax_m.set_yscale('log')
+        ax_m.set_title('Mass contribution')
 
-    # plt.show()
+        plt.show()
 
     return rw_prms, sw_prms, rc_prms, b_prms, rs_prms, ss_prms, mw_prms, mc_prms, ms_prms, r0w_prms, r0s_prms
+
+# ------------------------------------------------------------------------------
+# End of plot_gas_fit_bahamas_median()
+# ------------------------------------------------------------------------------
 
 def compare_fit_gas_bahamas():
     '''
     Compare how the fit performs for binned profiles
     '''
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned.hdf5', 'r')
+    # Load warm and hot data
+    T2 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_T1e45_1e65_M12_13.hdf5', 'r')
+    T2 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_T1e45_1e65_M13_15p64.hdf5', 'r')
+    T3 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_Tgt1e65_M13_15p64.hdf5', 'r')
 
-    # hot gas -> need mass fraction as function of halo mass to fit
-    c, c_err, masses, fit_prms = fit_dm_bahamas()
 
-    # warm gas
 
-    rho = binned['PartType1/MedianDensity'][:]
-    q16 = binned['PartType1/Q16'][:]
-    q84 = binned['PartType1/Q84'][:]
-    r200 = binned['PartType1/MedianR200'][:]
+    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_M11_15p5.hdf5', 'r')
+
+    rho = binned['PartType0/MedianDensity'][1:]
+    q16 = binned['PartType0/Q16'][1:]
+    q84 = binned['PartType0/Q84'][1:]
+    r200 = binned['PartType0/MedianR200'][1:]
+    m200 = binned['PartType0/MedianM200'][1:]
 
     r_bins = binned['RBins_R_Mean200'][:]
-    r = tools.bins2center(r_bins)
-    m_bins = binned['MBins_M_Mean200'][:]
-    m = tools.bins2center(m_bins)
+    r = tools.bins2center(r_bins).reshape(-1)
+    m_bins = binned['MBins_M_Mean200'][1:]
+    m = tools.bins2center(m_bins).reshape(-1)
 
     binned.close()
 
-    c_rel = np.power(10, dm_c_fit(m, **fit_prms))
+    r_x = r200
+    # extract all fit parameters
+    rw_prms, sw_prms, rc_prms, b_prms, rs_prms, ss_prms, mw_prms, mc_prms, ms_prms, r0w_prms, r0s_prms = plot_gas_fit_bahamas_median()
+
+    # need stars fit parameters for cold gas
+    as_prms, bs_prms, r0_prms, mscold_prms, ac_prms, bc_prms, cc_prms, mcold_prms = plot_stars_fit_bahamas_median()
+
+    f_w = gas_warm_mw_fit(m, **mw_prms)
+    fc_h = gas_hot_mc_fit(m, **mc_prms)
+    fs_h = gas_hot_ms_fit(m, **ms_prms)
+    f_c = stars_mc_fit(m200, **mcold_prms)
+
+    # warm gas
+    rw = gas_warm_rw_fit(m, **rw_prms)
+    sw = gas_warm_sigma_fit(m, **sw_prms)
+    r0w = gas_warm_r0_fit(m, **r0w_prms)
+    prof_w = np.zeros((m.shape[0], r.shape[0]))
+    for idx, mass in enumerate(m):
+        if mass <= 1e13:
+            r_sl = (r >= r0w[idx] * r_x[idx])
+            if r_sl.sum() > 0:
+                prof_w[idx, r_sl] = prof_gas_warm(r[r_sl], rw[idx],
+                                                  sw[idx],
+                                                  f_w[idx] * m[idx],
+                                                  r_x[idx])
+
+    # hot cen gas
+    rc = gas_hot_rc_fit(m, **rc_prms)
+    bc = gas_hot_beta_fit(m, **b_prms)
+    rs = gas_hot_rs_fit(m, **rs_prms)
+    prof_c = np.zeros((m.shape[0], r.shape[0]))
+    for idx, mass in enumerate(m):
+        if (mass >= 1e13):
+            prof_c[idx] = prof_gas_hot_c(r, rc[idx], bc[idx], rs[idx],
+                                         fc_h[idx] * m[idx], r_x[idx])
+
+    # hot sat gas
+    ss = gas_hot_sigma_fit(m, **ss_prms)
+    r0s = gas_hot_r0_fit(m, **r0s_prms)
+    prof_s = np.zeros((m.shape[0], r.shape[0]))
+    for idx, mass in enumerate(m):
+        if mass >= 1e13:
+            r_sl = (r >= r0s[idx] * r_x[idx])
+            if r_sl.sum() > 0:
+                prof_s[idx, r_sl] = prof_gas_hot_s(r[r_sl], rs[idx], ss[idx],
+                                                   fs_h[idx] * m[idx], r_x[idx])
+
+
+    # cold gas
+    ac = dm_plaw_fit(m200, **ac_prms)
+    bc = dm_plaw_fit(m200, **bc_prms)
+    cc = dm_plaw_fit(m200, **cc_prms)
+    prof_cold = np.zeros((m.shape[0], r.shape[0]))
+    for idx, mass in enumerate(m):
+        if mass < 1e13:
+            prof_cold[idx] = 0.4 * prof_stars_c(r, ac[idx], bc[idx], cc[idx],
+                                                f_c[idx] * m[idx], r_x[idx])
+
     for idx, prof in enumerate(rho):
-        mass = tools.m_h(prof, r * r200[idx])
-        profile = prof_nfw(r, c_rel[idx], mass, r200[idx])
-        plt.plot(r, prof)
-        plt.plot(r, profile)
-        plt.title(r'$m_{200} = 10^{%.2f}M_\odot$'%np.log10(m[idx]))
+        ch = prof_c[idx]
+        sh = prof_s[idx]
+        w = prof_w[idx]
+        c = prof_cold[idx]
+
+        plt.plot(r, r**2 * prof, label='sim')
+        plt.plot(r, r**2 * (c + ch + sh + w), label='tot')
+
+        c[c == 0] = np.nan
+        ch[ch == 0] = np.nan
+        sh[sh == 0] = np.nan
+        w[w == 0] = np.nan
+        plt.plot(r, r**2 * c, label='cold')
+        plt.plot(r, r**2 * ch, label='cen')
+        plt.plot(r, r**2 * sh, label='sat')
+        plt.plot(r, r**2 * w, label='warm')
+        plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
+        plt.ylim(ymin=1e10)
         plt.xscale('log')
         plt.yscale('log')
+        plt.legend(loc='best')
         plt.show()
 
 # ------------------------------------------------------------------------------
 # End of compare_fit_gas_bahamas()
 # ------------------------------------------------------------------------------
+
+# def prof_nfw(x, c, m200, r200):
+#     profile = (c*x)**(-1) * (1 + c*x)**(-3)
+#     mass = tools.m_h(profile, x * r200)
+#     profile *= m200/mass
+
+#     return profile
+
+def prof_dm_inner(r, sl, ri, b, m_sl):
+    '''
+    Profile for inner dark matter bump
+
+    r in physical coordinates, sl denotes r/r200 <= 0.05
+    '''
+    profile = np.exp(-(np.log10(r) - np.log10(ri))**2/b)
+    mass = tools.m_h(profile[sl], r[sl])
+    profile *= m_sl/mass
+    # y = r / ri
+    # profile  = (y)**(-1) * (1 + y**2)**(-1)
+    # mass = tools.m_h(profile[sl], r[sl])
+    # profile *= m_sl / mass
+
+    return profile
+
+
+def prof_nfw_nosl(r, rs, m):
+    '''
+    Normal NFW profile
+
+    r in physical coordinates, sl denotes r/r200 > 0.05
+    '''
+    x = r / rs
+    profile  = (x)**(-1) * (1 + x)**(-2)
+    mass = tools.m_h(profile, r)
+    profile *= m/mass
+
+    return profile
+
+def prof_nfw(r, sl, rs, m_sl):
+    '''
+    Normal NFW profile
+
+    r in physical coordinates, sl denotes r/r200 > 0.05
+    '''
+    x = r / rs
+    profile  = (x)**(-1) * (1 + x)**(-2)
+    mass = tools.m_h(profile[sl], r[sl])
+    profile *= m_sl/mass
+
+    return profile
+
+def dm_plaw_fit(m, a, b):
+    '''
+    Fit to c
+    '''
+    # return a + b * np.log10(m)*(1 + c * np.log10(m)**2)
+    return a * (m/1e14)**b
+
+# def dm_c_fit(m):
+#     A = 8.7449969011763216
+#     B = -0.093399926987858539
+#     plaw =  A * (m/1e14)**B
+
+#     return plaw
+
+def dm_c_fit(m, a, b):
+    A = 8.7449969011763216
+    B = -0.093399926987858539
+    mod = (1 + a * np.sin(2*np.pi/3 * np.log10((m-1e11)/b)) * np.exp(-m/1e13))
+    plaw =  A * (m/1e14)**B
+
+    return plaw * mod
+
+def dm_c_dmo(m):
+    A = 8.7449969011763216
+    B = -0.093399926987858539
+    plaw =  A * (m/1e14)**B
+    return plaw
+
+def dm_m1_fit(m, a, b, mc):
+    # yc = b
+    # gamma = c * 2 - yc
+    # beta = yc - gamma
+    # return beta / (1 + (1e11/m)**a) + gamma
+    return a * (0.5 + 0.5 * np.tanh(-b * np.log10(m/mc)))
+
+def dm_m2_fit(m, a, b, c):
+    # yc = b
+    # gamma = c * 2 - yc
+    # beta = yc - gamma
+    # return beta / (1 + (1e11/m)**a) + gamma
+    # yc = b
+    # gamma = c * 2 - yc
+    # beta = yc - gamma
+    # return beta / (1 + (1e11/m)**a) + gamma
+    return (c - b) / (1 + (1e11/m)**a) + b
+
+def dm_f_fit(m, a, b, c):
+    return a / (1 + b * np.log10(m/c)**2) + p.prms.f_dm
 
 def fit_dm_bahamas_all():
     '''
@@ -2625,8 +2086,8 @@ def fit_dm_bahamas_all():
     rs_err = -1 * np.ones_like(m200)
     c = -1 * np.ones_like(m200)
     c_err = -1 * np.ones_like(m200)
-    dc = -1 * np.ones_like(m200)
-    dc_err = -1 * np.ones_like(m200)
+    # dc = -1 * np.ones_like(m200)
+    # dc_err = -1 * np.ones_like(m200)
     masses = -1 * np.ones_like(m200)
 
     pl.set_style('line')
@@ -2635,15 +2096,15 @@ def fit_dm_bahamas_all():
         sl = ((prof > 0) & (r_range > 0.05))
         mass = tools.m_h(prof[sl], r200[idx] * r_range[sl])
 
-        popt, pcov = opt.curve_fit(lambda r_range, rs, dc: \
-                                   np.log10(prof_nfw(r_range, rs, dc)),
+        popt, pcov = opt.curve_fit(lambda r_range, rs: \
+                                   np.log10(prof_nfw_nosl(r_range, rs, mass)),
                                    r_range[sl]*r200[idx],
-                                   np.log10(prof[sl]), bounds=([0,0],[100, 1e5]))
+                                   np.log10(prof[sl]), bounds=([0],[100]))
         masses[idx] = mass
         rs[idx] = popt[0]
-        dc[idx] = popt[1]
+        # dc[idx] = popt[1]
         rs_err[idx] = np.sqrt(np.diag(pcov))[0]
-        dc_err[idx] = np.sqrt(np.diag(pcov))[1]
+        # dc_err[idx] = np.sqrt(np.diag(pcov))[1]
 
         c[idx] = r200[idx] / rs[idx]
         # if idx%1000 == 0:
@@ -2675,92 +2136,184 @@ def fit_dm_bahamas_all():
     # f_prms = {"a": fopt[0],
     #           "b": fopt[1]}
 
-    return rs, rs_err, dc, dc_err, c, masses, m200#, r_prms, d_prms, f_prms
+    return rs, rs_err, c, masses, m200#, r_prms, d_prms, f_prms
 
 # ------------------------------------------------------------------------------
 # End of fit_dm_bahamas_all()
 # ------------------------------------------------------------------------------
 
-def plot_dm_fit_bahamas_median(rs, rs_err, dc, dc_err, c, masses, m200):
-    # bin relation
-    m_bins = np.logspace(np.log10(m200).min(), np.log10(m200).max(), 20)
-    m = tools.bins2center(m_bins)
-    m_bin_idx = np.digitize(m200, m_bins)
-    c_med = np.array([np.median(c[m_bin_idx == m_bin])
-                                for m_bin in np.arange(1, len(m_bins))])
-    popt, pcov = opt.curve_fit(dm_c_fit, m[~np.isnan(c_med)],
-                               c_med[~np.isnan(c_med)])
-    fit_prms = {'a': popt[0], 'b': popt[1]}
-    print fit_prms
+def fit_dm_bahamas_bar():
+    '''
+    Fit the concentration for the BAHAMAS simulations
+    '''
+    # profiles = h5py.File('halo/data/BAHAMAS/DMONLY/eagle_subfind_particles_032_profiles_binned_200_mean_M13_15.hdf5', 'r')
+    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_M11_15p5.hdf5', 'r')
 
-    c_cor = profs.c_correa(m, 0).reshape(-1)
+    rho = profiles['PartType1/MedianDensity'][8:]
+    m200 = profiles['PartType1/MedianM200'][8:]
+    r200 = profiles['PartType1/MedianR200'][8:]
+    r_range = tools.bins2center(profiles['RBins_R_Mean200'][:])
+    profiles.close()
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    img = ax.hexbin(np.log10(m200), np.log10(c),
-                    cmap='magma',
-                    bins='log',
-                    gridsize=40)
-    ax.plot(np.log10(m), np.log10(c_med), c='w', label=r'$c_{\mathrm{med}}$')
-    ax.plot(np.log10(m), np.log10(dm_c_fit(m, **fit_prms)), c='w',
-            label=r'$c_{\mathrm{fit}}$')
-    ax.plot(np.log10(m), np.log10(c_cor), c='w',
-            label=r'$c_{\mathrm{correa}}$')
-    ax.set_xlabel(r'$m_{200m} \, [\log_{10}\mathrm{M}_\odot]$')
-    ax.set_ylabel(r'$\log_{10} c(m)$')
-    ax.set_xlim([np.log10(masses).min(), np.log10(masses).max()])
 
-    for line in ax.xaxis.get_ticklines():
-        line.set_color('w')
-    for line in ax.yaxis.get_ticklines():
-        line.set_color('w')
+    rs = -1 * np.ones_like(m200)
+    rs_err = -1 * np.ones_like(m200)
+    ri = -1 * np.ones_like(m200)
+    ri_err = -1 * np.ones_like(m200)
+    b = -1 * np.ones_like(m200)
+    b_err = -1 * np.ones_like(m200)
+    m1 = -1 * np.ones_like(m200)
+    m2 = -1 * np.ones_like(m200)
+    m = -1 * np.ones_like(m200)
+    mp = -1 * np.ones_like(m200)
+    pl.set_style('line')
 
-    leg = ax.legend(loc='best')
-    for text in leg.get_texts():
-        plt.setp(text, color='w')
+    for idx, prof in enumerate(rho):
+        mass = tools.m_h(prof, r200[idx] * r_range)
+        sl2 = ((prof > 0) & (r_range > 0.05))
+        mass2 = tools.m_h(prof[sl2], r200[idx] * r_range[sl2])
 
-    cb = fig.colorbar(img)
-    cb.set_label(r'$\log_{10} N_{\mathrm{bin}}$', rotation=270, labelpad=25)
+        # Normal NFW fit
+        sl = np.ones(sl2.sum(), dtype=bool)
+        popt2, pcov2 = opt.curve_fit(lambda r_range, rs: \
+                                     np.log10(prof_nfw(r_range, sl, rs, mass2)),
+                                     r_range[sl2]*r200[idx],
+                                     np.log10(prof[sl2]), bounds=([0],[1]))
 
-    plt.show()
+        # Inner baryon bump fit
+        nfw = prof_nfw(r_range*r200[idx], sl2, popt2[0], mass2)
+        diff = prof - nfw
+        sl1 = ((diff > 0) & (r_range <= 0.05))
+
+        mass1 = tools.m_h(diff[sl1], r200[idx] * r_range[sl1])
+        sl = np.ones(sl1.sum(), dtype=bool)
+        popt1, pcov1 = opt.curve_fit(lambda r_range, ri, b: \
+                                     np.log10(prof_dm_inner(r_range, sl, ri,
+                                                            b, mass1)),
+                                     r_range[sl1]*r200[idx],
+                                     np.log10(prof[sl1]-nfw[sl1]),
+                                     bounds=([0, 0],[0.1 * r200[idx], 10]))
+
+        ri[idx] = popt1[0]
+        ri_err[idx] = np.sqrt(np.diag(pcov1))[0]
+        b[idx] = popt1[1]
+        b_err[idx] = np.sqrt(np.diag(pcov1))[1]
+        rs[idx] = popt2[0]
+        rs_err[idx] = np.sqrt(np.diag(pcov2))[0]
+
+        nfw = prof_nfw(r_range*r200[idx], sl2, rs[idx], mass2)
+        bar = prof_dm_inner(r_range*r200[idx], sl1, ri[idx], b[idx], mass1)
+        # check total new mass in profile
+        mass_new = tools.m_h(nfw+bar, r_range*r200[idx])
+        m1[idx] = mass1
+        m2[idx] = mass2
+        mp[idx] = mass_new
+        m[idx] = mass
+
+        # print mass1 / mass
+        # print mass2 / mass
+        # print '-----------'
+        # plt.plot(r_range[sl1], r_range[sl1]**2 * (prof[sl1] - nfw[sl1]))
+        # plt.plot(r_range[sl1], r_range[sl1]**2 * bar[sl1])
+        # plt.xscale('log')
+        # plt.yscale('log')
+        # plt.show()
+
+        # plt.plot(r_range, r_range**2 * prof, lw=0, marker='o', label=r'sim')
+        # plt.plot(r_range, r_range**2 * (nfw + bar) * mass / mass_new,
+        #          label=r'total fit')
+        # plt.plot(r_range, r_range**2 * nfw)
+        # plt.plot(r_range, r_range**2 * bar)
+        # plt.ylim(ymin=1e11)
+        # plt.xlabel(r'$r/r_{200\mathrm{m}}$')
+        # plt.ylabel(r'$\rho_{\mathrm{DM}}(r) \cdot (r/r_{200\mathrm{m}})^2$')
+        # plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
+        # plt.xscale('log')
+        # plt.yscale('log')
+        # plt.legend(loc='best')
+        # plt.show()
+
+    riopt, ricov = opt.curve_fit(dm_plaw_fit, m200[ri>1e-4],
+                                 (ri/r200)[ri>1e-4],
+                                 sigma=ri_err[ri>1e-4])
+    ri_prms = {"a": riopt[0],
+               "b": riopt[1]}
+
+    rsopt, rscov = opt.curve_fit(dm_plaw_fit, m200, rs,
+                                 sigma=rs_err)
+    rs_prms = {"a": rsopt[0],
+               "b": rsopt[1]}
+
+    bopt, bcov = opt.curve_fit(dm_plaw_fit, m200, b, sigma=b_err)
+    b_prms = {"a": bopt[0],
+              "b": bopt[1]}
+
+
+    c = r200 / rs
+    c_err = c**2 * rs_err
+
+    copt, ccov = opt.curve_fit(dm_c_fit, m200, c,
+                               bounds=([0, 1e10],
+                                       [1, 1e15]))
+    c_prms = {"a": copt[0],
+              "b": copt[1]}
+              # "mc": copt[3]}
+
+    # plt.plot(m200, c)
+    # m = np.logspace(11, 15, 100)
+    # A = 8.7449969011763216
+    # B = -0.093399926987858539
+    # fit = dm_c_fit(m, **c_prms)
+    # plaw = A * (m/1e14)**B
+    # plt.plot(m, fit)
+    # plt.plot(m, plaw)
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.show()
+
+
+    # mopt1, mcov1 = opt.curve_fit(dm_plaw_fit, m200[(1e13<m200) & (m200<1e15)],
+    #                              (m1/m)[(1e13<m200) & (m200<1e15)])
+    # m1_prms = {"a": mopt1[0],
+    #            "b": mopt1[1]}
+    mopt1, mcov1 = opt.curve_fit(dm_m1_fit, m200[m200 < 1e14],
+                                 (m1/m)[m200 < 1e14],
+                                 bounds=([0, 0, 1e10],
+                                         [1, 10, 1e15]))
+    m1_prms = {"a": mopt1[0],
+               "b": mopt1[1],
+               "mc": mopt1[2]}
+
+    mopt2, mcov2 = opt.curve_fit(dm_m2_fit, m200, m2/m,
+                                 bounds=([0, 0, 0],
+                                         [1, 1, 1]))
+    m2_prms = {"a": mopt2[0],
+               "b": mopt2[1],
+               "c": mopt2[2]}
+
+    # fpopt, fpcov = opt.curve_fit(dm_f_fit, m200, m/mp)
+    # fp_prms = {"a": fpopt[0],
+    #            "b": fpopt[1]}
+
+    fopt, fcov = opt.curve_fit(dm_f_fit, m200, m/m200,
+                               bounds=([0, 0, 1e10],
+                                       [1, 5, 1e15]))
+    f_prms = {"a": fopt[0],
+              "b": fopt[1],
+              "c": fopt[2]}
+
+    # # plt.errorbar(m200, rs/r200, yerr=rs_err/r200, marker='o')
+    # plt.plot(m200, m1/m, marker='o', lw=0)
+    # plt.plot(m200, dm_plaw_fit(m200, **m1_prms))
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.show()
+
+    return rs, rs_err, c, c_err, ri, ri_err, b, b_err, m1, m2, m, m200, r200, ri_prms, b_prms, rs_prms, c_prms, m1_prms, m2_prms, f_prms
 
 # ------------------------------------------------------------------------------
-# End of plot_dm_fit_bahamas_median()
+# End of fit_dm_bahamas_bar()
 # ------------------------------------------------------------------------------
-
-# def prof_nfw(x, c, m200, r200):
-#     profile = (c*x)**(-1) * (1 + c*x)**(-3)
-#     mass = tools.m_h(profile, x * r200)
-#     profile *= m200/mass
-
-#     return profile
-def prof_nfw(r, rs, dc):
-    x = r / rs
-    profile = p.prms.rho_crit * p.prms.h**2 * dc * (x)**(-1) * (1 + x)**(-2)
-    # mass = tools.m_h(profile, r)
-    # profile *= m200/mass
-
-    return profile
-
-def dm_c_fit(m, a, b):
-    '''
-    Fit to c
-    '''
-    # return a + b * np.log10(m)*(1 + c * np.log10(m)**2)
-    return a * (m/1e14)**b
-
-def dm_rs_fit(m, a, b):
-    '''
-    Fit to c
-    '''
-    # return a + b * np.log10(m)*(1 + c * np.log10(m)**2)
-    return a * (m/1e14)**b
-
-def dm_dc_fit(m, a, b):
-    return a * (m/1e14)**b
-
-def dm_f_fit(m, a, b):
-    return a * (m/1e14)**b
 
 def fit_dm_bahamas():
     '''
@@ -2777,12 +2330,9 @@ def fit_dm_bahamas():
 
 
     rs = -1 * np.ones_like(m200)
-    rs_err = -1 * np.ones_like(m200)
     c = -1 * np.ones_like(m200)
-    c_err = -1 * np.ones_like(m200)
-    dc = -1 * np.ones_like(m200)
-    dc_err = -1 * np.ones_like(m200)
-    masses = -1 * np.ones_like(m200)
+    rs_err = -1 * np.ones_like(m200)
+    m = -1 * np.ones_like(m200)
 
     pl.set_style('line')
 
@@ -2791,45 +2341,45 @@ def fit_dm_bahamas():
         sl = ((prof > 0) & (r_range > 0.05))
         mass = tools.m_h(prof[sl], r200[idx] * r_range[sl])
 
-        popt, pcov = opt.curve_fit(lambda r_range, rs, dc: \
-                                   np.log10(prof_nfw(r_range, rs, dc)),
+        popt, pcov = opt.curve_fit(lambda r_range, rs: \
+                                   np.log10(prof_nfw_nosl(r_range, rs, mass)),
                                    r_range[sl]*r200[idx],
-                                   np.log10(prof[sl]), bounds=([0,0],[100, 1e5]))
-        masses[idx] = mass
+                                   np.log10(prof[sl]), bounds=([0],[100]))
+        m[idx] = mass
+
         rs[idx] = popt[0]
-        dc[idx] = popt[1]
         rs_err[idx] = np.sqrt(np.diag(pcov))[0]
-        dc_err[idx] = np.sqrt(np.diag(pcov))[1]
         c[idx] = r200[idx] / rs[idx]
-        # print rs[idx]
-        # print dc[idx]
-        # print mass
-        # print tools.m_h(prof_nfw(r_range[sl]*r200[idx], rs[idx], dc[idx]),
-        #                 r_range[sl] * r200[idx])
-        # print m200[idx]
-        # print '---'
-        # plt.plot(r_range[sl], prof[sl])
-        # plt.plot(r_range[sl], prof_nfw(r_range[sl]*r200[idx], rs[idx], dc[idx]))
+
+        # plt.plot(r_range, r_range**2 * prof)
+        # plt.plot(r_range[sl2], r_range[sl2]**2 * prof_nfw(r_range[sl2]*r200[idx],
+        #                                                 rs[idx], mass2))
+        # plt.plot(r_range[sl1], r_range[sl1]**2 * prof_nfw(r_range[sl1]*r200[idx],
+        #                                                   ri[idx], mass1))
         # plt.xscale('log')
         # plt.yscale('log')
         # plt.show()
 
-    copt, ccov = opt.curve_fit(dm_c_fit, m200, c)
+    copt, ccov = opt.curve_fit(dm_plaw_fit, m200, c)
     c_prms = {"a": copt[0],
               "b": copt[1],}
 
-    ropt, rcov = opt.curve_fit(dm_rs_fit, m200, rs)
-    r_prms = {"a": ropt[0],
-              "b": ropt[1]}
+    rsopt, rscov = opt.curve_fit(dm_plaw_fit, m200, rs)
+    rs_prms = {"a": rsopt[0],
+               "b": rsopt[1]}
 
-    dopt, dcov = opt.curve_fit(dm_dc_fit, m200, dc)
-    d_prms = {"a": dopt[0],
-              "b": dopt[1]}
+    # dopt, dcov = opt.curve_fit(dm_dc_fit, m200, dc)
+    # d_prms = {"a": dopt[0],
+    #           "b": dopt[1]}
 
-    fopt, fcov = opt.curve_fit(dm_f_fit, m200, masses/m200)
-    f_prms = {"a": fopt[0],
-              "b": fopt[1]}
 
+    mopt, mcov = opt.curve_fit(dm_plaw_fit, m200, m/m200)
+    m_prms = {"a": mopt[0],
+              "b": mopt[1]}
+
+    # fopt, fcov = opt.curve_fit(dm_f_fit, m200, (m1 + m2)/m200)
+    # f_prms = {"a": fopt[0],
+    #           "b": fopt[1]}
     # print c_prms
     # plt.plot(m200, c)
     # plt.plot(m200, dm_c_fit(m200, **c_prms))
@@ -2838,17 +2388,123 @@ def fit_dm_bahamas():
     # plt.show()
 
     # return c, c_err, masses, m200, c_prms, m_prms
-    return rs, rs_err, dc, dc_err, masses, m200, c_prms, r_prms, d_prms, f_prms
+    return rs, rs_err, m, m200, rs_prms, c_prms, m_prms
 
 # ------------------------------------------------------------------------------
 # End of fit_dm_bahamas()
+# ------------------------------------------------------------------------------
+
+def plot_dm_fit_bahamas_median():
+    # # get concentration mass plane plot
+    # rs, rs_err, c, masses, m200 = fit_dm_bahamas_all()
+
+    # # bin relation
+    # m_bins = np.logspace(np.log10(m200).min(), np.log10(m200).max(), 20)
+    # m = tools.bins2center(m_bins)
+    # m_bin_idx = np.digitize(m200, m_bins)
+    # c_med = np.array([np.median(c[m_bin_idx == m_bin])
+    #                             for m_bin in np.arange(1, len(m_bins))])
+    # popt, pcov = opt.curve_fit(dm_plaw_fit, m[~np.isnan(c_med)],
+    #                            c_med[~np.isnan(c_med)])
+    # fit_prms = {'a': popt[0], 'b': popt[1]}
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # img = ax.hexbin(np.log10(m200), np.clip(np.log10(c), np.log10(c).min(), 1.8),
+    #                 cmap='magma',
+    #                 bins='log',
+    #                 gridsize=40)
+    # ax.plot(np.log10(m), np.log10(c_med), c='w', label=r'$c_{\mathrm{med}}$')
+    # ax.plot(np.log10(m), np.log10(dm_plaw_fit(m, **fit_prms)), c='w',
+    #         label=r'$c_{\mathrm{fit}}$')
+
+    # # compare median binned
+    # rs, rs_err, masses, m200, r_prms, c_prms, f_prms = fit_dm_bahamas()
+    # c_binned = dm_plaw_fit(m, **c_prms)
+    # ax.plot(np.log10(m), np.log10(c_binned), c='w',
+    #         label=r'$c_{\mathrm{bin}}$')
+    # ax.set_xlabel(r'$m_{200\mathrm{m}} \, [\log_{10}\mathrm{M}_\odot]$')
+    # ax.set_ylabel(r'$\log_{10} c(m)$')
+    # # ax.set_title(r'NFW concentration')
+
+    # for line in ax.xaxis.get_ticklines():
+    #     line.set_color('w')
+    # for line in ax.yaxis.get_ticklines():
+    #     line.set_color('w')
+
+    # leg = ax.legend(loc='best')
+    # for text in leg.get_texts():
+    #     plt.setp(text, color='w')
+
+    # cb = fig.colorbar(img)
+    # cb.set_label(r'$\log_{10} N_{\mathrm{bin}}$', rotation=270, labelpad=25)
+
+    # plt.show()
+
+    pl.set_style()
+
+    # get other fit parameters
+    rs, rs_err, c, c_err, ri, ri_err, b, b_err, m1, m2, m, m200, r200,  ri_prms, b_prms, rs_prms, c_prms, m1_prms, m2_prms, f_prms = fit_dm_bahamas_bar()
+
+    fig = plt.figure(figsize=(14,6))
+    ax = fig.add_subplot(131)
+    axb = fig.add_subplot(132)
+    axm = fig.add_subplot(133)
+    ax.set_prop_cycle(pl.cycle_mark())
+    ax.errorbar(m200, c, yerr=c_err,
+                 marker='o', label=r'$c=r_{200\mathrm{m}}/r_s$')
+    ax.set_prop_cycle(pl.cycle_line())
+
+    c_fit = dm_c_fit(m200, **c_prms)
+    c_fit[m200 < 2e11] = dm_c_dmo(m200[m200<2e11])
+    ax.plot(m200, c_fit)
+    ax.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+    ax.legend(loc='best')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_title('NFW profile')
+
+    axb.set_prop_cycle(pl.cycle_mark())
+    axb.errorbar(m200, ri/r200, yerr=ri_err/r200,
+                 marker='o', label=r'$r_i/r_{200\mathrm{m}}$') #\, [\mathrm{Mpc}/h]$')
+    axb.plot(m200, m1/m, marker='x', label=r'$m_{i}/m_{\mathrm{DM}}$')
+    axb.errorbar(m200, b, yerr=b_err, marker='+', label=r'$\beta$')
+    axb.set_prop_cycle(pl.cycle_line())
+    axb.plot(m200, dm_plaw_fit(m200, **ri_prms))
+    axb.plot(m200, dm_m1_fit(m200, **m1_prms))
+    axb.plot(m200, dm_plaw_fit(m200, **b_prms))
+    axb.set_ylim([1e-4,10])
+    axb.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+    axb.legend(loc='best')
+    axb.set_xscale('log')
+    axb.set_yscale('log')
+    axb.set_title('Baryon modification')
+
+    axm.set_prop_cycle(pl.cycle_mark())
+    axm.plot(m200, m/m200, marker='o', label=r'$m_{\mathrm{DM}}/m_{200\mathrm{m}}$')
+    axm.plot(m200, m2/m, marker='+',
+             label=r'$m_{\mathrm{NFW}}/m_{\mathrm{DM}}$')
+    axm.set_prop_cycle(pl.cycle_line())
+    axm.plot(m200, dm_f_fit(m200, **f_prms))
+    axm.plot(m200, dm_m2_fit(m200, **m2_prms))
+    axm.set_ylim([7e-1,1])
+    axm.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+    axm.legend(loc='best')
+    axm.set_xscale('log')
+    # axm.set_yscale('log')
+    axm.set_title('Mass contribution')
+
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_dm_fit_bahamas_median()
 # ------------------------------------------------------------------------------
 
 def compare_fit_dm_bahamas():
     '''
     Compare how the fit performs for binned profiles
     '''
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned.hdf5', 'r')
+    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_M11_15p5.hdf5', 'r')
 
     rho = binned['PartType1/MedianDensity'][:]
     q16 = binned['PartType1/Q16'][:]
@@ -2857,119 +2513,156 @@ def compare_fit_dm_bahamas():
     m200 = binned['PartType1/MedianM200'][:]
 
     r_bins = binned['RBins_R_Mean200'][:]
-    r = tools.bins2center(r_bins)
+    r = tools.bins2center(r_bins).reshape(-1)
     m_bins = binned['MBins_M_Mean200'][:]
-    m = tools.bins2center(m_bins)
 
     binned.close()
-    rs1 = -1 * np.ones_like(m200)
-    rs_err1 = -1 * np.ones_like(m200)
-    c1 = -1 * np.ones_like(m200)
-    dc1 = -1 * np.ones_like(m200)
-    dc_err1 = -1 * np.ones_like(m200)
-    masses1 = -1 * np.ones_like(m200)
 
-    rs2 = -1 * np.ones_like(m200)
-    rs_err2 = -1 * np.ones_like(m200)
-    c2 = -1 * np.ones_like(m200)
-    dc2 = -1 * np.ones_like(m200)
-    dc_err2 = -1 * np.ones_like(m200)
-    masses2 = -1 * np.ones_like(m200)
+    rsf, rsf_err, c, c_err, rif, rif_err, bi, bi_err, m1, m2, mf, m200f, r200f, ri_prms, bi_prms, rs_prms, c_prms, m1_prms, m2_prms , f_prms = fit_dm_bahamas_bar()
 
-    rs3 = -1 * np.ones_like(m200)
-    rs_err3 = -1 * np.ones_like(m200)
-    c3 = -1 * np.ones_like(m200)
-    dc3 = -1 * np.ones_like(m200)
-    dc_err3 = -1 * np.ones_like(m200)
-    masses3 = -1 * np.ones_like(m200)
+    rs = dm_plaw_fit(m200, **rs_prms)
+    ri = dm_plaw_fit(m200, **ri_prms) * r200
+    bi = dm_plaw_fit(m200, **bi_prms)
+    m = m200 * dm_f_fit(m200, **f_prms)
+    m1 = m * dm_m1_fit(m200, **m1_prms)
+    m2 = m * dm_m2_fit(m200, **m2_prms)
+    sl1 = (r <= 0.05)
+    sl2 = (r > 0.05)
 
-    # rs4 = -1 * np.ones_like(m200)
-    # rs_err4 = -1 * np.ones_like(m200)
-    # c4 = -1 * np.ones_like(m200)
-    # dc4 = -1 * np.ones_like(m200)
-    # dc_err4 = -1 * np.ones_like(m200)
-    # masses4 = -1 * np.ones_like(m200)
+    pl.set_style()
+    fig = plt.figure(figsize=(20,6))
+    ax1 = fig.add_axes([0.1, 0.1, 0.2, 0.8])
+    ax2 = fig.add_axes([0.3, 0.1, 0.2, 0.8])
+    ax3 = fig.add_axes([0.5, 0.1, 0.2, 0.8])
+    ax4 = fig.add_axes([0.7, 0.1, 0.2, 0.8])
 
-    pl.set_style('line')
-    for idx, prof in enumerate(rho):
-        sl1 = (prof > 0)
-        sl2 = ((prof > 0) & (r > 0.05))
-        mass1 = tools.m_h(prof[sl1], r200[idx] * r[sl1])
-        mass2 = tools.m_h(prof[sl2], r200[idx] * r[sl2])
+    masses = np.array([1e12, 1e13, 1e14, 1e15])
+    axes = [ax1, ax2, ax3, ax4]
 
-        # include all particles
-        popt, pcov = opt.curve_fit(lambda r, c, dc: \
-                                   np.log10(prof_nfw(r, c, dc)),
-                                   r[sl1]*r200[idx],
-                                   np.log10(prof[sl1]), bounds=([0,0],[100, 1e5]))
-        masses1[idx] = mass1
-        rs1[idx] = popt[0]
-        dc1[idx] = popt[1]
-        rs_err1[idx] = np.sqrt(np.diag(pcov))[0]
-        dc_err1[idx] = np.sqrt(np.diag(pcov))[1]
-        c1[idx] = r200[idx] / rs1[idx]
+    for idx, mass in enumerate(masses):
+        # find closest matching halo
+        idx_match = np.argmin(np.abs(m200 - mass))
+        prof = rho[idx_match]
+        m_prof = tools.m_h(prof, r * r200[idx_match])
 
-        # include all particles with r > 0.05 r_vir
-        popt, pcov = opt.curve_fit(lambda r, c, dc: \
-                                   np.log10(prof_nfw(r, c, dc)),
-                                   r[sl2]*r200[idx],
-                                   np.log10(prof[sl2]), bounds=([0,0],[100, 1e5]))
+        prof1 = prof_dm_inner(r*r200[idx_match], sl1, ri[idx_match],
+                              bi[idx_match], m1[idx_match])
+        prof2 = prof_nfw(r*r200[idx_match], sl2, rs[idx_match], m2[idx_match])
+        prof3 = prof1 + prof2
+        mass3 = tools.m_h(prof3, r * r200[idx_match])
+        scale = m_prof / mass3
 
-        masses2[idx] = mass2
-        rs2[idx] = popt[0]
-        dc2[idx] = popt[1]
-        rs_err2[idx] = np.sqrt(np.diag(pcov))[0]
-        dc_err2[idx] = np.sqrt(np.diag(pcov))[1]
-        c2[idx] = r200[idx] / rs2[idx]
+        axes[idx].plot(r, (prof * r**2),
+                       marker='o', lw=0, label='sim')
+        axes[idx].plot(r, (prof1 * r**2) * scale, label=r'$\rho_i$')
+        axes[idx].plot(r, (prof2 * r**2) * scale, label=r'$\rho_{\mathrm{NFW}}$')
+        axes[idx].plot(r, (prof3 * r**2) * scale, label='total')
+        axes[idx].set_title(r'$m_{200\mathrm{m}} = 10^{%.2f}\mathrm{M_\odot}$'
+                        %np.log10(m200[idx_match]))
+        axes[idx].set_ylim([4e11, 2e13])
+        if idx == 0:
+            text = axes[idx].set_ylabel(r'$\rho(r) \cdot (r/r_{200\mathrm{m}})^2 \, [\mathrm{M_\odot/Mpc^3}]$')
+            font_properties = text.get_fontproperties()
+        # need to set visibility to False BEFORE log scaling
+        if idx > 0:
+            ticks = axes[idx].get_xticklabels()
+            # strange way of getting correct label
+            ticks[-7].set_visible(False)
 
-        # include all particles with r > 0.05 r_vir & no logarithmic fit
-        popt, pcov = opt.curve_fit(lambda r, c, dc: \
-                                   prof_nfw(r, c, dc),
-                                   r[sl2]*r200[idx],
-                                   prof[sl2], bounds=([0,0],[100, 1e5]))
+        axes[idx].set_xscale('log')
+        axes[idx].set_yscale('log')
+        if idx > 0:
+            axes[idx].yaxis.set_ticklabels([])
 
-        masses3[idx] = mass2
-        rs3[idx] = popt[0]
-        dc3[idx] = popt[1]
-        rs_err3[idx] = np.sqrt(np.diag(pcov))[0]
-        dc_err3[idx] = np.sqrt(np.diag(pcov))[1]
-        c3[idx] = r200[idx] / rs3[idx]
-
-    copt, ccov = opt.curve_fit(dm_c_fit, m200, c2)
-    c_prms = {"a": copt[0],
-              "b": copt[1]}
-
-    m200c = np.array([gas.m200m_to_m200c(i) for i in m200])
-    r200c = tools.mass_to_radius(m200c, 200 * p.prms.rho_crit * 0.7**2)
-    c_corr_c = profs.c_correa(m200, 0).reshape(-1)
-
-    plt.plot(m200, dm_c_fit(m200, **c_prms) * r200c/r200)
-    plt.plot(m200, c_corr_c)
-    plt.xscale('log')
-    plt.yscale('log')
+    fig.text(0.5, 0.03,
+             r'$r/r_{200\mathrm{m}}$', ha='center',
+             va='center', rotation='horizontal', fontproperties=font_properties)
+    ax1.legend(loc='best')
     plt.show()
-
-    dopt, dcov = opt.curve_fit(dm_dc_fit, m200, dc2)
-    d_prms = {"a": dopt[0],
-              "b": dopt[1]}
-
-    c_rel = np.power(10, dm_c_fit(m200, **c_prms))
-    dc_rel = dm_dc_fit(m200, **d_prms)
-    for idx, prof in enumerate(rho):
-        # mass = tools.m_h(prof, r * r200[idx])
-        prof1 = prof_nfw(r*r200[idx], rs1[idx], dc1[idx])
-        prof2 = prof_nfw(r*r200[idx], rs2[idx], dc2[idx])
-        prof3 = prof_nfw(r*r200[idx], rs3[idx], dc3[idx])
-        plt.plot(r, (prof * r**2)/p.prms.rho_crit, marker='o', lw=0, label='sim')
-        plt.plot(r, (prof1 * r**2)/p.prms.rho_crit, label='log all')
-        plt.plot(r, (prof2 * r**2)/p.prms.rho_crit, label='log $r>0.05r_{200m}$')
-        plt.plot(r, (prof3 * r**2)/p.prms.rho_crit, label='no log all')
-        plt.title(r'$m_{200} = 10^{%.2f}M_\odot$'%np.log10(m[idx]))
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.legend(loc='best')
-        plt.show()
 
 # ------------------------------------------------------------------------------
 # End of compare_fit_dm_bahamas()
+# ------------------------------------------------------------------------------
+
+def mass_fraction():
+    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_200_mean.hdf5', 'r')
+
+    r = tools.bins2center(profiles['RBins_R_Mean200'][:])
+    # Get mass in all particle types
+    rho0 = profiles['PartType0/Densities'][:]
+    rho1 = profiles['PartType1/Densities'][:]
+    rho4 = profiles['PartType4/Densities'][:]
+    r200_0 = profiles['PartType0/R200'][:] * cm2mpc
+    r200_1 = profiles['PartType1/R200'][:] * cm2mpc
+    r200_4 = profiles['PartType4/R200'][:] * cm2mpc
+
+    m_0 = tools.m_h(rho0, r.reshape(1,-1) * r200_0.reshape(-1,1))
+    m_1 = tools.m_h(rho1, r.reshape(1,-1) * r200_1.reshape(-1,1))
+    m_4 = tools.m_h(rho4, r.reshape(1,-1) * r200_4.reshape(-1,1))
+
+    # Find matching groups between different particle types
+    grnr0 = profiles['PartType0/GroupNumber'][:]
+    grnr1 = profiles['PartType1/GroupNumber'][:]
+    grnr4 = profiles['PartType4/GroupNumber'][:]
+    m200_4 = profiles['PartType4/M200'][:]
+
+    # stars have least amount of groups
+    idx_matched0 = np.searchsorted(grnr0, grnr4, 'left')
+    # idx_matched1 = np.searchsorted(grnr1, grnr4, 'left')
+    idx_found0 = (grnr0[idx_matched0] == grnr4)
+    # idx_found1 = (grnr1[idx_matched1] == grnr4)
+
+    # less matches in gas than in dark matter
+    idx0 = idx_matched0[idx_found0]
+    idx1 = np.in1d(grnr1, grnr0[idx0],
+                   assume_unique=True)
+    idx4 = np.in1d(grnr4, grnr0[idx0], assume_unique=True)
+
+    f_0 = m_0[idx0] / m200_4[idx4]
+    f_1 = m_1[idx1] / m200_4[idx4]
+    f_4 = m_4[idx4] / m200_4[idx4]
+
+    f_tot = f_0 + f_1 + f_4
+
+    m200 = m200_4[idx4]
+
+    pl.set_style()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    # bin relation
+    m_bins = np.logspace(np.log10(m200).min(), np.log10(m200).max(), 20)
+    m = tools.bins2center(m_bins)
+    m_bin_idx = np.digitize(m200, m_bins)
+
+    f_med = np.array([np.median(f_tot[m_bin_idx == m_bin])
+                      for m_bin in np.arange(1, len(m_bins))])
+    img = ax.hexbin(np.log10(m200), f_tot,
+                    cmap='magma',
+                    bins='log',
+                    gridsize=40)
+    ax.plot(np.log10(m), f_med, c='w', label=r'$f_{\mathrm{med}}$')
+    # ax.plot(np.log10(m), np.log10(dm_c_fit(m, **fit_prms)), c='w',
+    #         label=r'$c_{\mathrm{fit}}$')
+
+    ax.set_xlabel(r'$m_{200\mathrm{m}} \, [\log_{10}\mathrm{M}_\odot]$')
+    ax.set_ylabel(r'$f(m)$')
+    ax.set_title(r'Mass fraction total')
+
+    for line in ax.xaxis.get_ticklines():
+        line.set_color('w')
+    for line in ax.yaxis.get_ticklines():
+        line.set_color('w')
+
+    leg = ax.legend(loc='best')
+    for text in leg.get_texts():
+        plt.setp(text, color='w')
+
+    cb = fig.colorbar(img)
+    cb.set_label(r'$\log_{10} N_{\mathrm{bin}}$', rotation=270, labelpad=25)
+
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of mass_fraction()
 # ------------------------------------------------------------------------------

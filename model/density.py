@@ -79,6 +79,13 @@ class Profile(Cache):
         self.profile_f = profile_f
         self.profile_f_args = profile_f_args
 
+    # def __add__(self, other):
+    #     # check whether all parameters are the same
+    #     if not (np.allclose(self.r_range, other.r_range) or
+    #             np.allclose(self.m_range, other.m_range) or
+    #             np.allclose(self.k_range, other.k_range)):
+    #         raise AttributeError('r_range/m_range/k_range need to be the same')
+
     #===========================================================================
     # Parameters
     #===========================================================================
