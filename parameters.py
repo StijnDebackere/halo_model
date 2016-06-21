@@ -342,6 +342,17 @@ class Parameters(Cache):
     @cached_property('fnu_file', 'nu', 'm_fn')
     def fnu(self):
         nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
+
+        # dnu = np.diff(self.nu)
+        # dnu = np.append(dnu, dnu[-1])
+        # dm = np.diff(self.m_range_lin)
+        # dm = np.append(dm, dm[-1])
+
+        # nm = self.rho_m / self.m_range_lin * fnu * dnu / dm
+
+        # print tools.Integrate(fnu, nu)
+        # print tools.Integrate(nm, self.m_range_lin)
+
         # fnu = Parameters._MF_Tinker10(self.nu)
         # fnu = self.m_fn.fsigma / self.nu
         return fnu
@@ -417,11 +428,17 @@ prms3 = Parameters(m_min=12., m_max=15.)
 prms4 = Parameters(m_min=13., m_max=15.)
 prms5 = Parameters(m_min=14., m_max=15.)
 
-prms = Parameters(m_min=6.5, m_max=15.5)#, mf_fit='SMT')
-prms_dmo = Parameters(m_min=10.8923, m_max=15.4999,
-                      nu_file='HMcode/nu_fnu_m200.dat',
+# # Power spectrum converges for lower cutoff m_min = 6.5
+# # Power spectrum converges for upper cutoff m_max = 15.5
+# prms = Parameters(m_min=6.5, m_max=15.5)
+# this set of parameters is the correct baryon modified halo mass
+# for the dmo mass range 11 -> 15.5
+prms = Parameters(m_min=10.8923, m_max=15.4999,
+                  nu_file='HMcode/nu_fnu_m200.dat',
+                  fnu_file='HMcode/nu_fnu_dmo.dat',
+                  p_lin_file='HMcode/plin.dat')
+prms_dmo = Parameters(m_min=11, m_max=15.5,
+                      nu_file='HMcode/nu_fnu_dmo.dat',
                       fnu_file='HMcode/nu_fnu_dmo.dat',
                       p_lin_file='HMcode/plin.dat')
 
-# Power spectrum converges for lower cutoff m_min = 6.5
-# Power spectrum converges for upper cutoff m_max = 15.5

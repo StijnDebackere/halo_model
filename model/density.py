@@ -59,7 +59,8 @@ class Profile(Cache):
     m_h : (m,) array
       array containing the halo mass for each halo, obtained by integration
     '''
-    def __init__(self, r_range, m_range, k_range, profile, profile_f=None, n=84,
+    def __init__(self, r_range, m_range, k_range, profile, f_comp,
+                 profile_f=None, n=84,
                  taylor_err=1e-50, profile_args=None, profile_f_args=None,
                  cpus=multiprocessing.cpu_count()):
         '''
@@ -74,17 +75,27 @@ class Profile(Cache):
         self.n = n
         self.cpus = cpus
         self.taylor_err = taylor_err
+        self.f_comp = f_comp
         self.profile = profile
         self.profile_args = profile_args
         self.profile_f = profile_f
         self.profile_f_args = profile_f_args
 
-    # def __add__(self, other):
-    #     # check whether all parameters are the same
-    #     if not (np.allclose(self.r_range, other.r_range) or
-    #             np.allclose(self.m_range, other.m_range) or
-    #             np.allclose(self.k_range, other.k_range)):
-    #         raise AttributeError('r_range/m_range/k_range need to be the same')
+    def __add__(self, other):
+        # check whether all parameters are the same
+        if not (np.allclose(self.r_range, other.r_range) or
+                np.allclose(self.m_range, other.m_range) or
+                np.allclose(self.k_range, other.k_range)):
+            raise AttributeError('r_range/m_range/k_range need to be the same')
+
+        f_new = self.f_comp + other.f_comp
+        profile_new = (self.f_comp / f_new * self.profile +
+                       other.f_comp / f_new * other.profile)
+        profile_f_new = (self.f_comp / f_new * self.profile_f +
+                         other.f_comp / f_new * other.profile_f)
+        return Profile(self.r_range, self.m_range, self.k_range,
+                       f_comp= f_new,
+                       profile=profile_new, profile_f=profile_f_new)
 
     #===========================================================================
     # Parameters
@@ -99,6 +110,10 @@ class Profile(Cache):
 
     @parameter
     def k_range(self, val):
+        return val
+
+    @parameter
+    def f_comp(self, val):
         return val
 
     @parameter

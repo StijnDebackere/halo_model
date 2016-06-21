@@ -46,7 +46,7 @@ class Component(dens.Profile):
     Delta_tot: (k,) array
       dimensionless power spectrum
     '''
-    def __init__(self, name, p_lin, nu, fnu, f_comp, # m_fn,
+    def __init__(self, name, p_lin, nu, fnu, #f_comp, # m_fn,
                  bias_fn, bias_fn_args,
                  **profile_kwargs):
         super(Component, self).__init__(**profile_kwargs)
@@ -54,12 +54,16 @@ class Component(dens.Profile):
         # self.power_lin = m_fn.power
         self.name = name
         self.p_lin = p_lin
-        # self.m_fn = m_fn
         self.nu = nu
         self.fnu = fnu
-        self.f_comp = f_comp
         self.bias_fn = bias_fn
         self.bias_fn_args = bias_fn_args
+
+    # def __add__(self, other):
+    #     if not (np.allclose(self.nu, other.nu) or
+    #             np.allclose(self.fnu, other.fnu) or
+    #             np.allclose(self.p_lin, other.p_lin)):
+    #         raise AttributeError('nu/fnu/p_lin need to be the same')
 
     #===========================================================================
     # Parameters
@@ -90,10 +94,6 @@ class Component(dens.Profile):
     #         raise TypeError('m_fn should be hmf.MassFunction instance.')
     #     else:
     #         return val
-
-    @parameter
-    def f_comp(self, val):
-        return val
 
     @parameter
     def bias_fn(self, val):

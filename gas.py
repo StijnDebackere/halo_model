@@ -8,6 +8,7 @@ import sys
 import astropy.io.fits as fits
 import glob
 import re
+import cPickle
 
 import matplotlib.pyplot as plt
 # allow import of plot
@@ -20,7 +21,7 @@ import halo.tools as tools
 
 import pdb
 
-ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/data/'
+ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/halo/data/'
 prms = p.prms
 
 def T2Mgas(T):
@@ -418,6 +419,22 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
 # End of f_gas_fit()
 # ------------------------------------------------------------------------------
 
+def logmgas(logm500c):
+    return np.log10(np.power(10, logm500c) * f_gas(np.power(10, logm500c),
+                                                   **f_gas_fit()))
+
+def mgas_to_m500c(mgas500):
+    '''
+    Invert f_gas relation to find m500c belonging to mgas
+    '''
+    f1 = tools.inverse(logmgas, start=1.)
+    m500c = np.ones_like(mgas500)
+    # do everything logarithmically for speed, results in errors at .01% level
+    for idx, m in enumerate(mgas500):
+        m500c[idx] = np.power(10, f1(np.log10(m)))
+
+    return m500c
+
 def plot_eckert_fits():
     '''
     Plot beta profile fits to Eckert profiles
@@ -616,35 +633,42 @@ def fit_croston_profile():
 # ------------------------------------------------------------------------------
 # End of fit_croston_profile()
 # ------------------------------------------------------------------------------
-def massdiff_cm(m500c, m200m):
+
+def massdiff_5c2m(m500c, m200m):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
     '''
-    r500c = (m500c / (4./3 * np.pi * 500 * p.prms.rho_crit * 0.7**2))**(1./3)
+    r500c = (m500c / (4./3 * np.pi * 500 * p.prms.rho_crit * p.prms.h**2))**(1./3)
     r_range = np.logspace(-4, np.log10(r500c), 1000)
 
-    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
+                                 * p.prms.h**2)
     dens = profs.profile_NFW(r_range, np.array([m200m]),
                              profs.c_correa(m200m, 0).reshape(-1),
-                             np.array([r200m]), p.prms.rho_m * 0.7**2, Delta=200)
+                             np.array([r200m]),
+                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
+                             Delta=200)
     mass_int = tools.m_h(dens, r_range)
 
     return mass_int - m500c
 
 
-def massdiff_mc(m200m, m500c):
+def massdiff_2m5c(m200m, m500c):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
     '''
-    r500c = (m500c / (4./3 * np.pi * 500 * p.prms.rho_crit * 0.7**2))**(1./3)
+    r500c = (m500c / (4./3 * np.pi * 500 * p.prms.rho_crit * p.prms.h**2))**(1./3)
     r_range = np.logspace(-4, np.log10(r500c), 1000)
 
-    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
+                                 * p.prms.h**2)
     dens = profs.profile_NFW(r_range, np.array([m200m]),
                              profs.c_correa(m200m, 0).reshape(-1),
-                             np.array([r200m]), p.prms.rho_m * 0.7**2, Delta=200)
+                             np.array([r200m]),
+                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
+                             Delta=200)
     mass_int = tools.m_h(dens, r_range)
 
     return mass_int - m500c
@@ -664,7 +688,7 @@ def m500c_to_m200m(m500c):
       corresponding halo model halo virial mass
     '''
     # 1e19 Msun is ~maximum for c_correa
-    m200m = opt.brentq(massdiff_mc, 1e10, 1e19, args=(m500c))
+    m200m = opt.brentq(massdiff_2m5c, 1e5, 1e19, args=(m500c))
 
     return m200m
 
@@ -687,7 +711,7 @@ def m200m_to_m500c(m200m):
       halo mass at 500 times the universe critical density
     '''
     # 1e19 Msun is ~maximum for c_correa
-    m500c = opt.brentq(massdiff_cm, 1e8, 1e19, args=(m200m))
+    m500c = opt.brentq(massdiff_5c2m, 1e5, 1e19, args=(m200m))
 
     return m500c
 
@@ -695,185 +719,87 @@ def m200m_to_m500c(m200m):
 # End of m200m_to_m500c()
 # ------------------------------------------------------------------------------
 
-def read_croston():
-    # Load in croston metadata
-    ddir = 'halo/data/data_mccarthy/gas/Croston_data/'
-    files = glob.glob(ddir + 'Croston08*.dat')
-    fnames = [f.split('/')[-1] for f in files]
-    idcs = [re.search('[0-9]*.dat', f).span() for f in fnames]
-    sysnum = [int(fnames[idx][i[0]:i[1]][:-4]) for idx,i in enumerate(idcs)]
-
-    data = np.loadtxt(ddir + 'Pratt09.dat')
-    r500 = data[:,1] * 1e-3 # [Mpc]
-    mgas500 = np.power(10, data[:,2]) # [Msun]
-    mgas500_err = data[:,3]
-    Z = data[:,4]
-
-
-    # Load in croston data -> n = n_e
-    rx = [np.loadtxt(f)[:,1] for f in files]
-    n = [np.loadtxt(f)[:,2] for f in files]
-    n_err = [np.loadtxt(f)[:,3] for f in files]
-
-    # Convert electron densities to gas density
-    # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.25)
-    # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
-    #       = (2 + 3Y/(4X))n_H
-    # n_He = Y/(4X) n_H
-    # n_e = (2 + 3Y/(4X)) / (1 + Y/(4X)) n
-    # => n_gas = 2.07 n_e
-    # calculate correct mu factor for Z metallicity gas
-    n2rho = 1.92 * 0.59 * const.m_p.cgs * 1/u.cm**3 # in cgs
-    # change to ``cosmological'' coordinates
-    cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
-    rho =  [(ne * n2rho * cgs2cos).value for ne in n]
-    rho_err = [(ne * n2rho * cgs2cos).value for ne in n_err]
-
-    mgas = np.empty((0,), dtype=float)
-    m500gas = np.empty((0,), dtype=float)
-    for idx, prof in enumerate(rho):
-        mgas = np.append(mgas,
-                         tools.Integrate(prof, rx[idx]*r500[sysnum[idx]-1]))
-        m500gas = np.append(m500gas, mgas500[sysnum[idx] - 1])
-
-        # plt.plot(rx[idx], prof)
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.title('$m=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m500[sysnum[idx] - 1]))
-        # plt.show()
-
-    return mgas, m500gas
-
-def h(z):
-    return (0.3 * (1+z)**3 + 0.7)**0.5
-
-def read_croston():
-    # Load in croston metadata
-    ddir = 'halo/data/data_mccarthy/gas/Croston_data/'
-    files = glob.glob(ddir + 'Croston08*.dat')
-    fnames = [f.split('/')[-1] for f in files]
-    idcs = [re.search('[0-9]*.dat', f).span() for f in fnames]
-    sysnum = [int(fnames[idx][i[0]:i[1]][:-4]) for idx,i in enumerate(idcs)]
-
-    data = np.loadtxt(ddir + 'Pratt09.dat')
-    z = data[:,0]
-    r500 = data[:,1] * 1e-3 # [Mpc/h70]
-    mgas500 = np.power(10, data[:,2]) # [Msun/h70^(5/2)]
-    mgas500_err = data[:,3]
-    Z = data[:,4]
-
-    # Load in croston data -> n = n_e
-    rx = [np.loadtxt(f)[:,1] for idx, f in enumerate(files)]
-    n = [np.loadtxt(f)[:,2] for idx, f in enumerate(files)]
-    n_err = [np.loadtxt(f)[:,3] for idx, f in enumerate(files)]
-
-    # Convert electron densities to gas density
-    # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.25)
-    # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
-    #       = (2 + 3Y/(4X))n_H
-    # n_He = Y/(4X) n_H
-    # n_e = (2 + 3Y/(4X)) / (1 + Y/(4X)) n
-    # => n_gas = 2.07 n_e
-    # calculate correct mu factor for Z metallicity gas
-    n2rho = 1.92 * 0.59 * const.m_p.cgs * 1/u.cm**3 # in cgs
-    # change to ``cosmological'' coordinates
-    cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
-    rho =  [(ne * n2rho * cgs2cos).value for ne in n]
-    rho_err = [(ne * n2rho * cgs2cos).value for ne in n_err]
-
-    mgas = np.empty((0,), dtype=float)
-    m500gas = np.empty((0,), dtype=float)
-    for idx, prof in enumerate(rho):
-        idx_500 = np.argmin(np.abs(rx[idx] - 1))
-        mgas = np.append(mgas,
-                         tools.m_h(prof[:idx_500+1],
-                                   rx[idx][:idx_500+1]*r500[sysnum[idx]-1]))
-        m500gas = np.append(m500gas, mgas500[sysnum[idx] - 1])
-
-        # plt.plot(rx[idx], prof)
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.title('$m=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m500[sysnum[idx] - 1]))
-        # plt.show()
-
-    return m500gas, r500, rx, rho
-
-def read_eckert():
-    ddir = 'halo/data/data_mccarthy/gas/Eckert_data/'
-    files = glob.glob(ddir + 'XLSSC*.fits')
-
-    # metadata
-    mdata = fits.open(ddir + 'XXL100GC.fits')
-    units = mdata[1].header
-
-    # number of cluster
-    num = mdata[1].data['xlssc']
-    z = mdata[1].data['z']
-    # z_err = mdata[1].data['ez'] #?
-    # r500mt = mdata[1].data['r500mt'] # same as in fits files
-    m500mt = mdata[1].data['M500MT']
-    m500mt_err = mdata[1].data['M500MT_err']
-    mgas500 = mdata[1].data['Mgas500']
-    mgas500_err = mdata[1].data['Mgas500_err']
-    mdata.close()
-
-    m500mt *= 1e13
-    m500mt_err *= 1e13
-    mgas500 *= 1e13
-    mgas500_err *= 1e13
-
-
-    # system info
-    fnames = [f.split('/')[-1] for f in files]
-    idcs = [re.search('[0-9]*_nh.fits', f).span() for f in fnames]
-    numdata = np.array([int(fnames[idx][i[0]:i[1]][:-8])
-                        for idx,i in enumerate(idcs)])
-    # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.25)
-    # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
-    # n_He = Y/(4X) n_H
-    # => n_gas = 2.25 n_H
-    n2rho = 2.25 * 0.59 * const.m_p.cgs * 1/u.cm**3 # in cgs
-    cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
-
-    r500 = np.empty((0,), dtype=float)
-    z = np.empty((0,), dtype=float)
-    rx = []
-    rho = []
-    rho_err = []
-    for f in files:
-        # actual data
-        data = fits.open(f)
-        # !!!! check whether this still needs correction factor from weak lensing
-        r500 = np.append(r500, data[1].header['R500'] * 1e-3) # [Mpc]
-        z = np.append(z, data[1].header['REDSHIFT'])
-        rx.append(data[1].data['RADIUS'])
-        rho.append(data[1].data['NH'] * n2rho * cgs2cos)
-        rho_err.append(data[1].data['ENH'] * n2rho * cgs2cos)
-        data.close()
-
-
-    mgas = np.empty((0,), dtype=float)
-    m500gas = np.empty((0,), dtype=float)
-    mdata2data = np.empty((0,), dtype=int)
-    for idx, prof in enumerate(rho):
-        idx_500 = np.argmin(np.abs(rx[idx] - 1))
-        mgas = np.append(mgas,
-                          tools.m_h(prof[:idx_500+1], rx[idx][:idx_500+1] *
-                                    r500[idx]))
-        mdata2data = np.append(mdata2data, (num == numdata[idx]).nonzero()[0][0])
-
-    m500gas = mgas500[mdata2data]
-
-    print m500mt[mdata2data]
-    print 4./3 * np.pi * 500 * p.prms.rho_crit * r500**3
-
-    return m500gas, r500, rx, rho
-
-def fit_observations():
+def massdiff_2c2m(m200c, m200m):
     '''
-    Fit profiles to the observations
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
     '''
-    mgas_croston, r500_croston, r_croston, rho_croston = read_croston()
-    mgas_eckert, r500_eckert, r_eckert, rho_eckert = read_eckert()
+    r200c = (m200c / (4./3 * np.pi * 200 * p.prms.rho_crit * p.prms.h**2))**(1./3)
+    r_range = np.logspace(-4, np.log10(r200c), 1000)
 
-    
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
+                                 * p.prms.h**2)
+    dens = profs.profile_NFW(r_range, np.array([m200m]),
+                             profs.c_correa(m200m, 0).reshape(-1),
+                             np.array([r200m]),
+                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
+                             Delta=200)
+    mass_int = tools.m_h(dens, r_range)
+
+    return mass_int - m200c
+
+
+def massdiff_2m2c(m200m, m200c):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    r200c = (m200c / (4./3 * np.pi * 200 * p.prms.rho_crit * p.prms.h**2))**(1./3)
+    r_range = np.logspace(-4, np.log10(r200c), 1000)
+
+    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
+                                 * p.prms.h**2)
+    dens = profs.profile_NFW(r_range, np.array([m200m]),
+                             profs.c_correa(m200m, 0).reshape(-1),
+                             np.array([r200m]),
+                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
+                             Delta=200)
+    mass_int = tools.m_h(dens, r_range)
+
+    return mass_int - m200c
+
+def m200c_to_m200m(m200c):
+    '''
+    Give the virial mass for the halo corresponding to m200c
+
+    Parameters
+    ----------
+    m200c : float
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200m = opt.brentq(massdiff_2m2c, 1e5, 1e19, args=(m200c))
+
+    return m200m
+
+# ------------------------------------------------------------------------------
+# End of m200c_to_m200m()
+# ------------------------------------------------------------------------------
+
+def m200m_to_m200c(m200m):
+    '''
+    Give m200c for the an m200m virial mass halo
+
+    Parameters
+    ----------
+    m200m : float
+      halo virial mass
+
+    Returns
+    -------
+    m200c : float
+      halo mass at 500 times the universe critical density
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200c = opt.brentq(massdiff_2c2m, 1e5, 1e19, args=(m200m))
+
+    return m200c
+
+# ------------------------------------------------------------------------------
+# End of m200m_to_m200c()
+# ------------------------------------------------------------------------------

@@ -234,8 +234,8 @@ def radius_to_mass(r, mean_dens):
 # End of radius_to_mass()
 # ------------------------------------------------------------------------------
 
-def find_bounds(f, y):
-    x = 1.
+def find_bounds(f, y, start=1.):
+    x = start
     while f(x) < y:
         x = x * 2
     lo = 0 if (x == 1) else x/2.
@@ -252,7 +252,7 @@ def binary_search(f, y, lo, hi, delta):
             return x;
     return hi if (f(hi) - y < y - f(lo)) else lo
 
-def inverse(f, delta=1/1024.):
+def inverse(f, delta=1/1024., start=1.):
     ''''
     Returns the inverse of the monotonic function f, to a precision of delta.
 
@@ -269,7 +269,7 @@ def inverse(f, delta=1/1024.):
       inverse of f
     '''
     def f_1(y):
-        lo, hi = find_bounds(f, y)
+        lo, hi = find_bounds(f, y, start)
         return binary_search(f, y, lo, hi, delta)
     return f_1
 
