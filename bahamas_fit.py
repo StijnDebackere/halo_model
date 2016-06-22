@@ -170,7 +170,7 @@ def load_dm(prms):
     c_x = b.dm_c_fit(m_range, **c_prms)
     c_x[m_range < 2e11] = b.dm_c_dmo(m_range[m_range < 2e11])
 
-    mi = m_range * b.dm_plaw_fit(m_range, **m1_prms)
+    mi = m_range * b.dm_m1_fit(m_range, **m1_prms)
     ms = m_range * b.dm_m2_fit(m_range, **m2_prms)
     f_dm = b.dm_f_fit(m_range, **f_prms)
     # f_dm = np.ones_like(m_range) * prms.f_dm
