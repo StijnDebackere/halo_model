@@ -132,7 +132,7 @@ def c_dmo(m):
     plaw =  A * (m/1e14)**B
     return plaw
 
-def load_dm(prms):
+def load_dm(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
@@ -345,7 +345,7 @@ def load_gas(prms):
 
     return comp_w, comp_c, comp_s
 
-def load_stars(prms):
+def load_stars(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
