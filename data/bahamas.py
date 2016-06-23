@@ -1252,7 +1252,7 @@ def compare_fit_stars_bahamas():
         idx_match = np.argmin(np.abs(m200 - mass))
         profc = rhoc[idx_match]
         profs = rhos[idx_match]
-        m_prof = tools.m_h(profc + profs, r * r200[idx_match])
+        # m_prof = tools.m_h(profc + profs, r * r200[idx_match])
 
         prof_s = np.zeros_like(r)
         # get satellite profile
@@ -1266,8 +1266,8 @@ def compare_fit_stars_bahamas():
                               mc[idx_match], r200[idx_match])
 
         prof_t = prof_s + prof_c
-        mass3 = tools.m_h(prof_t, r * r200[idx_match])
-        scale = m_prof / mass3
+        # mass3 = tools.m_h(prof_t, r * r200[idx_match])
+        # scale = m_prof / mass3
 
         prof = profc + profs
         profc[profc == 0] = np.nan
@@ -1282,9 +1282,9 @@ def compare_fit_stars_bahamas():
                        marker='o', lw=0, label='sim')
         # axes[idx].plot(r, (profc * r**2), marker='x', lw=0, c='k')
         # axes[idx].plot(r, (profs * r**2), marker='+', lw=0, c='k')
-        axes[idx].plot(r, (prof_c * r**2) * scale, label='cen')
-        axes[idx].plot(r, (prof_s * r**2) * scale, label='sat')
-        axes[idx].plot(r, (prof_t * r**2) * scale, label='tot')
+        axes[idx].plot(r, (prof_c * r**2), label='cen')
+        axes[idx].plot(r, (prof_s * r**2), label='sat')
+        axes[idx].plot(r, (prof_t * r**2), label='tot')
         axes[idx].set_title(r'$m_{200\mathrm{m}} = 10^{%.2f}\mathrm{M_\odot}$'
                         %np.log10(m200[idx_match]))
         axes[idx].set_ylim([5e9, 2e13])
