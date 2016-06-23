@@ -1018,42 +1018,41 @@ def fit_stars_bahamas():
 
         if slc.sum() > 0:
             mc = tools.m_h(cen[slc], r_range[slc] * r200[idx])
-            copt, ccov = opt.curve_fit(lambda r_range, a, b, c: \
-                                       prof_stars_c(r_range, a, b, c,
-                                                    mc, r200[idx]),
-                                       r_range[slc], cen[slc],
-                                       bounds=([0, 0, 0],
-                                               [1, 4, 5]))
-            slg = (cold[slc] > 0)
-            fcopt, fccov = opt.curve_fit(lambda r_range, f:\
-                                         f * prof_stars_c(r_range,
-                                                          copt[0], copt[1],
-                                                          copt[2], mc, r200[idx]),
-                                         r_range[slc][slg], cold[slc][slg],
-                                         bounds=([0],[1]))
+            if sls.sum() < 5:
+                copt, ccov = opt.curve_fit(lambda r_range, a, b, c: \
+                                           prof_stars_c(r_range, a, b, c,
+                                                        mc, r200[idx]),
+                                           r_range[slc], cen[slc],
+                                           bounds=([0, 0, 0],
+                                                   [1, 4, 5]))
+                c_c[idx] = copt[2]
+                c_c_err[idx] = np.sqrt(np.diag(ccov))[1]
+            else:
+                copt, ccov = opt.curve_fit(lambda r_range, a, b: \
+                                           prof_stars_c(r_range, a, b, a_s[idx],
+                                                        mc, r200[idx]),
+                                           r_range[slc], cen[slc],
+                                           bounds=([0, 0],
+                                                   [1, 4]))
+                c_c[idx] = a_s[idx]
+                c_c_err[idx] = a_s_err[idx]
+
 
             a_c[idx] = copt[0]
             b_c[idx] = copt[1]
-            c_c[idx] = copt[2]
-            f_c[idx] = fcopt[0]
             a_c_err[idx] = np.sqrt(np.diag(ccov))[0]
             b_c_err[idx] = np.sqrt(np.diag(ccov))[1]
-            c_c_err[idx] = np.sqrt(np.diag(ccov))[1]
-            fc_err[idx] = np.sqrt(np.diag(fccov))[0]
             m_c[idx] = mc
-            plt.plot(r_range[slc], r_range[slc]**2 * cen[slc])
-            plt.plot(r_range[slc], r_range[slc]**2 *
-                     prof_stars_c(r_range[slc], a_c[idx], b_c[idx], c_c[idx],
-                                  m_c[idx], r200[idx]))
-            plt.plot(r_range[slc][slg], r_range[slc][slg]**2 * cold[slc][slg])
-            plt.plot(r_range[slc][slg], r_range[slc][slg]**2 * f_c[idx] *
-                     prof_stars_c(r_range[slc][slg], a_c[idx], b_c[idx], c_c[idx],
-                                  m_c[idx], r200[idx]))
-            plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
-            plt.ylim(ymin=(cen[slc]).min())
-            plt.xscale('log')
-            plt.yscale('log')
-            plt.show()
+
+            # plt.plot(r_range[slc], r_range[slc]**2 * cen[slc])
+            # plt.plot(r_range[slc], r_range[slc]**2 *
+            #          prof_stars_c(r_range[slc], a_c[idx], b_c[idx], c_c[idx],
+            #                       m_c[idx], r200[idx]))
+            # plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
+            # plt.ylim(ymin=(cen[slc]).min())
+            # plt.xscale('log')
+            # plt.yscale('log')
+            # plt.show()
 
     cen_cut = (a_c >= 0)
     sat_cut = (a_s >= 0)
@@ -1129,7 +1128,7 @@ def plot_stars_fit_bahamas_median(plot=False):
         axc.errorbar(m200[cen_cut], a_c[cen_cut], yerr=a_c_err[cen_cut],
                      marker='o', label=r'$r_c/r_{200\mathrm{m}}$')
         axc.errorbar(m200[cen_cut], b_c[cen_cut], yerr=b_c_err[cen_cut],
-                     marker='x', label=r'$\beta_c$')
+                     marker='x', label=r'$\beta$')
         axc.errorbar(m200[cen_cut], c_c[cen_cut], yerr=c_c_err[cen_cut],
                      marker='x', label=r'$r_x/r_{200\mathrm{m}}$')
         axc.set_prop_cycle(pl.cycle_line())
@@ -1137,8 +1136,8 @@ def plot_stars_fit_bahamas_median(plot=False):
         axc.plot(m200, dm_plaw_fit(m200, **bc_prms))
         axc.plot(m200, dm_plaw_fit(m200, **cc_prms))
         axc.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
-        axc.set_ylim(ymin=1e-4)
-        axc.legend(loc=2)
+        axc.set_ylim([1e-4, 1e1])
+        axc.legend(loc=8)
         axc.set_xscale('log')
         axc.set_yscale('log')
         axc.set_title('Central galaxies')
@@ -1166,7 +1165,7 @@ def plot_stars_fit_bahamas_median(plot=False):
         axs.errorbar(m200[sat_cut], a_s[sat_cut], yerr=a_s_err[sat_cut],
                      marker='o', label=r'$r_s/r_{200\mathrm{m}}$')
         axs.errorbar(m200[sat_cut], b_s[sat_cut], yerr=b_s_err[sat_cut],
-                     marker='x', label=r'$\beta_s$')
+                     marker='x', label=r'$\sigma_s$')
         axs.set_prop_cycle(pl.cycle_line())
         axs.plot(m200, dm_plaw_fit(m200, **as_prms))
         axs.plot(m200, dm_plaw_fit(m200, **bs_prms))
@@ -1209,12 +1208,18 @@ def compare_fit_stars_bahamas():
     '''
     Compare how the fit performs for binned profiles
     '''
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_censat_200_mean_M11_15p5.hdf5', 'r')
+    # binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_M10_16.hdf5', 'r')
+    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_M11_15p5.hdf5', 'r')
 
-    rho_c = binned['PartType4/CenMedianDensity'][:]
-    rho_s = binned['PartType4/SatMedianDensity'][:]
-    r200_c = binned['PartType4/MedianR200'][:]
-    m200_c = binned['PartType4/MedianM200'][:]
+    # rho = binned['PartType4/MedianDensity'][:][[1,3,4,5]]
+    # q16 = binned['PartType4/Q16'][:][[1,3,4,5]]
+    # q84 = binned['PartType4/Q84'][:][[1,3,4,5]]
+    # r200 = binned['PartType4/MedianR200'][:][[1,3,4,5]]
+    # m200 = binned['PartType4/MedianM200'][:][[1,3,4,5]]
+    rhoc = binned['PartType4/CenMedianDensity'][:]
+    rhos = binned['PartType4/SatMedianDensity'][:]
+    r200 = binned['PartType4/MedianR200'][:]
+    m200 = binned['PartType4/MedianM200'][:]
 
     # r_bins = binned['RBins_R_Mean200'][:]
     # r = tools.bins2center(r_bins).reshape(-1)
@@ -1250,8 +1255,9 @@ def compare_fit_stars_bahamas():
     for idx, mass in enumerate(masses):
         # find closest matching halo
         idx_match = np.argmin(np.abs(m200 - mass))
-        prof = rho[idx_match]
-        m_prof = tools.m_h(prof, r * r200[idx_match])
+        profc = rhoc[idx_match]
+        profs = rhos[idx_match]
+        # m_prof = tools.m_h(profc + profs, r * r200[idx_match])
 
         prof_s = np.zeros_like(r)
         # get satellite profile
@@ -1265,9 +1271,12 @@ def compare_fit_stars_bahamas():
                               mc[idx_match], r200[idx_match])
 
         prof_t = prof_s + prof_c
-        mass3 = tools.m_h(prof_t, r * r200[idx_match])
-        scale = m_prof / mass3
+        # mass3 = tools.m_h(prof_t, r * r200[idx_match])
+        # scale = m_prof / mass3
 
+        prof = profc + profs
+        profc[profc == 0] = np.nan
+        profs[profs == 0] = np.nan
         prof[prof == 0] = np.nan
         prof_c[prof_c == 0] = np.nan
         prof_s[prof_s == 0] = np.nan
@@ -1276,9 +1285,11 @@ def compare_fit_stars_bahamas():
 
         axes[idx].plot(r, (prof * r**2),
                        marker='o', lw=0, label='sim')
-        axes[idx].plot(r, (prof_c * r**2) * scale, label='cen')
-        axes[idx].plot(r, (prof_s * r**2) * scale, label='sat')
-        axes[idx].plot(r, (prof_t * r**2) * scale, label='tot')
+        # axes[idx].plot(r, (profc * r**2), marker='x', lw=0, c='k')
+        # axes[idx].plot(r, (profs * r**2), marker='+', lw=0, c='k')
+        axes[idx].plot(r, (prof_c * r**2), label='cen')
+        axes[idx].plot(r, (prof_s * r**2), label='sat')
+        axes[idx].plot(r, (prof_t * r**2), label='tot')
         axes[idx].set_title(r'$m_{200\mathrm{m}} = 10^{%.2f}\mathrm{M_\odot}$'
                         %np.log10(m200[idx_match]))
         axes[idx].set_ylim([5e9, 2e13])

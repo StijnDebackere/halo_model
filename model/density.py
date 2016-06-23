@@ -365,8 +365,8 @@ class Profile(Cache):
         indeces[indeces == 0] = k
         for idx, idx_max in enumerate(indeces):
             u[idx,idx_max:] = np.nan
-            # if idx_max != k:
-            #     u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
+            if idx_max != k:
+                u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
 
         # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
         # # systematic offset, while we know that theoretically u[k=0] = 1

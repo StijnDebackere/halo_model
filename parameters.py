@@ -297,9 +297,9 @@ class Parameters(Cache):
 
         return massf
 
-    @cached_property('m_fn_prms')
-    def m_fn(self):
-        return hmf.MassFunction(**self.m_fn_prms)
+    # @cached_property('m_fn_prms')
+    # def m_fn(self):
+    #     return hmf.MassFunction(**self.m_fn_prms)
 
     @cached_property('p_lin_file', 'k_range_lin')
     def p_lin(self):
@@ -333,13 +333,13 @@ class Parameters(Cache):
 
         return mfn
 
-    @cached_property('nu_file', 'm_fn')
+    @cached_property('nu_file')
     def nu(self):
         nu, fnu = np.loadtxt(self.nu_file, unpack=True)
         # nu = np.sqrt(self.m_fn.nu)
         return nu
 
-    @cached_property('fnu_file', 'nu', 'm_fn')
+    @cached_property('fnu_file', 'nu')
     def fnu(self):
         nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
 
@@ -422,23 +422,34 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m_min=10., m_max=15.)
-prms2 = Parameters(m_min=11., m_max=15.)
-prms3 = Parameters(m_min=12., m_max=15.)
-prms4 = Parameters(m_min=13., m_max=15.)
-prms5 = Parameters(m_min=14., m_max=15.)
+prms1 = Parameters(m_min=10., m_max=11.,
+                   nu_file='HMcode/nu_fnu_dmo_10_11.dat',
+                   fnu_file='HMcode/nu_fnu_dmo_10_11.dat',
+                   p_lin_file='HMcode/plin.dat')
+prms2 = Parameters(m_min=11., m_max=12.,
+                   nu_file='HMcode/nu_fnu_dmo_11_12.dat',
+                   fnu_file='HMcode/nu_fnu_dmo_11_12.dat',
+                   p_lin_file='HMcode/plin.dat')
+prms3 = Parameters(m_min=12., m_max=13.,
+                   nu_file='HMcode/nu_fnu_dmo_12_13.dat',
+                   fnu_file='HMcode/nu_fnu_dmo_12_13.dat',
+                   p_lin_file='HMcode/plin.dat')
+prms4 = Parameters(m_min=13., m_max=14.,
+                   nu_file='HMcode/nu_fnu_dmo_13_14.dat',
+                   fnu_file='HMcode/nu_fnu_dmo_13_14.dat',
+                   p_lin_file='HMcode/plin.dat')
+prms5 = Parameters(m_min=14., m_max=15.,
+                   nu_file='HMcode/nu_fnu_dmo_14_15.dat',
+                   fnu_file='HMcode/nu_fnu_dmo_14_15.dat',
+                   p_lin_file='HMcode/plin.dat')
+prmst = Parameters(m_min=10., m_max=15.,
+                   nu_file='HMcode/nu_fnu_dmo_10_15.dat',
+                   fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
+                   p_lin_file='HMcode/plin.dat')
 
-# # Power spectrum converges for lower cutoff m_min = 6.5
-# # Power spectrum converges for upper cutoff m_max = 15.5
-# prms = Parameters(m_min=6.5, m_max=15.5)
-# this set of parameters is the correct baryon modified halo mass
-# for the dmo mass range 11 -> 15.5
-prms = Parameters(m_min=10.8923, m_max=15.4999,
-                  nu_file='HMcode/nu_fnu_m200.dat',
-                  fnu_file='HMcode/nu_fnu_dmo.dat',
+# prms = Parameters(m_min=6.5, m_max=15.5)#, mf_fit='SMT')
+prms = Parameters(m_min=11, m_max=15.5,
+                  nu_file='HMcode/nu_fnu_dmo_11_15p5.dat',
+                  fnu_file='HMcode/nu_fnu_dmo_11_15p5.dat',
                   p_lin_file='HMcode/plin.dat')
-prms_dmo = Parameters(m_min=11, m_max=15.5,
-                      nu_file='HMcode/nu_fnu_dmo.dat',
-                      fnu_file='HMcode/nu_fnu_dmo.dat',
-                      p_lin_file='HMcode/plin.dat')
 

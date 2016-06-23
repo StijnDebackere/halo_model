@@ -24,7 +24,7 @@ import halo.data.data as d
 
 import pdb
 
-def load_dm_dmo(prms=p.prms, save=True):
+def load_dm_dmo(prms=p.prms_dmo, save=True):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
@@ -83,7 +83,6 @@ def load_dm(prms=p.prms, save=True):
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
-
 
     m_range = prms.m_range_lin
     m200c = np.array([gas.m200m_to_m200c(m) for m in m_range])
@@ -167,7 +166,7 @@ def load_gas(prms=p.prms, fit='med', save=True):
         bc = b_med
     elif fit == 'q16':
         rc = rc_q16
-        bc = b_q16
+        bc = b_q84
     elif fit == 'q84':
         rc = rc_q84
         bc = b_q84
@@ -198,7 +197,7 @@ def load_gas(prms=p.prms, fit='med', save=True):
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      # 'm_fn': prms.m_fn,
+                      'm_fn': p.prms_dmo.m_fn,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
 
@@ -216,13 +215,13 @@ def load_gas(prms=p.prms, fit='med', save=True):
 # ------------------------------------------------------------------------------
 
 def compare():
-    comp_dm_dmo = load_dm_dmo()
+    # comp_dm_dmo = load_dm_dmo()
     comp_dm = load_dm()
     comp_gas_med = load_gas(fit='med')
     comp_gas_q16 = load_gas(fit='q16')
     comp_gas_q84 = load_gas(fit='q84')
 
-    pwr_dmo = power.Power([comp_dm_dmo], comp_dm_dmo.p_lin)
+    # pwr_dmo = power.Power([comp_dm_dmo], comp_dm_dmo.p_lin)
     pwr_med = power.Power([comp_dm, comp_gas_med], comp_dm.p_lin)
     pwr_q16 = power.Power([comp_dm, comp_gas_q16], comp_dm.p_lin)
     pwr_q84 = power.Power([comp_dm, comp_gas_q84], comp_dm.p_lin)
@@ -231,9 +230,9 @@ def compare():
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(k_range, pwr_med.delta_tot/pwr_dmo.delta_tot, label=r'median')
-    ax.plot(k_range, pwr_q16.delta_tot/pwr_dmo.delta_tot, label=r'q16')
-    ax.plot(k_range, pwr_q84.delta_tot/pwr_dmo.delta_tot, label=r'q84')
+    ax.plot(k_range, pwr_med.delta_tot/pwr_med.delta_tot, label=r'median')
+    ax.plot(k_range, pwr_q16.delta_tot/pwr_med.delta_tot, label=r'q16')
+    ax.plot(k_range, pwr_q84.delta_tot/pwr_med.delta_tot, label=r'q84')
     ax.axhline(y=1, ls='--', c='k')
 
     # Get twiny instance for main plot, to also have physical scales
@@ -248,6 +247,6 @@ def compare():
     axd.set_xscale('log')
     axd.set_xlabel(r'$\lambda \, [\mathrm{Mpc}/h]$', labelpad=5)
     ax.set_xlabel(r'$k \, [h\,\mathrm{Mpc}^{-1}]$')
-    ax.set_ylabel(r'$\Delta^2_i/\Delta^2_{\mathrm{DMO}}$')
+    ax.set_ylabel(r'$\Delta^2_i/\Delta^2_{\mathrm{med}}$')
     ax.legend(loc='best')
     plt.show()
