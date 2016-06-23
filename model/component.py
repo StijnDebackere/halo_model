@@ -59,11 +59,39 @@ class Component(dens.Profile):
         self.bias_fn = bias_fn
         self.bias_fn_args = bias_fn_args
 
-    # def __add__(self, other):
-    #     if not (np.allclose(self.nu, other.nu) or
-    #             np.allclose(self.fnu, other.fnu) or
-    #             np.allclose(self.p_lin, other.p_lin)):
-    #         raise AttributeError('nu/fnu/p_lin need to be the same')
+    def __add__(self, other):
+        if not (np.allclose(self.nu, other.nu) or
+                np.allclose(self.fnu, other.fnu) or
+                np.allclose(self.p_lin, other.p_lin)):
+            raise AttributeError('nu/fnu/p_lin need to be the same')
+        if not (np.allclose(self.r_range, other.r_range) or
+                np.allclose(self.m_range, other.m_range) or
+                np.allclose(self.k_range, other.k_range)):
+            raise AttributeError('nu/fnu/p_lin need to be the same')
+
+        prof1 = self.rho_r
+        prof2 = other.rho_r
+
+        prof1_f = self.rho_k
+        prof2_f = other.rho_k
+
+        f_comp1 = self.f_comp
+        f_comp2 = other.f_comp
+        f_new = f_comp1 + f_comp2
+
+        prof_new = 1. / f_new.reshape(-1,1) * (f_comp1.reshape(-1,1) * prof1 +
+                                               f_comp2.reshape(-1,1) * prof2)
+        prof_f_new = 1. / f_new.reshape(-1,1) * (f_comp1.reshape(-1,1) * prof1_f +
+                                                 f_comp2.reshape(-1,1) * prof2_f)
+
+        profile_kwargs = {"r_range": self.r_range,
+                          "m_range": self.m_range,
+                          "k_range": self.k_range,
+                          "profile": prof_new,
+                          "f_comp": f_new,
+                          "profile_f": prof_f_new}
+        return Component(self.name, self.p_lin, self.nu, self.fnu, self.bias_fn,
+                         self.bias_fn_args, **profile_kwargs)
 
     #===========================================================================
     # Parameters

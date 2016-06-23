@@ -243,7 +243,7 @@ def load_dm(prms=p.prmst):
 
 #     return popt[0]
 
-def load_gas(prms):
+def load_gas(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
@@ -343,7 +343,14 @@ def load_gas(prms):
     s_kwargs = tools.merge_dicts(s_kwargs, comp_s_kwargs)
     comp_s = comp.Component(**s_kwargs)
 
-    return comp_w, comp_c, comp_s
+    comp_gas = comp_w + comp_c + comp_s
+    comp_gas.name = 'gas'
+
+    return comp_gas
+
+# ------------------------------------------------------------------------------
+# End of load_gas()
+# ------------------------------------------------------------------------------
 
 def load_stars(prms=p.prmst):
     # general profile kwargs to be used for all components
@@ -426,4 +433,11 @@ def load_stars(prms=p.prmst):
     comp_c = comp.Component(**c_kwargs)
     comp_cold = comp.Component(**cold_kwargs)
 
-    return comp_c, comp_s, comp_cold
+    comp_stars = comp_c + comp_s
+    comp_stars.name = 'stars'
+
+    return comp_stars
+
+# ------------------------------------------------------------------------------
+# End of load_stars()
+# ------------------------------------------------------------------------------
