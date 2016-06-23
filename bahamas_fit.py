@@ -288,7 +288,7 @@ def load_gas(prms):
                      # 'm_fn': prms.m_fn,
                      'f_comp': f_w,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn}}
+                     'bias_fn_args': {'nu': prms.nu}}
     w_kwargs = tools.merge_dicts(w_kwargs, comp_w_kwargs)
     comp_w = comp.Component(**w_kwargs)
 
@@ -313,7 +313,7 @@ def load_gas(prms):
                      # 'm_fn': prms.m_fn,
                      'f_comp': fc_h,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn}}
+                     'bias_fn_args': {'nu': prms.nu}}
     c_kwargs = tools.merge_dicts(c_kwargs, comp_c_kwargs)
     comp_c = comp.Component(**c_kwargs)
 
@@ -339,7 +339,7 @@ def load_gas(prms):
                      # 'm_fn': prms.m_fn,
                      'f_comp': fs_h,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn}}
+                     'bias_fn_args': {'nu': prms.nu}}
     s_kwargs = tools.merge_dicts(s_kwargs, comp_s_kwargs)
     comp_s = comp.Component(**s_kwargs)
 
@@ -389,7 +389,7 @@ def load_stars(prms):
                      # 'm_fn': prms.m_fn,
                      'f_comp': fs,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn}}
+                     'bias_fn_args': {'nu': prms.nu}}
     s_kwargs = tools.merge_dicts(s_kwargs, comp_s_kwargs)
     comp_s = comp.Component(**s_kwargs)
 
@@ -412,7 +412,7 @@ def load_stars(prms):
                      # 'm_fn': prms.m_fn,
                      'f_comp': fc,
                      'bias_fn': bias.bias_Tinker10,
-                     'bias_fn_args': {'m_fn': prms.m_fn}}
+                     'bias_fn_args': {'nu': prms.nu}}
     comp_cold_kwargs = {'name': r'cold',
                         'p_lin': prms.p_lin,
                         'nu': prms.nu,
@@ -420,7 +420,7 @@ def load_stars(prms):
                         # 'm_fn': prms.m_fn,
                         'f_comp': f_cold,
                         'bias_fn': bias.bias_Tinker10,
-                        'bias_fn_args': {'m_fn': prms.m_fn}}
+                        'bias_fn_args': {'nu': prms.nu}}
     c_kwargs = tools.merge_dicts(c_kwargs, comp_c_kwargs)
     cold_kwargs = tools.merge_dicts(c_kwargs, comp_cold_kwargs)
     comp_c = comp.Component(**c_kwargs)
