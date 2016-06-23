@@ -436,7 +436,7 @@ def load_stars(prms=p.prmst):
     comp_stars = comp_c + comp_s
     comp_stars.name = 'stars'
 
-    return comp_stars
+    return comp_stars, comp_cold
 
 # ------------------------------------------------------------------------------
 # End of load_stars()
