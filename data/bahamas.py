@@ -963,11 +963,11 @@ def fit_stars_bahamas():
     Fit profiles to the bahamas stellar bins
     '''
     # bahamas data
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_Tlt1e45_M11_13.hdf5', 'r')
+    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_M11_15p5.hdf5', 'r')
 
     rho_c = profiles['PartType4/CenMedianDensity'][:]
     rho_s = profiles['PartType4/SatMedianDensity'][:]
-    rho_g = profiles['PartType0/CenMedianDensity'][:]
+    # rho_g = profiles['PartType0/CenMedianDensity'][:]
     m200 = profiles['PartType4/MedianM200'][:]
     r200 = profiles['PartType4/MedianR200'][:]
     r_range = tools.bins2center(profiles['RBins_R_Mean200'][:])
@@ -988,10 +988,11 @@ def fit_stars_bahamas():
     fc_err = -1 * np.ones_like(m200)
     m_c = -1 * np.ones_like(m200)
     m_s = -1 * np.ones_like(m200)
-    for idx, profs in enumerate(zip(rho_c, rho_s, rho_g)):
+    # for idx, profs in enumerate(zip(rho_c, rho_s, rho_g)):
+    for idx, profs in enumerate(zip(rho_c, rho_s)):
         cen = profs[0]
         sat = profs[1]
-        cold = profs[2]
+        # cold = profs[2]
 
         slc = (cen > 0)
         sls = (sat > 0)
@@ -1024,36 +1025,36 @@ def fit_stars_bahamas():
                                        r_range[slc], cen[slc],
                                        bounds=([0, 0, 0],
                                                [1, 4, 5]))
-            slg = (cold[slc] > 0)
-            fcopt, fccov = opt.curve_fit(lambda r_range, f:\
-                                         f * prof_stars_c(r_range,
-                                                          copt[0], copt[1],
-                                                          copt[2], mc, r200[idx]),
-                                         r_range[slc][slg], cold[slc][slg],
-                                         bounds=([0],[1]))
+            # slg = (cold[slc] > 0)
+            # fcopt, fccov = opt.curve_fit(lambda r_range, f:\
+            #                              f * prof_stars_c(r_range,
+            #                                               copt[0], copt[1],
+            #                                               copt[2], mc, r200[idx]),
+            #                              r_range[slc][slg], cold[slc][slg],
+            #                              bounds=([0],[1]))
 
             a_c[idx] = copt[0]
             b_c[idx] = copt[1]
             c_c[idx] = copt[2]
-            f_c[idx] = fcopt[0]
+            # f_c[idx] = fcopt[0]
             a_c_err[idx] = np.sqrt(np.diag(ccov))[0]
             b_c_err[idx] = np.sqrt(np.diag(ccov))[1]
             c_c_err[idx] = np.sqrt(np.diag(ccov))[1]
-            fc_err[idx] = np.sqrt(np.diag(fccov))[0]
+            # fc_err[idx] = np.sqrt(np.diag(fccov))[0]
             m_c[idx] = mc
-            plt.plot(r_range[slc], r_range[slc]**2 * cen[slc])
-            plt.plot(r_range[slc], r_range[slc]**2 *
-                     prof_stars_c(r_range[slc], a_c[idx], b_c[idx], c_c[idx],
-                                  m_c[idx], r200[idx]))
-            plt.plot(r_range[slc][slg], r_range[slc][slg]**2 * cold[slc][slg])
-            plt.plot(r_range[slc][slg], r_range[slc][slg]**2 * f_c[idx] *
-                     prof_stars_c(r_range[slc][slg], a_c[idx], b_c[idx], c_c[idx],
-                                  m_c[idx], r200[idx]))
-            plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
-            plt.ylim(ymin=(cen[slc]).min())
-            plt.xscale('log')
-            plt.yscale('log')
-            plt.show()
+            # plt.plot(r_range[slc], r_range[slc]**2 * cen[slc])
+            # plt.plot(r_range[slc], r_range[slc]**2 *
+            #          prof_stars_c(r_range[slc], a_c[idx], b_c[idx], c_c[idx],
+            #                       m_c[idx], r200[idx]))
+            # plt.plot(r_range[slc][slg], r_range[slc][slg]**2 * cold[slc][slg])
+            # plt.plot(r_range[slc][slg], r_range[slc][slg]**2 * f_c[idx] *
+            #          prof_stars_c(r_range[slc][slg], a_c[idx], b_c[idx], c_c[idx],
+            #                       m_c[idx], r200[idx]))
+            # plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
+            # plt.ylim(ymin=(cen[slc]).min())
+            # plt.xscale('log')
+            # plt.yscale('log')
+            # plt.show()
 
     cen_cut = (a_c >= 0)
     sat_cut = (a_s >= 0)
@@ -1083,7 +1084,7 @@ def fit_stars_bahamas():
     # plt.yscale('log')
     # plt.show()
 
-    return a_s, a_s_err, b_s, b_s_err, r0_s, m_s, a_c, a_c_err, b_c, b_c_err, c_c, c_c_err, f_c, fc_err, m_c, m200
+    return a_s, a_s_err, b_s, b_s_err, r0_s, m_s, a_c, a_c_err, b_c, b_c_err, c_c, c_c_err, m_c, m200
 
 # ------------------------------------------------------------------------------
 # End of fit_stars_bahamas()
@@ -1209,7 +1210,7 @@ def compare_fit_stars_bahamas():
     '''
     Compare how the fit performs for binned profiles
     '''
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_censat_200_mean_M11_15p5.hdf5', 'r')
+    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_M11_15p5.hdf5', 'r')
 
     rho_c = binned['PartType4/CenMedianDensity'][:]
     rho_s = binned['PartType4/SatMedianDensity'][:]
@@ -1251,7 +1252,7 @@ def compare_fit_stars_bahamas():
         # find closest matching halo
         idx_match = np.argmin(np.abs(m200 - mass))
         prof = rho[idx_match]
-        m_prof = tools.m_h(prof, r * r200[idx_match])
+        # m_prof = tools.m_h(prof, r * r200[idx_match])
 
         prof_s = np.zeros_like(r)
         # get satellite profile
@@ -1265,8 +1266,8 @@ def compare_fit_stars_bahamas():
                               mc[idx_match], r200[idx_match])
 
         prof_t = prof_s + prof_c
-        mass3 = tools.m_h(prof_t, r * r200[idx_match])
-        scale = m_prof / mass3
+        # mass3 = tools.m_h(prof_t, r * r200[idx_match])
+        # scale = m_prof / mass3
 
         prof[prof == 0] = np.nan
         prof_c[prof_c == 0] = np.nan
@@ -1276,9 +1277,9 @@ def compare_fit_stars_bahamas():
 
         axes[idx].plot(r, (prof * r**2),
                        marker='o', lw=0, label='sim')
-        axes[idx].plot(r, (prof_c * r**2) * scale, label='cen')
-        axes[idx].plot(r, (prof_s * r**2) * scale, label='sat')
-        axes[idx].plot(r, (prof_t * r**2) * scale, label='tot')
+        axes[idx].plot(r, (prof_c * r**2), label='cen')
+        axes[idx].plot(r, (prof_s * r**2), label='sat')
+        axes[idx].plot(r, (prof_t * r**2), label='tot')
         axes[idx].set_title(r'$m_{200\mathrm{m}} = 10^{%.2f}\mathrm{M_\odot}$'
                         %np.log10(m200[idx_match]))
         axes[idx].set_ylim([5e9, 2e13])
@@ -1869,26 +1870,26 @@ def compare_fit_gas_bahamas():
     Compare how the fit performs for binned profiles
     '''
     # Load warm and hot data
-    T2 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_T1e45_1e65_M12_13.hdf5', 'r')
-    T2 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_T1e45_1e65_M13_15p64.hdf5', 'r')
-    T3 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_Tgt1e65_M13_15p64.hdf5', 'r')
+    T2 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_T1e45_1e65_M11_15p5.hdf5', 'r')
+    T3 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_Tgt1e65_M11_15p5.hdf5', 'r')
 
+    # rho = binned['PartType0/MedianDensity'][1:]
+    # q16 = binned['PartType0/Q16'][1:]
+    # q84 = binned['PartType0/Q84'][1:]
+    # r200 = binned['PartType0/MedianR200'][1:]
+    # m200 = binned['PartType0/MedianM200'][1:]
+    rho_w = T2['PartType0/CenMedianDensity'][:] + T2['PartType0/SatMedianDensity'][:]
+    rho_h = T3['PartType0/CenMedianDensity'][:] + T3['PartType0/SatMedianDensity'][:]
+    m200 = T2['PartType0/MedianM200'][:]
+    r200 = T2['PartType0/MedianR200'][:]
 
-
-    binned = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_200_mean_M11_15p5.hdf5', 'r')
-
-    rho = binned['PartType0/MedianDensity'][1:]
-    q16 = binned['PartType0/Q16'][1:]
-    q84 = binned['PartType0/Q84'][1:]
-    r200 = binned['PartType0/MedianR200'][1:]
-    m200 = binned['PartType0/MedianM200'][1:]
-
-    r_bins = binned['RBins_R_Mean200'][:]
+    r_bins = T3['RBins_R_Mean200'][:]
     r = tools.bins2center(r_bins).reshape(-1)
-    m_bins = binned['MBins_M_Mean200'][1:]
+    m_bins = T3['MBins_M_Mean200'][1:]
     m = tools.bins2center(m_bins).reshape(-1)
 
-    binned.close()
+    T2.close()
+    T3.close()
 
     r_x = r200
     # extract all fit parameters
@@ -1897,80 +1898,142 @@ def compare_fit_gas_bahamas():
     # need stars fit parameters for cold gas
     as_prms, bs_prms, r0_prms, mscold_prms, ac_prms, bc_prms, cc_prms, mcold_prms = plot_stars_fit_bahamas_median()
 
-    f_w = gas_warm_mw_fit(m, **mw_prms)
-    fc_h = gas_hot_mc_fit(m, **mc_prms)
-    fs_h = gas_hot_ms_fit(m, **ms_prms)
+    f_w = gas_warm_mw_fit(m200, **mw_prms)
+    fc_h = gas_hot_mc_fit(m200, **mc_prms)
+    fs_h = gas_hot_ms_fit(m200, **ms_prms)
     f_c = stars_mc_fit(m200, **mcold_prms)
 
     # warm gas
-    rw = gas_warm_rw_fit(m, **rw_prms)
-    sw = gas_warm_sigma_fit(m, **sw_prms)
-    r0w = gas_warm_r0_fit(m, **r0w_prms)
-    prof_w = np.zeros((m.shape[0], r.shape[0]))
-    for idx, mass in enumerate(m):
+    rw = gas_warm_rw_fit(m200, **rw_prms)
+    sw = gas_warm_sigma_fit(m200, **sw_prms)
+    r0w = gas_warm_r0_fit(m200, **r0w_prms)
+    prof_w = np.zeros((m200.shape[0], r.shape[0]))
+    for idx, mass in enumerate(m200):
         if mass <= 1e13:
             r_sl = (r >= r0w[idx] * r_x[idx])
             if r_sl.sum() > 0:
                 prof_w[idx, r_sl] = prof_gas_warm(r[r_sl], rw[idx],
                                                   sw[idx],
-                                                  f_w[idx] * m[idx],
+                                                  f_w[idx] * mass,
                                                   r_x[idx])
 
     # hot cen gas
-    rc = gas_hot_rc_fit(m, **rc_prms)
-    bc = gas_hot_beta_fit(m, **b_prms)
-    rs = gas_hot_rs_fit(m, **rs_prms)
-    prof_c = np.zeros((m.shape[0], r.shape[0]))
-    for idx, mass in enumerate(m):
+    rc = gas_hot_rc_fit(m200, **rc_prms)
+    bc = gas_hot_beta_fit(m200, **b_prms)
+    rs = gas_hot_rs_fit(m200, **rs_prms)
+    prof_c = np.zeros((m200.shape[0], r.shape[0]))
+    for idx, mass in enumerate(m200):
         if (mass >= 1e13):
             prof_c[idx] = prof_gas_hot_c(r, rc[idx], bc[idx], rs[idx],
-                                         fc_h[idx] * m[idx], r_x[idx])
+                                         fc_h[idx] * mass, r_x[idx])
 
     # hot sat gas
-    ss = gas_hot_sigma_fit(m, **ss_prms)
-    r0s = gas_hot_r0_fit(m, **r0s_prms)
-    prof_s = np.zeros((m.shape[0], r.shape[0]))
-    for idx, mass in enumerate(m):
+    ss = gas_hot_sigma_fit(m200, **ss_prms)
+    r0s = gas_hot_r0_fit(m200, **r0s_prms)
+    prof_s = np.zeros((m200.shape[0], r.shape[0]))
+    for idx, mass in enumerate(m200):
         if mass >= 1e13:
             r_sl = (r >= r0s[idx] * r_x[idx])
             if r_sl.sum() > 0:
                 prof_s[idx, r_sl] = prof_gas_hot_s(r[r_sl], rs[idx], ss[idx],
-                                                   fs_h[idx] * m[idx], r_x[idx])
+                                                   fs_h[idx] * mass, r_x[idx])
 
 
-    # cold gas
-    ac = dm_plaw_fit(m200, **ac_prms)
-    bc = dm_plaw_fit(m200, **bc_prms)
-    cc = dm_plaw_fit(m200, **cc_prms)
-    prof_cold = np.zeros((m.shape[0], r.shape[0]))
-    for idx, mass in enumerate(m):
-        if mass < 1e13:
-            prof_cold[idx] = 0.4 * prof_stars_c(r, ac[idx], bc[idx], cc[idx],
-                                                f_c[idx] * m[idx], r_x[idx])
+    # # cold gas
+    # ac = dm_plaw_fit(m200, **ac_prms)
+    # bc = dm_plaw_fit(m200, **bc_prms)
+    # cc = dm_plaw_fit(m200, **cc_prms)
+    # prof_cold = np.zeros((m.shape[0], r.shape[0]))
+    # for idx, mass in enumerate(m):
+    #     if mass < 1e13:
+    #         prof_cold[idx] = 0.4 * prof_stars_c(r, ac[idx], bc[idx], cc[idx],
+    #                                             f_c[idx] * m[idx], r_x[idx])
 
-    for idx, prof in enumerate(rho):
-        ch = prof_c[idx]
-        sh = prof_s[idx]
-        w = prof_w[idx]
-        c = prof_cold[idx]
+    # for idx, profs in enumerate(zip(rho_w, rho_h)):
+    #     ch = prof_c[idx]
+    #     sh = prof_s[idx]
+    #     w = prof_w[idx]
+    #     prof_t = (ch + sh + w)
+    #     # c = prof_cold[idx]
 
-        plt.plot(r, r**2 * prof, label='sim')
-        plt.plot(r, r**2 * (c + ch + sh + w), label='tot')
+    #     sim_w = profs[0]
+    #     sim_h = profs[1]
+    #     sim_t = sim_w + sim_h
 
-        c[c == 0] = np.nan
-        ch[ch == 0] = np.nan
-        sh[sh == 0] = np.nan
-        w[w == 0] = np.nan
-        plt.plot(r, r**2 * c, label='cold')
-        plt.plot(r, r**2 * ch, label='cen')
-        plt.plot(r, r**2 * sh, label='sat')
-        plt.plot(r, r**2 * w, label='warm')
-        plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
-        plt.ylim(ymin=1e10)
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.legend(loc='best')
-        plt.show()
+    #     if (prof_t > 0).any():
+    #         sim_t[sim_t == 0] = np.nan
+    #         prof_t[prof_t == 0] = np.nan
+
+    #         plt.plot(r, r**2 * sim_t, marker='o', lw=0, label='sim')
+    #         plt.plot(r, r**2 * prof_t, label='tot')
+    #         # c[c == 0] = np.nan
+    #         ch[ch == 0] = np.nan
+    #         sh[sh == 0] = np.nan
+    #         w[w == 0] = np.nan
+    #         # plt.plot(r, r**2 * c, label='cold')
+    #         if m200[idx] > 1e13:
+    #             plt.plot(r, r**2 * ch, label='cen')
+    #             plt.plot(r, r**2 * sh, label='sat')
+    #         else:
+    #             plt.plot(r, r**2 * w, label='warm')
+    #         plt.title(r'$M=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m200[idx]))
+    #         # plt.ylim(ymin=1e10)
+    #         plt.xscale('log')
+    #         plt.yscale('log')
+    #         plt.legend(loc='best')
+    #         plt.show()
+    pl.set_style()
+    fig = plt.figure(figsize=(20,6))
+    ax1 = fig.add_axes([0.1, 0.1, 0.2, 0.8])
+    ax2 = fig.add_axes([0.3, 0.1, 0.2, 0.8])
+    ax3 = fig.add_axes([0.5, 0.1, 0.2, 0.8])
+    ax4 = fig.add_axes([0.7, 0.1, 0.2, 0.8])
+
+    masses = np.array([1e12, 1e13, 1e14, 1e15])
+    axes = [ax1, ax2, ax3, ax4]
+
+    for idx, mass in enumerate(masses):
+        # find closest matching halo
+        idx_match = np.argmin(np.abs(m200 - mass))
+        if m200[idx_match] < 1e13:
+            prof = rho_w[idx_match]
+            prof_f = prof_w[idx_match]
+        else:
+            prof = rho_h[idx_match]
+            prof_f = prof_c[idx_match] + prof_s[idx_match]
+
+        prof[prof == 0] = np.nan
+        prof_f[prof_f == 0] = np.nan
+
+        axes[idx].plot(r, (prof * r**2),
+                       marker='o', lw=0, label='sim')
+        if m200[idx_match] < 1e13:
+            axes[idx].plot(r, (prof_f * r**2), label='warm')
+        else:
+            axes[idx].plot(r, (prof_f * r**2), label='hot')
+
+        axes[idx].set_title(r'$m_{200\mathrm{m}} = 10^{%.2f}\mathrm{M_\odot}$'
+                        %np.log10(m200[idx_match]))
+        axes[idx].set_ylim([5e9, 2e13])
+        axes[idx].legend(loc='best')
+        if idx == 0:
+            text = axes[idx].set_ylabel(r'$\rho(r) \cdot (r/r_{200\mathrm{m}})^2 \, [\mathrm{M_\odot/Mpc^3}]$')
+            font_properties = text.get_fontproperties()
+        # need to set visibility to False BEFORE log scaling
+        if idx > 0:
+            ticks = axes[idx].get_xticklabels()
+            # strange way of getting correct label
+            ticks[-7].set_visible(False)
+
+        axes[idx].set_xscale('log')
+        axes[idx].set_yscale('log')
+        if idx > 0:
+            axes[idx].yaxis.set_ticklabels([])
+
+    fig.text(0.5, 0.03,
+             r'$r/r_{200\mathrm{m}}$', ha='center',
+             va='center', rotation='horizontal', fontproperties=font_properties)
+    plt.show()
 
 # ------------------------------------------------------------------------------
 # End of compare_fit_gas_bahamas()
