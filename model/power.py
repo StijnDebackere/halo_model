@@ -23,8 +23,9 @@ class Power(Cache):
     -------
 
     '''
-    def __init__(self, components, p_lin):
+    def __init__(self, components, p_lin, name):
         super(Power, self).__init__()
+        self.name = name
         self.comps = {}
         for comp in components:
             self.comps[comp.name] = comp
@@ -34,6 +35,10 @@ class Power(Cache):
     #===========================================================================
     # Parameters
     #===========================================================================
+    @parameter
+    def name(self, val):
+        return val
+
     @parameter
     def comps(self, val):
         return val
