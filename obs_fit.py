@@ -24,7 +24,7 @@ import halo.data.data as d
 
 import pdb
 
-def load_dm_dmo(prms=p.prms_dmo, save=True):
+def load_dm_dmo(prms=p.prms, save=True):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
@@ -154,7 +154,7 @@ def load_gas_dmo(prms=p.prms, save=True):
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      'm_fn': p.prms_dmo.m_fn,
+                      # 'm_fn': p.prms_dmo.m_fn,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
 
@@ -284,7 +284,7 @@ def load_gas(prms=p.prms, fit='med', save=True):
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      'm_fn': p.prms_dmo.m_fn,
+                      # 'm_fn': p.prms_dmo.m_fn,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
 
