@@ -1725,6 +1725,10 @@ def fit_gas_warm_bahamas():
         m_2[idx] = m2
 
     sl = (a > 0)
+    plt.plot(m[sl], r_0[sl])
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.show()
 
     return a[sl], b[sl], a_err[sl], b_err[sl], r_0[sl], m_2[sl], m[sl]
 
@@ -2000,7 +2004,12 @@ def compare_fit_gas_bahamas():
             prof_f = prof_w[idx_match]
         else:
             prof = rho_h[idx_match]
+            prof_fc = prof_c[idx_match]
+            prof_fs = prof_s[idx_match]
             prof_f = prof_c[idx_match] + prof_s[idx_match]
+
+            prof_fc[prof_fc == 0] = np.nan
+            prof_fs[prof_fs == 0] = np.nan
 
         prof[prof == 0] = np.nan
         prof_f[prof_f == 0] = np.nan
@@ -2010,6 +2019,8 @@ def compare_fit_gas_bahamas():
         if m200[idx_match] < 1e13:
             axes[idx].plot(r, (prof_f * r**2), label='warm')
         else:
+            axes[idx].plot(r, (prof_fc * r**2), label='hot cen')
+            axes[idx].plot(r, (prof_fs * r**2), label='hot sat')
             axes[idx].plot(r, (prof_f * r**2), label='hot')
 
         axes[idx].set_title(r'$m_{200\mathrm{m}} = 10^{%.2f}\mathrm{M_\odot}$'

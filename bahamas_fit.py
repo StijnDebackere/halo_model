@@ -211,37 +211,48 @@ def load_dm(prms=p.prmst):
 
     return comp_dm
 
-# def alpha_power(k_range, alpha, P1, P2):
-#     f = 0.188 * p.prms.sigma_8**(4.29)
-#     sv = 2.
-#     Pn = P2 * (1 - f*np.tanh(k_range * sv/np.sqrt(f))**2)
-#     return (P1**alpha + Pn**alpha)**(1./alpha)
+def alpha_power(k_range, alpha, P1, P2):
+    # f = 0.188 * p.prms.sigma_8**(4.29)
+    # sv = 2.
+    # Pn = P2 * (1 - f*np.tanh(k_range * sv/np.sqrt(f))**2)
+    # return (P1**alpha + Pn**alpha)**(1./alpha)
+    return (P1**alpha + P2**alpha)**(1./alpha)
 
-# def fit_alpha(k_range, P1, P2, power):
-#     popt, pcov = opt.curve_fit(lambda k_range, alpha: \
-#                                alpha_power(k_range, alpha, P1, P2),
-#                                k_range, power)
+def fit_alpha(k_range, P1, P2, power):
+    sl = (k_range > 2e-1)
+    popt, pcov = opt.curve_fit(lambda k_range, alpha: \
+                               alpha_power(k_range, alpha, P1[sl], P2[sl]),
+                               k_range[sl], power[sl],
+                               bounds=([0.5, 2]))
 
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111)
-#     ax.plot(k_range, alpha_power(k_range, popt[0], P1, P2)/power,
-#             label=r'$(P_{\mathrm{1h}}^{\alpha} + P_{\mathrm{2h}}^{\alpha})^{1/\alpha}$')
-#     ax.plot(k_range, (P1+P2)/power, label=r'$P_{\mathrm{1h}} + P_{\mathrm{2h}}$')
-#     # plt.plot(k_range, power)
-#     ax.axhline(y=1, c='k', ls='--')
-#     minor_locator = AutoMinorLocator(2)
-#     ax.yaxis.set_minor_locator(minor_locator)
-#     ax.yaxis.grid(which='both')
-#     ax.xaxis.grid()
-#     ax.set_xscale('log')
-#     ax.set_ylim([0.75,1.4])
-#     ax.set_xlabel(r'$k \, [h\,\mathrm{Mpc}^{-1}]$')
-#     ax.set_ylabel(r'ratio')# , rotation=270, labelpad=20)
-#     leg = ax.legend(loc='best', frameon=True, framealpha=1.)
-#     leg.get_frame().set_linewidth(0.0)
-#     plt.show()
+    alpha = 0.83
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    r8 = np.load('8bar_8dmo.npy')
+    # ax.plot(k_range, alpha_power(k_range, popt[0], P1, P2)/power,
+    #         label=r'$(P_{\mathrm{1h}}^{\alpha} + P_{\mathrm{2h}}^{\alpha})^{1/\alpha}$')
+    # ax.plot(k_range, (P1+P2)/power, label=r'$P_{\mathrm{1h}} + P_{\mathrm{2h}}$')
+    # ax.axhline(y=1, c='k', ls='--')
 
-#     return popt[0]
+    ax.plot(k_range, r8 * (P1**alpha + P2**alpha)**(1./alpha)/power,
+            label=r'$(P_{\mathrm{1h}}^{\alpha} + P_{\mathrm{2h}}^{\alpha})^{1/\alpha}$')
+    ax.plot(k_range, r8 * (P1+P2)/power, label=r'$P_{\mathrm{1h}} + P_{\mathrm{2h}}$')
+    # plt.plot(k_range, power)
+    ax.axhline(y=1, c='k', ls='--')
+    minor_locator = AutoMinorLocator(2)
+    ax.yaxis.set_minor_locator(minor_locator)
+    # ax.yaxis.grid(which='both')
+    # ax.xaxis.grid()
+    ax.set_xscale('log')
+    # ax.set_yscale('log')
+    ax.set_ylim([0.75,1.4])
+    ax.set_xlabel(r'$k \, [h\,\mathrm{Mpc}^{-1}]$')
+    ax.set_ylabel(r'ratio')# , rotation=270, labelpad=20)
+    leg = ax.legend(loc='best', frameon=True, framealpha=1.)
+    leg.get_frame().set_linewidth(0.0)
+    plt.show()
+
+    return popt[0]
 
 def load_gas(prms=p.prmst):
     # general profile kwargs to be used for all components

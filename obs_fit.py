@@ -433,3 +433,10 @@ def compare_profiles(comp_dm, comp_gas_dmo, comp_gas1q84, comp_gas2q16):
 # ------------------------------------------------------------------------------
 # End of compare_fit_dm_bahamas()
 # ------------------------------------------------------------------------------
+
+def load_pows(prms=p.prms):
+    comp_dm = load_dm(prms)
+
+    
+
+
