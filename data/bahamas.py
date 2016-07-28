@@ -1725,10 +1725,10 @@ def fit_gas_warm_bahamas():
         m_2[idx] = m2
 
     sl = (a > 0)
-    plt.plot(m[sl], r_0[sl])
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.show()
+    # plt.plot(m[sl], r_0[sl])
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.show()
 
     return a[sl], b[sl], a_err[sl], b_err[sl], r_0[sl], m_2[sl], m[sl]
 

@@ -172,6 +172,15 @@ class Power(Cache):
 
         return cross_d
 
+    @cached_property('p_lin', 'comps')
+    def delta_lin(self):
+        '''
+        Return linear delta
+        '''
+        k_range = self.comps.values()[0].k_range
+
+        return 0.5 / np.pi**2 * k_range**3 * self.p_lin
+
     @cached_property('cross_P', 'comps', 'p_lin')
     def P_tot(self):
         '''

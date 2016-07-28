@@ -452,3 +452,44 @@ def load_stars(prms=p.prmst):
 # ------------------------------------------------------------------------------
 # End of load_stars()
 # ------------------------------------------------------------------------------
+
+def load_masses():
+    comp_dm1 = load_dm(p.prms1)
+    comp_dm2 = load_dm(p.prms2)
+    comp_dm3 = load_dm(p.prms3)
+    comp_dm4 = load_dm(p.prms4)
+    comp_dm5 = load_dm(p.prms5)
+    comp_dmt = load_dm(p.prmst)
+
+    comp_gas1 = load_gas(p.prms1)
+    comp_gas2 = load_gas(p.prms2)
+    comp_gas3 = load_gas(p.prms3)
+    comp_gas4 = load_gas(p.prms4)
+    comp_gas5 = load_gas(p.prms5)
+    comp_gast = load_gas(p.prmst)
+
+    comp_stars1, comp_cold1 = load_stars(p.prms1)
+    comp_stars2, comp_cold2 = load_stars(p.prms2)
+    comp_stars3, comp_cold3 = load_stars(p.prms3)
+    comp_stars4, comp_cold4 = load_stars(p.prms4)
+    comp_stars5, comp_cold5 = load_stars(p.prms5)
+    comp_starst, comp_coldt = load_stars(p.prmst)
+
+    comp_gas1 += comp_cold1
+    comp_gas2 += comp_cold2
+    comp_gas3 += comp_cold3
+    comp_gas4 += comp_cold4
+    comp_gas5 += comp_cold5
+    comp_gast += comp_coldt
+
+    powt = power.Power([comp_dmt, comp_gast, comp_starst], comp_dmt.p_lin, name='10-15')
+
+    comps_dm = [comp_dm1, comp_dm2, comp_dm3, comp_dm4, comp_dm5]
+    comps_gas = [comp_gas1, comp_gas2, comp_gas3, comp_gas4, comp_gas5]
+    comps_stars = [comp_stars1, comp_stars2, comp_stars3, comp_stars4, comp_stars5]
+
+    return comps_dm, comps_gas, comps_stars, powt
+
+# ------------------------------------------------------------------------------
+# End of load_masses()
+# ------------------------------------------------------------------------------

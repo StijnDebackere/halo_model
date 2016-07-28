@@ -223,39 +223,6 @@ def load_gas(prms=p.prms, fit='med', save=True):
                                        f_gas500[idx] * m500c[idx],
                                        r500c[idx]))
 
-    # # Look at gas fraction -> may not exceed baryon fraction
-    # # as soon as fraction exceeds baryon, extrapolate  r^-3 slope
-    # m_range = prms.m_range_lin
-    # m200c = np.array([gas.m200m_to_m200c(m) for m in m_range])
-    # r200c = tools.mass_to_radius(m200c, 200 * prms.rho_crit * prms.h**2)
-    # # --------------------------------------------------------------------------
-    # # Correa
-    # c_x = profs.c_correa(m200c, 0).reshape(-1) * prms.r_range_lin[:,-1]/r200c
-    # r_x = prms.r_range_lin[:,-1]
-    # r_s = r_x / c_x
-
-    # comp_dm = load_dm(prms)
-    # m_dm = np.array([tools.m_h(comp_dm.rho_r[:,:i] * comp_dm.f_comp.reshape(-1,1),
-    #                            comp_dm.r_range[:,:i])
-    #                  for i in range(1, comp_dm.r_range.shape[-1])])
-    # m_gas1 = np.array([tools.m_h(prof_gas1[:,:i], prms.r_range_lin[:,:i])
-    #                    for i in range(1, prms.r_range_lin.shape[-1])])
-    # m_gas2 = np.array([tools.m_h(prof_gas1[:,:i], prms.r_range_lin[:,:i])
-    #                    for i in range(1, prms.r_range_lin.shape[-1])])
-
-    # m_tot1 = m_dm + m_gas1
-    # m_tot2 = m_dm + m_gas2
-
-    # idx1 = np.argmax((m_gas1 / m_tot1 > 1 - prms.f_dm), axis=0)
-    # idx2 = np.argmax((m_gas2 / m_tot1 > 1 - prms.f_dm), axis=0)
-
-    # for idx, r in enumerate(prms.r_range_lin):
-    #     rs = r_s[idx]
-    #     idx_sl = np.argmax(r >= rs)
-    #     sl = (r >= rs)
-    #     prof_gas1[idx, idx_sl:] = (prof_gas1[idx, idx_sl] * 4 /
-    #                                ((r[sl]/rs) * (1 + r[sl]/rs)**2))
-
     mgas200_1 = tools.m_h(prof_gas_min, prms.r_range_lin)
     f_gas_min = mgas200_1 / m_range
     mgas200_2 = tools.m_h(prof_gas_max, prms.r_range_lin)
@@ -323,6 +290,9 @@ def load_saved():
 
     return comp_dm, comp_gas_dmo, comp_gas_med, comp_gas_q16, comp_gas_q84
 
+# ------------------------------------------------------------------------------
+# End of load_saved()
+# ------------------------------------------------------------------------------
 
 def compare():
     # comp_dm_dmo = load_dm_dmo()
@@ -434,9 +404,35 @@ def compare_profiles(comp_dm, comp_gas_dmo, comp_gas1q84, comp_gas2q16):
 # End of compare_fit_dm_bahamas()
 # ------------------------------------------------------------------------------
 
-def load_pows(prms=p.prms):
-    comp_dm = load_dm(prms)
+def load_models():
+    # load dm
+    comp_dm = load_dm(p.prms)
 
-    
+    # load dmo
+    comp_gas_dmo = load_gas_dmo(p.prms)
 
+    # initialize dmo power
+    pow_dmo = power.Power([comp_dm, comp_gas_dmo], comp_dm.p_lin, name='dmo')
 
+    # load different gas models
+    comp_g_min_med, comp_g_max_med, comp_g_med_med = load_gas(p.prms,fit='med')
+    comp_g_min_q16, comp_g_max_q16, comp_g_med_q16 = load_gas(p.prms,fit='q16')
+    comp_g_min_q84, comp_g_max_q84, comp_g_med_q84 = load_gas(p.prms,fit='q84')
+
+    # initialize different powers
+    pow_med_med = power.Power([comp_dm, comp_g_med_med], comp_dm.p_lin, name='med, med')
+    pow_med_q16 = power.Power([comp_dm, comp_g_med_q16], comp_dm.p_lin, name='med, q16')
+    pow_med_q84 = power.Power([comp_dm, comp_g_med_q84], comp_dm.p_lin, name='med, q84')
+
+    pow_min_med = power.Power([comp_dm, comp_g_min_med], comp_dm.p_lin, name='min, med')
+    pow_min_q16 = power.Power([comp_dm, comp_g_min_q16], comp_dm.p_lin, name='min, q16')
+    pow_min_q84 = power.Power([comp_dm, comp_g_min_q84], comp_dm.p_lin, name='min, q84')
+
+    pow_max_med = power.Power([comp_dm, comp_g_max_med], comp_dm.p_lin, name='max, med')
+    pow_max_q16 = power.Power([comp_dm, comp_g_max_q16], comp_dm.p_lin, name='max, q16')
+    pow_max_q84 = power.Power([comp_dm, comp_g_max_q84], comp_dm.p_lin, name='max, q84')
+
+    return pow_med_med, pow_med_q16, pow_med_q84, pow_min_med, pow_min_q16, pow_min_q84, pow_max_med, pow_max_q16, pow_max_q84
+# ------------------------------------------------------------------------------
+# End of load_models()
+# ------------------------------------------------------------------------------

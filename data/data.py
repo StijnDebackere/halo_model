@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+from cycler import cycler
 import scipy.optimize as opt
 import scipy.special as spec
 import scipy.interpolate as interp
@@ -356,9 +358,9 @@ def fit_croston():
                                    r[sl], prof[sl], bounds=([0, 0],
                                                             [1, 5]))
 
-        # plt.plot(r, r**2 * prof)
-        # plt.plot(r, r**2 * prof_gas_hot(r, sl, popt[0], popt[1], # , popt[2],
-        #                                   mass, r500[idx]))
+        # plt.plot(r, prof)
+        # plt.plot(r, prof_gas_hot(r, sl, popt[0], popt[1], # , popt[2],
+        #                          mass, r500[idx]))
         # plt.title('%i'%idx)
         # plt.xscale('log')
         # plt.yscale('log')
@@ -967,6 +969,9 @@ def plot_profiles():
 
     plt.show()
 
+# ------------------------------------------------------------------------------
+# End of plot_profiles()
+# ------------------------------------------------------------------------------
 
 def corr_fit(x, a, b):
     return a + b * x
@@ -1065,3 +1070,254 @@ def plot_correlation():
     ax3.legend(handles, labs, loc=1)
 
     plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_correlation()
+# ------------------------------------------------------------------------------
+
+def plot_profiles_croston_presentation():
+    with open('croston.p', 'rb') as f:
+        data_c = cPickle.load(f)
+
+    fig1 = plt.figure(1,figsize=(10,9))
+    ax1 = fig1.add_subplot(111)
+
+    rx_c = data_c['rx']
+    rho_c = data_c['rho']
+
+    pc = cycler(c=['k'], ls=['-'])
+    ax1.set_prop_cycle(pc)
+    for r, prof in zip(rx_c, rho_c):
+        ax1.plot(r, prof, lw=0.5)
+
+    ax1.set_ylim([1e11, 1e16])
+
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+    ax1.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax1.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
+    ax1.set_title(r'Croston+08')
+
+    plt.savefig('obs_croston.pdf', transparent=True)
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_profiles_croston_presentation()
+# ------------------------------------------------------------------------------
+
+def plot_profiles_eckert_presentation():
+    with open('eckert.p', 'rb') as f:
+        data_e = cPickle.load(f)
+
+    fig1 = plt.figure(1,figsize=(10,9))
+    ax1 = fig1.add_subplot(111)
+
+    rx_e = data_e['rx']
+    rho_e = data_e['rho']
+
+    pc = cycler(c=['k'], ls=['-'])
+    ax1.set_prop_cycle(pc)
+    for r, prof in zip(rx_e, rho_e):
+        ax1.plot(r, prof, lw=0.5)
+
+    ax1.set_ylim([1e11, 1e16])
+
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+    ax1.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax1.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
+    ax1.set_title(r'Eckert+15')
+
+    plt.savefig('obs_eckert.pdf', transparent=True)
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_profiles_croston_presentation()
+# ------------------------------------------------------------------------------
+
+def plot_profiles_fgas_presentation():
+    fig1 = plt.figure(1,figsize=(10,9))
+    ax3 = fig1.add_subplot(111)
+    # Gas fractions
+    m500_obs, f_obs = np.loadtxt(ddir +
+                                 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
+                                 unpack=True)
+
+    n_m = 15
+    m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m)
+    m = tools.bins2center(m_bins)
+    m_bin_idx = np.digitize(10**(m500_obs), m_bins)
+
+    f_med = np.array([np.median(f_obs[m_bin_idx == m_bin])
+                      for m_bin in np.arange(1, len(m_bins))])
+    f_q16 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 16)
+                      for m_bin in np.arange(1, len(m_bins))])
+    f_q84 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 84)
+                      for m_bin in np.arange(1, len(m_bins))])
+
+    fm_prms, f1_prms, f2_prms = f_gas_prms()
+
+    ax3.set_prop_cycle(pl.cycle_mark())
+    ax3.plot(10**(m500_obs[23:33]), f_obs[23:33], marker='o',
+             label=r'Vikhlinin+2006')
+    ax3.plot(10**(m500_obs[128:165]), f_obs[128:165],
+             marker='^', label=r'Maughan+2008')
+    ax3.plot(10**(m500_obs[:23]), f_obs[:23], marker='v',
+             label=r'Sun+2009')
+    ax3.plot(10**(m500_obs[33:64]), f_obs[33:64], marker='<',
+             label=r'Pratt+2009')
+    ax3.plot(10**(m500_obs[64:128]), f_obs[64:128], marker='>',
+             label=r'Lin+2012')
+    ax3.plot(10**(m500_obs[165:]), f_obs[165:], marker='D',
+             label=r'Lovisari+2015')
+
+
+    ax3.plot(m, f_med, ls='-', c='k', lw=2, marker='None')
+    ax3.plot(m, f_q16, ls='--', c='k', lw=2, marker='None')
+    ax3.plot(m, f_q84, ls='--', c='k', lw=2, marker='None')
+    ax3.plot(m, f_gas(m, **fm_prms), ls='-', c='r', lw=1, marker='None')
+    ax3.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1, marker='None')
+    ax3.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1, marker='None')
+    text = ax3.set_title(r'Gas fractions')
+    title_props = text.get_fontproperties()
+
+    f_bar = p.prms.omegab/p.prms.omegam
+    ax3.axhline(y=f_bar, c='k', ls='--')
+    # add annotation to f_bar
+    ax3.annotate(r'$f_{\mathrm{b}}$',
+                 # xy=(1e14, 0.16), xycoords='data',
+                 # xytext=(1e14, 0.15), textcoords='data',
+                 xy=(10**(13), f_bar), xycoords='data',
+                 xytext=(1.2 * 10**(13),
+                         f_bar * 0.95), textcoords='data',
+                 fontproperties=title_props)
+
+    ax3.set_xlim([1e13, 10**(15.5)])
+    ax3.set_ylim([0.01, 0.17])
+    ax3.set_xscale('log')
+    ax3.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M_\odot}]$')
+    ax3.set_ylabel(r'$f_{\mathrm{gas,500c}}$')
+    leg = ax3.legend(loc='best', numpoints=1)
+
+    plt.savefig('obs_fgas.pdf', transparent=True)
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_profiles_presentation()
+# ------------------------------------------------------------------------------
+
+def plot_correlation_presentation():
+    with open('croston_500.p', 'rb') as f:
+        data_c = cPickle.load(f)
+    with open('eckert_500.p', 'rb') as f:
+        data_e = cPickle.load(f)
+    beta, rc, m500c, r, prof_h = beta_mass()
+
+    m500c_d = np.append(data_c['m500c'], data_e['m500c'])
+    rc_d = np.append(data_c['rc'], data_e['rc'])
+    beta_d = np.append(data_c['b'], data_e['b'])
+
+    sl = (rc_d > 1e-2)
+
+    copt, ccov = opt.curve_fit(corr_fit, np.log10(rc_d[sl]), np.log10(beta_d[sl]))
+    corr_prms = {"a": copt[0],
+                 "b": copt[1]}
+
+    fig = plt.figure(figsize=(10,9))
+    ax3 = fig.add_subplot(111)
+
+    pl.set_style('mark')
+    ############################################################################
+    # Plot correlation
+    ax3.scatter(np.median(rc_d), np.median(beta_d), c='r', marker='x', s=80)
+    s1 = ax3.scatter(data_e['rc'], data_e['b'], marker='o',
+                     c=np.log10(data_e['m500c']),
+                     label=r'Eckert+15', cmap='magma', lw=0, s=80)
+    s2 = ax3.scatter(data_c['rc'], data_c['b'], marker='D',
+                    c=np.log10(data_c['m500c']),
+                    label=r'Croston+08', cmap='magma', lw=0, s=80)
+    s3 = ax3.scatter(rc, beta, marker='^',
+                    c=np.log10(m500c), label=r'$m_\mathrm{200m}$ matched',
+                    cmap='magma', lw=0, s=80)
+
+    # Plot fit to correlation
+    r_bins = np.logspace(np.log10(rc_d[sl].min()), np.log10(rc_d[sl].max()), 10)
+    r = tools.bins2center(r_bins)
+    r_bin_idx = np.digitize(rc_d[sl], r_bins)
+    med = np.array([np.median(beta_d[sl][r_bin_idx == r_bin]) for r_bin in
+                    np.arange(1, len(r_bins))])
+    # q16 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 16) for r_bin in
+    #                 np.arange(1, len(r_bins))])
+    # q84 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 84) for r_bin in
+    #                 np.arange(1, len(r_bins))])
+    ax3.plot(r, np.power(10, corr_fit(np.log10(r), **corr_prms)),
+             ls='-', c='k', lw=1, marker='None')
+    ax3.plot(r, med, ls='--', c='k', lw=0.5, marker='None')
+    # ax3.plot(r, q16, ls='-.', c='k', lw=0.5)
+    # ax3.plot(r, q84, ls='-.', c='k', lw=0.5)
+    # ax3.set_xlim(xmin=1e-3)
+    ax3.set_xlabel(r'$r_c/r_\mathrm{500c}$')
+    ax3.set_ylabel(r'$\beta$')
+    ax3.set_xscale('log')
+    ax3.set_ylim([1,4])
+    ax3.set_yscale('log')
+    ax3.set_yticks([1,2,3,4])
+    # ax3.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+    ax3.set_yticklabels(["1","2","3","4"])
+    cb = fig.colorbar(s1)
+    cb.set_label(r'$\log_{10} m_\mathrm{500c}/\mathrm{M_\odot}$',
+                 rotation=270, labelpad=30)
+
+    # Set label color to black
+    s1.set_color('k')
+    s2.set_color('k')
+    s3.set_color('k')
+    handles = [s1, s2, s3]
+    labs = [s1.get_label(), s2.get_label(), s3.get_label()]
+    # handles = [s1, s2]
+    # labs = [s1.get_label(), s2.get_label()]
+    ax3.legend(handles, labs, loc=2)
+    plt.savefig('obs_corr_matched.pdf', transparent=True)
+
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_correlation_presentation()
+# ------------------------------------------------------------------------------
+
+def plot_beta_presentation():
+    with open('croston.p', 'rb') as f:
+        data_croston = cPickle.load(f)
+
+    r500 = data_croston['r500']
+    m500g = data_croston['m500gas']
+    rx = data_croston['rx']
+    rho = data_croston['rho']
+
+    r = rx[8]
+    prof = rho[8]
+
+    rc, rc_err, beta, beta_err, m500g = fit_croston()
+
+    fig = plt.figure(figsize=(10,9))
+    ax = fig.add_subplot(111)
+
+    sl = ((prof > 0) & (r >= 0.05))
+    mass = tools.m_h(prof[sl], r[sl] * r500[8])
+
+    pl.set_style('mark')
+    ax.plot(r, prof, lw=0, marker='o')
+    ax.set_prop_cycle(pl.cycle_line())
+    ax.plot(r, prof_gas_hot(r, sl, rc[8], beta[8], mass, r500[8]))
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax.set_ylabel(r'$\rho(r)$')
+
+    plt.savefig('obs_beta.pdf', transparent=True)
+    plt.show()
+
+
+
+
+
