@@ -1307,6 +1307,14 @@ def compare_fit_stars_bahamas():
 # End of compare_fit_stars_bahamas()
 # ------------------------------------------------------------------------------
 
+def prof_gas_hot_beta(x, a, b, m, r200):
+    '''beta profile'''
+    profile = (1 + (x/a)**2)**(-b/2)
+    mass = tools.m_h(profile, x * r200)
+    profile *= m/mass
+
+    return profile
+
 def prof_gas_hot_c(x, a, b, c, m, r200):
     '''beta profile'''
     profile = (1 + (x/a)**2)**(-b/2) * np.exp(-(x/c)**2)
@@ -1478,6 +1486,99 @@ def fit_gas_hot_bahamas():
 
 # ------------------------------------------------------------------------------
 # End of fit_gas_hot_bahamas()
+# ------------------------------------------------------------------------------
+
+def fit_gas_hot_bahamas_paper():
+    '''
+    Fit beta profiles to the total hot gas for M>1e13 in bahamas
+    '''
+    # T3 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_200_mean_Tgt1e65.hdf5', 'r')
+    T3 = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_censat_binned_200_mean_Tgt1e65_M13_15p64.hdf5', 'r')
+
+    # get density profiles
+    # rho_3_c = T3['PartType0/CenDensities'][:]
+    # rho_3_s = T3['PartType0/SatDensities'][:]
+    rho_3_c = T3['PartType0/CenMedianDensity'][:]
+    rho_3_s = T3['PartType0/SatMedianDensity'][:]
+
+    m200 = T3['PartType0/MedianM200'][:]
+    r200 = T3['PartType0/MedianR200'][:]
+    # m200 = T3['PartType0/M200'][:]
+    # r200 = T3['PartType0/R200'][:] * cm2mpc
+
+    # r_bins = T3['RBins_R_Crit500'][:]
+    r_bins = T3['RBins_R_Mean200'][:]
+    r_range = tools.bins2center(r_bins)
+
+    T3.close()
+
+    pl.set_style('line')
+
+    mass_slice = (m200 >= 1e13)
+    rc = -1 * np.ones_like(mass_slice, dtype=float)
+    b = -1 * np.ones_like(mass_slice, dtype=float)
+    rc_err = -1 * np.ones_like(mass_slice, dtype=float)
+    b_err = -1 * np.ones_like(mass_slice, dtype=float)
+    m_g = -1 * np.ones_like(mass_slice, dtype=float)
+
+    for idx, m in zip(np.arange(m200.shape[0])[mass_slice],
+                      m200[mass_slice]):
+        prof_3_c = rho_3_c[idx]
+        prof_3_s = rho_3_s[idx]
+        prof_3 = prof_3_c + prof_3_s
+
+        sl_0 = (prof_3 == 0)
+        sl = ((sl_0.sum() <= 3) & (r_range > 0.05))
+        # we do not want empty slices
+        if sl.sum() == 0:
+            continue
+        # check whether region is contiguous, otherwise can run into trouble
+        # with mass determination
+        if np.diff((sl == 0)[:-1]).nonzero()[0].size > 2:
+            continue
+
+        mg_tot = tools.m_h(prof_3[sl], r_range[sl] * r200[idx])
+
+        if mg_tot > 0:
+            try:
+                p, c = opt.curve_fit(lambda r_range, rc, b: \
+                                     prof_gas_hot_beta(r_range, rc, b,
+                                                       mg_tot, r200[idx]),
+                                     r_range[sl], prof_3[sl],
+                                     bounds=([0., 0],
+                                             [1., 3]))
+            except RuntimeError:
+                continue
+
+            m_g[idx] = mg_tot
+            rc[idx] = p[0]
+            b[idx] = p[1]
+            rc_err[idx] = np.sqrt(np.diag(c))[0]
+            b_err[idx] = np.sqrt(np.diag(c))[1]
+
+            # plt.plot(r_range[sl], prof_3[sl], label='tot')
+            # plt.plot(r_range, prof_gas_hot_beta(r_range, p[0], p[1],
+            #                                     m_g[idx], r200[idx]),
+            #          label='tot fit')
+            # plt.title(r'$M=10^{%.2f}M_\odot$'%np.log10(m))
+            # plt.ylim([1e9,1e16])
+            # plt.xscale('log')
+            # plt.yscale('log')
+            # plt.legend(loc='best')
+            # plt.show()
+
+    mass_slice = mass_slice & (m_g > 0)
+    m200 = m200[mass_slice]
+    m_g = m_g[mass_slice]
+    rc = rc[mass_slice]
+    b = b[mass_slice]
+    rc_err = rc_err[mass_slice]
+    b_err = b_err[mass_slice]
+
+    return (m200, m_g, rc, b, rc_err, b_err)
+
+# ------------------------------------------------------------------------------
+# End of fit_gas_hot_bahamas_paper()
 # ------------------------------------------------------------------------------
 
 def plot_gas_hot_fit_bahamas_median(m200, m_c, a_c, b_c, m_s, a_s, b_s, r_0):
@@ -1867,6 +1968,80 @@ def plot_gas_fit_bahamas_median(plot=False):
 
 # ------------------------------------------------------------------------------
 # End of plot_gas_fit_bahamas_median()
+# ------------------------------------------------------------------------------
+
+def plot_gas_fit_bahamas_median_paper(plot=False):
+    '''Fit median relations to gas fitting functions'''
+    m200, m_g, rc, b, rc_err, b_err = fit_gas_hot_bahamas_paper()
+
+    if plot:
+        fig = plt.figure(figsize=(10,6))
+        ax_h = fig.add_subplot(121)
+        ax_m = fig.add_subplot(122)
+
+    # hot central gas
+    rc_err[rc_err == 0] = rc_err[(rc_err == 0).nonzero()[0] - 1]
+    b_err[b_err == 0] = b_err[(b_err == 0).nonzero()[0] - 1]
+
+    # ropt, rcov = opt.curve_fit(gas_hot_rc_fit, m200_h[~np.isnan(rc_h)],
+    #                            rc_h[~np.isnan(rc_h)],
+    #                            sigma=rc_err[~np.isnan(rc_h)])
+    # rc_prms = {'a': ropt[0], 'b': ropt[1]}
+
+    # bopt, bcov = opt.curve_fit(gas_hot_beta_fit, m200_h[~np.isnan(bc_h)],
+    #                            bc_h[~np.isnan(bc_h)],
+    #                            sigma=bc_err[~np.isnan(bc_h)])
+    # b_prms = {'a': bopt[0], 'b': bopt[1]}
+
+    if plot:
+        ax_h.set_prop_cycle(pl.cycle_mark())
+        ax_h.errorbar(m200_h, rc_h, yerr=rc_err, marker='o',
+                       label=r'$r_c/r_{200\mathrm{m}}$')
+        ax_h.errorbar(m200_h, bc_h, yerr=bc_err, marker='x',
+                       label=r'$\beta$')
+
+        ax_h.set_prop_cycle(pl.cycle_line())
+        ax_h.plot(m200_h, gas_hot_rc_fit(m200_h, **rc_prms))
+        ax_h.plot(m200_h, gas_hot_beta_fit(m200_h, **b_prms))
+
+        ax_h.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+        ax_h.legend(loc='best')
+        ax_h.set_xscale('log')
+        ax_h.set_yscale('log')
+        ax_h.set_title('Hot central gas')
+
+    # mass contributions
+    mhopt, mhcov = opt.curve_fit(gas_hot_mc_fit, m200_h, mc_h/m200_h)
+    mh_prms = {'mc': mcopt[0], 'a': mcopt[1], 'b': mcopt[2]}
+
+    if plot:
+        ax_m.set_prop_cycle(pl.cycle_mark())
+        ax_m.plot(m200_w, m_w/m200_w, label=r'$m_{\mathrm{warm}}$')
+        ax_m.plot(m200_h, mc_h/m200_h, label=r'$m_{\mathrm{hot,c}}$')
+        ax_m.plot(m200_h, ms_h/m200_h, label=r'$m_{\mathrm{hot,s}}$')
+
+        ax_m.set_prop_cycle(pl.cycle_line())
+        ax_m.plot(m200_w, gas_warm_mw_fit(m200_w, **mw_prms))
+        ax_m.plot(m200_h, gas_hot_mc_fit(m200_h, **mc_prms))
+        ax_m.plot(m200_h, gas_hot_ms_fit(m200_h, **ms_prms))
+
+        ax_m.yaxis.tick_right()
+        ax_m.yaxis.set_ticks_position('both')
+        ax_m.yaxis.set_label_position("right")
+        ax_m.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
+        ax_m.set_ylabel(r'$m/m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$', rotation=270,
+                        labelpad=20)
+        ax_m.legend(loc='best')
+        ax_m.set_xscale('log')
+        # ax_m.set_yscale('log')
+        ax_m.set_title('Mass contribution')
+
+        plt.show()
+
+    return rw_prms, sw_prms, rc_prms, b_prms, rs_prms, ss_prms, mw_prms, mc_prms, ms_prms, r0w_prms, r0s_prms
+
+# ------------------------------------------------------------------------------
+# End of plot_gas_fit_bahamas_median_paper()
 # ------------------------------------------------------------------------------
 
 def compare_fit_gas_bahamas():
