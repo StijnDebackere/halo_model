@@ -132,6 +132,53 @@ def c_dmo(m):
     plaw =  A * (m/1e14)**B
     return plaw
 
+def load_dm_dmo(prms):
+    # general profile kwargs to be used for all components
+    profile_kwargs = {'r_range': prms.r_range_lin,
+                      'm_range': prms.m_range_lin,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
+
+    m_range = prms.m_range_lin
+    # --------------------------------------------------------------------------
+    # DMO fit
+    f_dm = np.ones_like(m_range)
+    c_x = c_dmo(m_range)
+    r_x = prms.r_range_lin[:,-1]
+    # specific dm extra kwargs
+    dm_extra = {'profile': profs.profile_NFW,
+                'profile_f': profs.profile_NFW_f,
+                'profile_args': {'c_x': c_x,
+                                 'r_x': r_x,
+                                 'rho_mean': 1.},
+                'profile_f_args': {'c_x': c_x,
+                                   'r_x': r_x,
+                                   'rho_mean': 1.}}
+    prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
+    # --------------------------------------------------------------------------
+
+    # additional kwargs for comp.Component
+    comp_dm_kwargs = {'name': 'dm',
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,
+                      'm_fn': prms.m_fn,
+                      'f_comp': f_dm,
+                      'bias_fn': bias.bias_Tinker10,
+                      'bias_fn_args': {'nu': prms.nu}}
+
+    dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
+
+    comp_dm = comp.Component(**dm_kwargs)
+
+    return comp_dm
+
+# ------------------------------------------------------------------------------
+# End of load_dm_dmo()
+# ------------------------------------------------------------------------------
+
 def load_dm(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,

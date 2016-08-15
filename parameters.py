@@ -452,3 +452,10 @@ prms = Parameters(m_min=11, m_max=15.5,
                   nu_file='HMcode/nu_fnu_dmo_11_15p5.dat',
                   fnu_file='HMcode/nu_fnu_dmo_11_15p5.dat',
                   p_lin_file='HMcode/plin.dat')
+
+prms_hm = Parameters(m_min=10, m_max=15,
+                  nu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
+                  fnu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
+                  p_lin_file='HMcode/plin_k-3_2.dat')
+
+
