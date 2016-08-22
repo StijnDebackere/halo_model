@@ -22,6 +22,20 @@ import halo.data.bahamas as b
 
 import pdb
 
+def fdmo_to_f200(mdmo, fdmo):
+    '''
+    Velliscig conversion formula for the hmf
+    '''
+    a = -0.0872
+    b = 0.0872
+    c = -13.6339
+    d = 0.3509
+
+    log_ratio = a + b / (1 + np.exp(-(np.log10(mdmo) + c) / d))
+    f200 = fdmo * np.power(10, log_ratio)
+
+    return f200
+
 def mdmo_to_m200(mdmo):
     '''
     Velliscig conversion formula -> we need mdmo > 1e11
@@ -164,7 +178,6 @@ def load_dm_dmo(prms):
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      'm_fn': prms.m_fn,
                       'f_comp': f_dm,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}

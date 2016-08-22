@@ -76,7 +76,8 @@ class Parameters(Cache):
       log10m mass interval for mass function
 
     '''
-    def __init__(self, m_min=10, m_max=15, m_bins=101,
+    def __init__(self, m_range_lin,
+                 m_min=10, m_max=15, m_bins=101,
                  r_min=-4.0, r_bins=1000,
                  k_min=-1.8, k_max=2., k_bins=1000,
                  sigma_8=0.821, H0=70.0, omegab=0.0463, omegac=0.233,
@@ -94,6 +95,7 @@ class Parameters(Cache):
                  delta_wrt='mean', delta_c=1.686,
                  rho_crit=2.7763458 * (10.0**11.0)):
         super(Parameters, self).__init__()
+        self.m_range_lin = m_range_lin
         self.m_min = m_min
         self.m_max = m_max
         self.m_bins = m_bins
@@ -124,6 +126,10 @@ class Parameters(Cache):
     #===========================================================================
     # Parameters
     #===========================================================================
+    @parameter
+    def m_range_lin(self, val):
+        return val
+
     @parameter
     def m_min(self, val):
         return val
@@ -245,13 +251,9 @@ class Parameters(Cache):
     def dlog10m(self):
         return (self.m_max - self.m_min)/np.float(self.m_bins)
 
-    @cached_property('m_min', 'm_max', 'm_bins')
-    def m_range_lin(self):
-        return np.logspace(self.m_min, self.m_max, self.m_bins)
-
     @cached_property('k_min', 'k_max', 'k_bins')
     def dlnk(self):
-        return (self.k_max - self.k_min)/np.float(self.k_bins)
+        return np.log(10) * (self.k_max - self.k_min)/np.float(self.k_bins)
 
     @cached_property('k_min', 'k_max', 'k_bins')
     def k_range_lin(self):
@@ -271,8 +273,8 @@ class Parameters(Cache):
                      'transfer_options', 'cosmo_prms')
     def trans_prms(self):
         trans = {
-            "lnk_min": self.k_min,
-            "lnk_max": self.k_max,
+            "lnk_min": np.log(10) * self.k_min,
+            "lnk_max": np.log(10) * self.k_max,
             "dlnk": self.dlnk,
             "transfer_fit": self.transfer_fit,
             "transfer_options": self.transfer_options,
@@ -285,6 +287,7 @@ class Parameters(Cache):
                      'delta_wrt', 'delta_c', 'trans_prms')
     def m_fn_prms(self):
         massf = {
+            "m_range": self.m_range_lin,
             "Mmin": self.m_min,
             "Mmax": self.m_max,
             "dlog10m": self.dlog10m,
@@ -297,9 +300,9 @@ class Parameters(Cache):
 
         return massf
 
-    # @cached_property('m_fn_prms')
-    # def m_fn(self):
-    #     return hmf.MassFunction(**self.m_fn_prms)
+    @cached_property('m_fn_prms')
+    def m_fn(self):
+        return hmf.MassFunction(**self.m_fn_prms)
 
     @cached_property('p_lin_file', 'k_range_lin')
     def p_lin(self):
@@ -308,53 +311,41 @@ class Parameters(Cache):
         plin = p_int(self.k_range_lin)
         return plin
 
-    @staticmethod
-    def _MF_ST(nu):
-        '''Returns Sheth-Tormen mass function'''
-        p=0.3
-        q=0.707
+    # @staticmethod
+    # def _MF_ST(nu):
+    #     '''Returns Sheth-Tormen mass function'''
+    #     p=0.3
+    #     q=0.707
 
-        mfn=0.21616*(1.+((q*nu*nu)**(-p)))*np.exp(-q*nu*nu/2.)
-        return mfn
+    #     mfn=0.21616*(1.+((q*nu*nu)**(-p)))*np.exp(-q*nu*nu/2.)
+    #     return mfn
 
-    @staticmethod
-    def _MF_Tinker10(nu):
-        '''Returns Tinker (2010) mass function'''
-        a = 0.368
-        b = 0.589
-        p = -0.729
-        e = -0.243
-        g = 0.864
-        # N = 1.5104431117066848
+    # @staticmethod
+    # def _MF_Tinker10(nu):
+    #     '''Returns Tinker (2010) mass function'''
+    #     a = 0.368
+    #     b = 0.589
+    #     p = -0.729
+    #     e = -0.243
+    #     g = 0.864
+    #     # N = 1.5104431117066848
 
-        # N tuned to integrate to rho_m in halo model
-        # mfn = N * a * (1 + (b*nu)**(-2*p)) * nu**(2*e) * np.exp(-g*nu**2/2.)
-        mfn = a * (1 + (b*nu)**(-2*p)) * nu**(2*e) * np.exp(-g*nu**2/2.)
+    #     # N tuned to integrate to rho_m in halo model
+    #     # mfn = N * a * (1 + (b*nu)**(-2*p)) * nu**(2*e) * np.exp(-g*nu**2/2.)
+    #     mfn = a * (1 + (b*nu)**(-2*p)) * nu**(2*e) * np.exp(-g*nu**2/2.)
 
-        return mfn
+    #     return mfn
 
-    @cached_property('nu_file')
+    @cached_property('nu_file', 'm_fn')
     def nu(self):
-        nu, fnu = np.loadtxt(self.nu_file, unpack=True)
-        # nu = np.sqrt(self.m_fn.nu)
+        # nu, fnu = np.loadtxt(self.nu_file, unpack=True)
+        nu = np.sqrt(self.m_fn.nu)
         return nu
 
-    @cached_property('fnu_file', 'nu')
+    @cached_property('fnu_file', 'nu', 'm_fn')
     def fnu(self):
-        nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
-
-        # dnu = np.diff(self.nu)
-        # dnu = np.append(dnu, dnu[-1])
-        # dm = np.diff(self.m_range_lin)
-        # dm = np.append(dm, dm[-1])
-
-        # nm = self.rho_m / self.m_range_lin * fnu * dnu / dm
-
-        # print tools.Integrate(fnu, nu)
-        # print tools.Integrate(nm, self.m_range_lin)
-
-        # fnu = Parameters._MF_Tinker10(self.nu)
-        # fnu = self.m_fn.fsigma / self.nu
+        # nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
+        fnu = self.m_fn.fsigma / self.nu
         return fnu
 
     # @cached_property('m_range_lin', 'm_fn_prms')
@@ -422,40 +413,48 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m_min=10., m_max=11.,
+prms1 = Parameters(m_range_lin=np.logspace(10,11,101),
+                   m_min=10., m_max=11.,
                    nu_file='HMcode/nu_fnu_dmo_10_11.dat',
                    fnu_file='HMcode/nu_fnu_dmo_10_11.dat',
                    p_lin_file='HMcode/plin.dat')
-prms2 = Parameters(m_min=11., m_max=12.,
+prms2 = Parameters(m_range_lin=np.logspace(11,12,101),
+                   m_min=11., m_max=12.,
                    nu_file='HMcode/nu_fnu_dmo_11_12.dat',
                    fnu_file='HMcode/nu_fnu_dmo_11_12.dat',
                    p_lin_file='HMcode/plin.dat')
-prms3 = Parameters(m_min=12., m_max=13.,
+prms3 = Parameters(m_range_lin=np.logspace(12,13,101),
+                   m_min=12., m_max=13.,
                    nu_file='HMcode/nu_fnu_dmo_12_13.dat',
                    fnu_file='HMcode/nu_fnu_dmo_12_13.dat',
                    p_lin_file='HMcode/plin.dat')
-prms4 = Parameters(m_min=13., m_max=14.,
+prms4 = Parameters(m_range_lin=np.logspace(13,14,101),
+                   m_min=13., m_max=14.,
                    nu_file='HMcode/nu_fnu_dmo_13_14.dat',
                    fnu_file='HMcode/nu_fnu_dmo_13_14.dat',
                    p_lin_file='HMcode/plin.dat')
-prms5 = Parameters(m_min=14., m_max=15.,
+prms5 = Parameters(m_range_lin=np.logspace(14,15,101),
+                   m_min=14., m_max=15.,
                    nu_file='HMcode/nu_fnu_dmo_14_15.dat',
                    fnu_file='HMcode/nu_fnu_dmo_14_15.dat',
                    p_lin_file='HMcode/plin.dat')
-prmst = Parameters(m_min=10., m_max=15.,
+prmst = Parameters(m_range_lin=np.logspace(10,15,101),
+                   m_min=10., m_max=15.,
                    nu_file='HMcode/nu_fnu_dmo_10_15.dat',
                    fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
                    p_lin_file='HMcode/plin.dat')
 
-# prms = Parameters(m_min=6.5, m_max=15.5)#, mf_fit='SMT')
-prms = Parameters(m_min=11, m_max=15.5,
-                  nu_file='HMcode/nu_fnu_dmo_11_15p5.dat',
-                  fnu_file='HMcode/nu_fnu_dmo_11_15p5.dat',
+prms = Parameters(m_range_lin=np.logspace(10,15,101),
+                  m_min=10, m_max=15,
+                  k_min=-1.8, k_max=2, k_bins=1000,
+                  nu_file='HMcode/nu_fnu_dmo_10_15.dat',
+                  fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
                   p_lin_file='HMcode/plin.dat')
 
-prms_hm = Parameters(m_min=10, m_max=15,
-                  nu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
-                  fnu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
-                  p_lin_file='HMcode/plin_k-3_2.dat')
-
-
+prms_comp = Parameters(m_range_lin=np.logspace(10,15,101),
+                       m_min=10, m_max=15,
+                       # ~ 0.001 < kR < 100
+                       k_min=-3, k_max=2, k_bins=1000,
+                       nu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
+                       fnu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
+                       p_lin_file='HMcode/plin_k-3_2.dat')
