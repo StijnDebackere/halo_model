@@ -56,9 +56,10 @@ def load_dm_dmo(prms=p.prms, save=True):
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
                       'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,
-                      # 'm_fn': prms.m_fn,
+                      # 'nu': prms.nu,
+                      # 'fnu': prms.fnu,
+                      'm_fn': prms.m_fn,
+                      'f_comp': f_dm,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
 
@@ -107,9 +108,10 @@ def load_dm(prms=p.prms, save=True):
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
                       'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,
-                      # 'm_fn': prms.m_fn,
+                      # 'nu': prms.nu,
+                      # 'fnu': prms.fnu,
+                      'm_fn': prms.m_fn,
+                      'f_comp': f_dm,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
 
@@ -151,12 +153,13 @@ def load_gas_dmo(prms=p.prms, save=True):
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,
-                      # 'm_fn': p.prms_dmo.m_fn,
-                      'bias_fn': bias.bias_Tinker10,
-                      'bias_fn_args': {'nu': prms.nu}}
+                       'p_lin': prms.p_lin,
+                       # 'nu': prms.nu,
+                       # 'fnu': prms.fnu,
+                       'f_comp': f_gas,
+                       'm_fn': p.prms.m_fn,
+                       'bias_fn': bias.bias_Tinker10,
+                       'bias_fn_args': {'nu': prms.nu}}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 

@@ -76,7 +76,7 @@ class Parameters(Cache):
       log10m mass interval for mass function
 
     '''
-    def __init__(self, m_range_lin,
+    def __init__(self, m_range_lin, #m_range_mfn,
                  m_min=10, m_max=15, m_bins=101,
                  r_min=-4.0, r_bins=1000,
                  k_min=-1.8, k_max=2., k_bins=1000,
@@ -96,6 +96,7 @@ class Parameters(Cache):
                  rho_crit=2.7763458 * (10.0**11.0)):
         super(Parameters, self).__init__()
         self.m_range_lin = m_range_lin
+        self.m_range_mfn = m_range_lin
         self.m_min = m_min
         self.m_max = m_max
         self.m_bins = m_bins
@@ -128,6 +129,10 @@ class Parameters(Cache):
     #===========================================================================
     @parameter
     def m_range_lin(self, val):
+        return val
+
+    @parameter
+    def m_range_mfn(self, val):
         return val
 
     @parameter
@@ -338,14 +343,14 @@ class Parameters(Cache):
 
     @cached_property('nu_file', 'm_fn')
     def nu(self):
-        # nu, fnu = np.loadtxt(self.nu_file, unpack=True)
-        nu = np.sqrt(self.m_fn.nu)
+        nu, fnu = np.loadtxt(self.nu_file, unpack=True)
+        # nu = np.sqrt(self.m_fn.nu)
         return nu
 
     @cached_property('fnu_file', 'nu', 'm_fn')
     def fnu(self):
-        # nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
-        fnu = self.m_fn.fsigma / self.nu
+        nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
+        # fnu = self.m_fn.fsigma / self.nu
         return fnu
 
     # @cached_property('m_range_lin', 'm_fn_prms')
@@ -444,17 +449,18 @@ prmst = Parameters(m_range_lin=np.logspace(10,15,101),
                    fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
                    p_lin_file='HMcode/plin.dat')
 
-prms = Parameters(m_range_lin=np.logspace(10,15,101),
-                  m_min=10, m_max=15,
+prms = Parameters(m_range_lin=np.logspace(11,15,101),
+                  m_min=11, m_max=15,
                   k_min=-1.8, k_max=2, k_bins=1000,
-                  nu_file='HMcode/nu_fnu_dmo_10_15.dat',
-                  fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
-                  p_lin_file='HMcode/plin.dat')
+                  nu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
+                  fnu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
+                  p_lin_file='HMcode/plin_k-1p8_2.dat')
 
-prms_comp = Parameters(m_range_lin=np.logspace(10,15,101),
-                       m_min=10, m_max=15,
-                       # ~ 0.001 < kR < 100
-                       k_min=-3, k_max=2, k_bins=1000,
-                       nu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
-                       fnu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
-                       p_lin_file='HMcode/plin_k-3_2.dat')
+# prms_comp = Parameters(m_range_lin=np.logspace(10,15,101),
+#                        m_min=10, m_max=15,
+#                        # ~ 0.001 < kR < 100
+#                        k_min=-3, k_max=2, k_bins=1000,
+#                        nu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
+#                        fnu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
+#                        p_lin_file='HMcode/plin_k-3_2.dat')
+

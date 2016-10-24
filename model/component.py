@@ -4,6 +4,7 @@ import numpy as np
 import hmf
 import scipy.special as spec
 import halo.density_profiles as profs
+import halo.parameters as p
 from halo.tools import Integrate
 import halo.model.density as dens
 from halo.model._cache import Cache, cached_property, parameter
@@ -46,7 +47,8 @@ class Component(dens.Profile):
     Delta_tot: (k,) array
       dimensionless power spectrum
     '''
-    def __init__(self, name, p_lin, nu, fnu, #f_comp, # m_fn,
+    def __init__(self, name, p_lin, #nu, fnu,
+                 f_comp, m_fn,
                  bias_fn, bias_fn_args,
                  **profile_kwargs):
         super(Component, self).__init__(**profile_kwargs)
@@ -54,44 +56,46 @@ class Component(dens.Profile):
         # self.power_lin = m_fn.power
         self.name = name
         self.p_lin = p_lin
-        self.nu = nu
-        self.fnu = fnu
+        self.f_comp = f_comp
+        # self.nu = nu
+        # self.fnu = fnu
+        self.m_fn = m_fn
         self.bias_fn = bias_fn
         self.bias_fn_args = bias_fn_args
 
-    def __add__(self, other):
-        if not (np.allclose(self.nu, other.nu) or
-                np.allclose(self.fnu, other.fnu) or
-                np.allclose(self.p_lin, other.p_lin)):
-            raise AttributeError('nu/fnu/p_lin need to be the same')
-        if not (np.allclose(self.r_range, other.r_range) or
-                np.allclose(self.m_range, other.m_range) or
-                np.allclose(self.k_range, other.k_range)):
-            raise AttributeError('nu/fnu/p_lin need to be the same')
+    # def __add__(self, other):
+    #     if not (np.allclose(self.nu, other.nu) or
+    #             np.allclose(self.fnu, other.fnu) or
+    #             np.allclose(self.p_lin, other.p_lin)):
+    #         raise AttributeError('nu/fnu/p_lin need to be the same')
+    #     if not (np.allclose(self.r_range, other.r_range) or
+    #             np.allclose(self.m_range, other.m_range) or
+    #             np.allclose(self.k_range, other.k_range)):
+    #         raise AttributeError('nu/fnu/p_lin need to be the same')
 
-        prof1 = self.rho_r
-        prof2 = other.rho_r
+    #     prof1 = self.rho_r
+    #     prof2 = other.rho_r
 
-        prof1_f = self.rho_k
-        prof2_f = other.rho_k
+    #     prof1_f = self.rho_k
+    #     prof2_f = other.rho_k
 
-        f_comp1 = self.f_comp
-        f_comp2 = other.f_comp
-        f_new = f_comp1 + f_comp2
+    #     f_comp1 = self.f_comp
+    #     f_comp2 = other.f_comp
+    #     f_new = f_comp1 + f_comp2
 
-        prof_new = 1. / f_new.reshape(-1,1) * (f_comp1.reshape(-1,1) * prof1 +
-                                               f_comp2.reshape(-1,1) * prof2)
-        prof_f_new = 1. / f_new.reshape(-1,1) * (f_comp1.reshape(-1,1) * prof1_f +
-                                                 f_comp2.reshape(-1,1) * prof2_f)
+    #     prof_new = 1. / f_new.reshape(-1,1) * (f_comp1.reshape(-1,1) * prof1 +
+    #                                            f_comp2.reshape(-1,1) * prof2)
+    #     prof_f_new = 1. / f_new.reshape(-1,1) * (f_comp1.reshape(-1,1) * prof1_f +
+    #                                              f_comp2.reshape(-1,1) * prof2_f)
 
-        profile_kwargs = {"r_range": self.r_range,
-                          "m_range": self.m_range,
-                          "k_range": self.k_range,
-                          "profile": prof_new,
-                          "f_comp": f_new,
-                          "profile_f": prof_f_new}
-        return Component(self.name, self.p_lin, self.nu, self.fnu, self.bias_fn,
-                         self.bias_fn_args, **profile_kwargs)
+    #     profile_kwargs = {"r_range": self.r_range,
+    #                       "m_range": self.m_range,
+    #                       "k_range": self.k_range,
+    #                       "profile": prof_new,
+    #                       "f_comp": f_new,
+    #                       "profile_f": prof_f_new}
+    #     return Component(self.name, self.p_lin, self.nu, self.fnu, self.bias_fn,
+    #                      self.bias_fn_args, **profile_kwargs)
 
     #===========================================================================
     # Parameters
@@ -108,20 +112,20 @@ class Component(dens.Profile):
     def p_lin(self, val):
         return val
 
-    @parameter
-    def nu(self, val):
-        return val
-
-    @parameter
-    def fnu(self, val):
-        return val
+    # @parameter
+    # def nu(self, val):
+    #     return val
 
     # @parameter
-    # def m_fn(self, val):
-    #     if not isinstance(val, hmf.MassFunction):
-    #         raise TypeError('m_fn should be hmf.MassFunction instance.')
-    #     else:
-    #         return val
+    # def fnu(self, val):
+    #     return val
+
+    @parameter
+    def m_fn(self, val):
+        if not isinstance(val, hmf.MassFunction):
+            raise TypeError('m_fn should be hmf.MassFunction instance.')
+        else:
+            return val
 
     @parameter
     def bias_fn(self, val):
@@ -138,7 +142,7 @@ class Component(dens.Profile):
     def Delta_lin(self):
         return 0.5/np.pi**2 * self.k_range**3 * self.p_lin
 
-    @cached_property('m_range', 'f_comp', 'nu', 'fnu')
+    @cached_property('m_range', 'f_comp', 'm_fn')
     def rho_comp(self):
         '''
         Compute the average density of the component as a fraction of rho_m
@@ -146,14 +150,17 @@ class Component(dens.Profile):
             rho_comp(z) = int_m m n(m,z) f_comp(m,z)
             rho_comp(z) / rho_m = int_nu f(nu, z) f_comp(nu, z)
         '''
-        # could solve this discrepancy by again including rho_m as integral
-        # over hmf, then we are self-consistent again.
-        # Then we need to consider also halo definition, since we would actually
-        # like rho_m to be the natural value, this was a problem earlier on
-        norm = Integrate(y=self.fnu, x=self.nu, axis=0)
-        result = Integrate(y=self.fnu * self.f_comp,
-                           x=self.nu,
-                           axis=0) / norm
+        # # could solve this discrepancy by again including rho_m as integral
+        # # over hmf, then we are self-consistent again.
+        # # Then we need to consider also halo definition, since we would actually
+        # # like rho_m to be the natural value, this was a problem earlier on
+        # norm = Integrate(y=self.fnu, x=self.nu, axis=0)
+        # result = Integrate(y=self.fnu * self.f_comp,
+        #                    x=self.nu,
+        #                    axis=0) / norm
+
+        result = Integrate(y=self.m_fn.dndlnm * self.f_comp, x=self.m_range,
+                           axis=0)
         return result
 
     # @cached_property('bias_fn', 'bias_fn_args', 'm_range', 'nu', 'fnu')
@@ -222,30 +229,39 @@ class Component(dens.Profile):
                                    self.r_range,
                                    axis=1)
 
-    @cached_property('m_range', 'k_range', 'nu', 'fnu', 'rho_k')
+    @cached_property('m_range', 'k_range', 'rho_k', 'f_comp', 'm_fn', )
     def P_1h(self):
         '''
         Compute the 1-halo term of the power spectrum.
         '''
         # define shapes for readability
         m = self.m_range.shape[0]
-        k = self.k_range.shape[0]
 
         m_range = self.m_range.reshape(m,1)
         f_comp = self.f_comp.reshape(m,1)
 
-        nu = self.nu.reshape(m,1)
-        fnu = self.fnu.reshape(m,1)
-
-        # hmf implementation
+        # # hmf implementation
         # nu = np.sqrt(self.m_fn.nu).reshape(m,1)
         # fnu = self.m_fn.fsigma.reshape(m,1) / nu
 
-        r_x = self.r_range[:,-1].reshape(m,1)
-        prefactor = 4./3 * np.pi * 200.
-        result = Integrate(y=fnu * f_comp**2 * np.abs(self.rho_k)**2 * r_x**3,
-                           x=nu,
-                           axis=0)
+        # # HM readout
+        # nu = self.nu.reshape(m,1)
+        # fnu = self.fnu.reshape(m,1)
+
+        # # HM way
+        # r_x = self.r_range[:,-1].reshape(m,1)
+        # prefactor = 4./3 * np.pi * 200.
+        # result = Integrate(y=fnu * f_comp**2 * np.abs(self.rho_k)**2 * r_x**3,
+        #                    x=nu,
+        #                    axis=0)
+        # result *= prefactor
+
+        # hmf way
+        dndlnm = self.m_fn.dndlnm.reshape(m,1)
+
+        prefactor = 1. / p.prms.rho_m**2
+        result = Integrate(y=dndlnm * m_range * f_comp**2 * np.abs(self.rho_k)**2,
+                           x=m_range, axis=0)
         result *= prefactor
 
         return result

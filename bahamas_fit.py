@@ -146,7 +146,54 @@ def c_dmo(m):
     plaw =  A * (m/1e14)**B
     return plaw
 
-def load_dm_dmo(prms):
+def load_dm_dmo1(prms):
+    m_range = mdmo_to_m200(prms.m_range_lin)
+    # general profile kwargs to be used for all components
+    profile_kwargs = {'r_range': prms.r_range_lin,
+                      'm_range': m_range,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
+
+    # --------------------------------------------------------------------------
+    # DMO fit
+    f_dm = np.ones_like(m_range)
+    c_x = c_dmo(m_range)
+    r_x = prms.r_range_lin[:,-1]
+    # specific dm extra kwargs
+    dm_extra = {'profile': profs.profile_NFW,
+                'profile_f': profs.profile_NFW_f,
+                'profile_args': {'c_x': c_x,
+                                 'r_x': r_x,
+                                 'rho_mean': 1.},
+                'profile_f_args': {'c_x': c_x,
+                                   'r_x': r_x,
+                                   'rho_mean': 1.}}
+    prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
+    # --------------------------------------------------------------------------
+
+    # additional kwargs for comp.Component
+    comp_dm_kwargs = {'name': 'dm',
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,
+                      'm_fn': prms.m_fn,
+                      'f_comp': f_dm,
+                      'bias_fn': bias.bias_Tinker10,
+                      'bias_fn_args': {'nu': prms.nu}}
+
+    dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
+
+    comp_dm = comp.Component(**dm_kwargs)
+
+    return comp_dm
+
+# ------------------------------------------------------------------------------
+# End of load_dm_dmo()
+# ------------------------------------------------------------------------------
+
+def load_dm_dmo2(prms):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
@@ -178,6 +225,7 @@ def load_dm_dmo(prms):
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
+                      'm_fn': prms.m_fn,
                       'f_comp': f_dm,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
@@ -285,18 +333,18 @@ def fit_alpha(k_range, P1, P2, power):
                                k_range[sl], power[sl],
                                bounds=([0.5, 2]))
 
-    alpha = 0.83
+    alpha = popt[0]
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    r8 = np.load('8bar_8dmo.npy')
+    # r8 = np.load('8bar_8dmo.npy')
     # ax.plot(k_range, alpha_power(k_range, popt[0], P1, P2)/power,
     #         label=r'$(P_{\mathrm{1h}}^{\alpha} + P_{\mathrm{2h}}^{\alpha})^{1/\alpha}$')
     # ax.plot(k_range, (P1+P2)/power, label=r'$P_{\mathrm{1h}} + P_{\mathrm{2h}}$')
     # ax.axhline(y=1, c='k', ls='--')
 
-    ax.plot(k_range, r8 * (P1**alpha + P2**alpha)**(1./alpha)/power,
+    ax.plot(k_range, (P1**alpha + P2**alpha)**(1./alpha)/power,
             label=r'$(P_{\mathrm{1h}}^{\alpha} + P_{\mathrm{2h}}^{\alpha})^{1/\alpha}$')
-    ax.plot(k_range, r8 * (P1+P2)/power, label=r'$P_{\mathrm{1h}} + P_{\mathrm{2h}}$')
+    ax.plot(k_range, (P1+P2)/power, label=r'$P_{\mathrm{1h}} + P_{\mathrm{2h}}$')
     # plt.plot(k_range, power)
     ax.axhline(y=1, c='k', ls='--')
     minor_locator = AutoMinorLocator(2)
