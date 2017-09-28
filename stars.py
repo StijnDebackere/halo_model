@@ -6,7 +6,7 @@ import halo.parameters as p
 
 import pdb
 
-ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/data/'
+ddir = '/Volumes/Data/stijn/Documents/Leiden/MR/code/halo/data/'
 
 def f_interp(m_range, f, m_f):
     '''

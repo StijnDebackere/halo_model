@@ -160,7 +160,7 @@ def load_dm_dmo1(prms):
     # DMO fit
     f_dm = np.ones_like(m_range)
     c_x = c_dmo(m_range)
-    r_x = prms.r_range_lin[:,-1]
+    r_x = tools.mass_to_radius(m_range, 200 * prms.rho_m)# prms.r_range_lin[:,-1]
     # specific dm extra kwargs
     dm_extra = {'profile': profs.profile_NFW,
                 'profile_f': profs.profile_NFW_f,
@@ -219,7 +219,6 @@ def load_dm_dmo2(prms):
                                    'rho_mean': 1.}}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
     # --------------------------------------------------------------------------
-
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
                       'p_lin': prms.p_lin,
@@ -308,7 +307,7 @@ def load_dm(prms=p.prmst):
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      # 'm_fn': prms.m_fn,
+                      'm_fn': prms.m_fn,
                       'f_comp': f_dm,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
@@ -429,7 +428,7 @@ def load_gas(prms=p.prmst):
                      'p_lin': prms.p_lin,
                      'nu': prms.nu,
                      'fnu': prms.fnu,
-                     # 'm_fn': prms.m_fn,
+                     'm_fn': prms.m_fn,
                      'f_comp': fc_h,
                      'bias_fn': bias.bias_Tinker10,
                      'bias_fn_args': {'nu': prms.nu}}
@@ -512,7 +511,7 @@ def load_stars(prms=p.prmst):
                      'p_lin': prms.p_lin,
                      'nu': prms.nu,
                      'fnu': prms.fnu,
-                     # 'm_fn': prms.m_fn,
+                     'm_fn': prms.m_fn,
                      'f_comp': fs,
                      'bias_fn': bias.bias_Tinker10,
                      'bias_fn_args': {'nu': prms.nu}}
@@ -535,7 +534,7 @@ def load_stars(prms=p.prmst):
                      'p_lin': prms.p_lin,
                      'nu': prms.nu,
                      'fnu': prms.fnu,
-                     # 'm_fn': prms.m_fn,
+                     'm_fn': prms.m_fn,
                      'f_comp': fc,
                      'bias_fn': bias.bias_Tinker10,
                      'bias_fn_args': {'nu': prms.nu}}
@@ -543,7 +542,7 @@ def load_stars(prms=p.prmst):
                         'p_lin': prms.p_lin,
                         'nu': prms.nu,
                         'fnu': prms.fnu,
-                        # 'm_fn': prms.m_fn,
+                        'm_fn': prms.m_fn,
                         'f_comp': f_cold,
                         'bias_fn': bias.bias_Tinker10,
                         'bias_fn_args': {'nu': prms.nu}}

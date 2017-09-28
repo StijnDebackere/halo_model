@@ -12,7 +12,7 @@ import cPickle
 
 import matplotlib.pyplot as plt
 # allow import of plot
-sys.path.append('~/Documents/Universiteit/MR/code')
+sys.path.append('~/Documents/Leiden/MR/code')
 import plot as pl
 
 import halo.parameters as p
@@ -21,7 +21,7 @@ import halo.tools as tools
 
 import pdb
 
-ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/halo/data/'
+ddir = '/Volumes/Data/stijn/Documents/Leiden/MR/code/halo/data/'
 prms = p.prms
 
 def T2Mgas(T):
@@ -192,6 +192,7 @@ def rhogas_eckert():
     # ni : [cm^-3]
     # si : [cm^-3] -> error
     path = ddir + 'data_mccarthy/gas/ngas_profiles.txt'
+    # different temperature cuts
     r, n1, s1, n2, s2, n3, s3, n4, s4 = np.loadtxt(path, unpack=True)
     # rescale to hydrostatic r500_wl/r500_hydro ~ (M_wl/M_hydro)^1/3 = 1.09
     r *= 1.09
@@ -199,14 +200,14 @@ def rhogas_eckert():
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
     # n_He = Y/(4X) n_H
     # => n_gas = 2.25 n_H
-    rho1 = 2.25 * 0.59 * const.m_p.cgs * n1 * 1/u.cm**3 # in cgs
-    rho2 = 2.25 * 0.59 * const.m_p.cgs * n2 * 1/u.cm**3
-    rho3 = 2.25 * 0.59 * const.m_p.cgs * n3 * 1/u.cm**3
-    rho4 = 2.25 * 0.59 * const.m_p.cgs * n4 * 1/u.cm**3
-    s1 = 2.25 * 0.59 * const.m_p.cgs * s1 * 1/u.cm**3
-    s2 = 2.25 * 0.59 * const.m_p.cgs * s2 * 1/u.cm**3
-    s3 = 2.25 * 0.59 * const.m_p.cgs * s3 * 1/u.cm**3
-    s4 = 2.25 * 0.59 * const.m_p.cgs * s4 * 1/u.cm**3
+    rho1 = 2.31 * 0.61 * const.m_p.cgs * n1 * 1/u.cm**3 # in cgs
+    rho2 = 2.31 * 0.61 * const.m_p.cgs * n2 * 1/u.cm**3
+    rho3 = 2.31 * 0.61 * const.m_p.cgs * n3 * 1/u.cm**3
+    rho4 = 2.31 * 0.61 * const.m_p.cgs * n4 * 1/u.cm**3
+    s1 = 2.31 * 0.61 * const.m_p.cgs * s1 * 1/u.cm**3
+    s2 = 2.31 * 0.61 * const.m_p.cgs * s2 * 1/u.cm**3
+    s3 = 2.31 * 0.61 * const.m_p.cgs * s3 * 1/u.cm**3
+    s4 = 2.31 * 0.61 * const.m_p.cgs * s4 * 1/u.cm**3
     # data is in temperature bins, need to convert to mass bins
     T_bins = np.array([0.6, 2, 3, 4, 5])
     # halo mass bin edges! What are min and max mass?

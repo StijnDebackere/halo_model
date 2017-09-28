@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import sys
 
 # allow import of plot
-sys.path.append('~/Documents/Universiteit/MR/code')
+sys.path.append('~/Documents/Leiden/MR/code')
 import plot as pl
 
 import halo.tools as tools
@@ -58,10 +58,13 @@ def load_dm():
 
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
-                      'm_fn': prms.m_fn,
-                      'f_comp': f_dm,
-                      'bias_fn': bias.bias_Tinker10,
-                      'bias_fn_args': {'m_fn': prms.m_fn}}
+                      # 'm_fn': prms.m_fn,
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,
+                      'f_comp': f_dm,}
+                      # 'bias_fn': bias.bias_Tinker10,
+                      # 'bias_fn_args': {'m_fn': prms.m_fn}}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
 
@@ -85,10 +88,13 @@ def load_sat():
     prof_sat_kwargs = tools.merge_dicts(profile_kwargs, sat_extra)
 
     comp_sat_kwargs = {'name': 'sat',
-                       'm_fn': prms.m_fn,
-                       'f_comp': f_sat,
-                       'bias_fn': bias.bias_Tinker10,
-                       'bias_fn_args': {'m_fn': prms.m_fn}}
+                       # 'm_fn': prms.m_fn,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,
+                       'f_comp': f_sat,}
+                       # 'bias_fn': bias.bias_Tinker10,
+                       # 'bias_fn_args': {'m_fn': prms.m_fn}}
 
     sat_kwargs = tools.merge_dicts(prof_sat_kwargs, comp_sat_kwargs)
     comp_sat = comp.Component(**sat_kwargs)
@@ -132,10 +138,13 @@ def load_bcg():
     print '! Check M_h-M* relation !'
 
     comp_bcg_kwargs = {'name': 'bcg',
-                       'm_fn': prms.m_fn,
-                       'f_comp': f_cen,
-                       'bias_fn': bias.bias_Tinker10,
-                       'bias_fn_args': {'m_fn': prms.m_fn}}
+                       # 'm_fn': prms.m_fn,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,
+                       'f_comp': f_cen,}
+                       # 'bias_fn': bias.bias_Tinker10,
+                       # 'bias_fn_args': {'m_fn': prms.m_fn}}
 
     bcg_kwargs = tools.merge_dicts(prof_bcg_kwargs, comp_bcg_kwargs)
     comp_bcg = comp.Component(**bcg_kwargs)
@@ -156,10 +165,13 @@ def load_icl():
     prof_icl_kwargs = tools.merge_dicts(profile_kwargs, icl_extra)
 
     comp_icl_kwargs = {'name': 'icl',
-                       'm_fn': prms.m_fn,
-                       'f_comp': f_cen,
-                       'bias_fn': bias.bias_Tinker10,
-                       'bias_fn_args': {'m_fn': prms.m_fn}}
+                       # 'm_fn': prms.m_fn,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,
+                       'f_comp': f_cen,}
+                       # 'bias_fn': bias.bias_Tinker10,
+                       # 'bias_fn_args': {'m_fn': prms.m_fn}}
 
     icl_kwargs = tools.merge_dicts(prof_icl_kwargs, comp_icl_kwargs)
     comp_icl = comp.Component(**icl_kwargs)
@@ -264,10 +276,13 @@ def load_gas():
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
 
     comp_gas_kwargs = {'name': 'gas',
-                       'm_fn': prms.m_fn,
-                       'f_comp': f_gas,
-                       'bias_fn': bias.bias_Tinker10,
-                       'bias_fn_args': {'m_fn': prms.m_fn}}
+                       # 'm_fn': prms.m_fn,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,
+                       'f_comp': f_gas,}
+                       # 'bias_fn': bias.bias_Tinker10,
+                       # 'bias_fn_args': {'m_fn': prms.m_fn}}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
     comp_gas = comp.Component(**gas_kwargs)

@@ -82,10 +82,10 @@ class Parameters(Cache):
                  k_min=-1.8, k_max=2., k_bins=1000,
                  sigma_8=0.821, H0=70.0, omegab=0.0463, omegac=0.233,
                  omegav=0.7207, n=0.972,
-                 transfer_fit='EH',
-                 transfer_options=None,
-                 # transfer_fit='FromFile',
-                 # transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
+                 # transfer_fit='EH',
+                 # transfer_options=None,
+                 transfer_fit='FromFile',
+                 transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
                  z=0.,
                  p_lin_file='HMcode/plin.dat',
                  nu_file='HMcode/nu_fnu.dat',
@@ -96,7 +96,7 @@ class Parameters(Cache):
                  rho_crit=2.7763458 * (10.0**11.0)):
         super(Parameters, self).__init__()
         self.m_range_lin = m_range_lin
-        self.m_range_mfn = m_range_lin
+        # self.m_range_mfn = m_range_lin
         self.m_min = m_min
         self.m_max = m_max
         self.m_bins = m_bins
@@ -131,9 +131,9 @@ class Parameters(Cache):
     def m_range_lin(self, val):
         return val
 
-    @parameter
-    def m_range_mfn(self, val):
-        return val
+    # @parameter
+    # def m_range_mfn(self, val):
+    #     return val
 
     @parameter
     def m_min(self, val):
@@ -292,7 +292,7 @@ class Parameters(Cache):
                      'delta_wrt', 'delta_c', 'trans_prms')
     def m_fn_prms(self):
         massf = {
-            "m_range": self.m_range_lin,
+            # "m_range": self.m_range_lin,
             "Mmin": self.m_min,
             "Mmax": self.m_max,
             "dlog10m": self.dlog10m,
