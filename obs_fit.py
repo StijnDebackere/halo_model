@@ -259,9 +259,9 @@ def load_gas(prms=p.prms, fit='med', save=True):
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
                       'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,
-                      # 'm_fn': p.prms_dmo.m_fn,
+                      # 'nu': prms.nu,
+                      # 'fnu': prms.fnu,
+                      'm_fn': p.prms_dmo.m_fn,
                       'bias_fn': bias.bias_Tinker10,
                       'bias_fn_args': {'nu': prms.nu}}
 

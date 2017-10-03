@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import numpy as np
-import hmf
+import halo.hmf.hmf as hmf
 import scipy.special as spec
 import halo.density_profiles as profs
 import halo.parameters as p
