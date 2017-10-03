@@ -21,7 +21,7 @@ import halo.tools as tools
 
 import pdb
 
-ddir = '/Volumes/Data/stijn/Documents/Universiteit/MR/code/halo/data/'
+ddir = '/Volumes/Data/stijn/Documents/Leiden/MR/code/halo/data/'
 prms = p.prms
 
 def T2Mgas(T):

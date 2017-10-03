@@ -182,6 +182,13 @@ def prof_gas_hot(x, sl, a, b, m_sl, r500):
 
     return profile
 
+
+def mdmo_to_mgas(m_dmo, f_gas):
+    '''
+    Convert equally spaced m_dmo unequally spaced m_gas 
+    '''
+    pass
+
 def load_gas(prms=p.prms, fit='med', save=True):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,

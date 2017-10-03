@@ -50,6 +50,7 @@ def read_croston():
     Z = data[:,4]
 
     # Load in croston data -> n = n_e
+    r = [np.loadtxt(f)[:,0] for idx, f in enumerate(files)] * 10**(-3) #[Mpc]
     rx = [np.loadtxt(f)[:,1] for idx, f in enumerate(files)]
     n = [np.loadtxt(f)[:,2] for idx, f in enumerate(files)]
     n_err = [np.loadtxt(f)[:,3] for idx, f in enumerate(files)]
@@ -141,10 +142,12 @@ def read_eckert():
     for f in files:
         # actual data
         data = fits.open(f)
-        # !!!! check whether this still needs correction factor from weak lensing
         r500 = np.append(r500, data[1].header['R500'] * 1e-3) # [Mpc]
         z = np.append(z, data[1].header['REDSHIFT'])
+        # Need to rescale because of wrong lensing mass estimate
+        # See mail Ian
         rx.append(data[1].data['RADIUS'])
+        # rx.append(data[1].data['RADIUS'] * (1.3)**(1./3))
         rho.append(data[1].data['NH'] * n2rho * cgs2cos)
         rho_err.append(data[1].data['ENH'] * n2rho * cgs2cos)
         data.close()
@@ -162,8 +165,8 @@ def read_eckert():
 
     m500gas = mgas500[mdata2data]
 
-    print m500mt[mdata2data]
-    print 4./3 * np.pi * 500 * p.prms.rho_crit * r500**3
+    # print m500mt[mdata2data]
+    # print 4./3 * np.pi * 500 * p.prms.rho_crit * r500**3
 
     data = {'m500gas': m500gas,
             'r500': r500,
@@ -365,6 +368,7 @@ def fit_croston():
         # plt.xscale('log')
         # plt.yscale('log')
         # plt.show()
+        print mass / m500g[idx]
 
         a = np.append(a, popt[0])
         b = np.append(b, popt[1])
@@ -394,6 +398,7 @@ def fit_eckert():
         sl = ((prof > 0) & (rx[idx] >= 0.05))
         r = rx[idx]
         mass = tools.m_h(prof[sl], r[sl] * r500[idx])
+        print mass / m500g[idx]
         sl_fit = np.ones(sl.sum(), dtype=bool)
         popt, pcov = opt.curve_fit(lambda r, a, b: \
                                    # , c:\
@@ -1315,6 +1320,48 @@ def plot_beta_presentation():
     ax.set_ylabel(r'$\rho(r)$')
 
     plt.savefig('obs_beta.pdf', transparent=True)
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_beta_presentation()
+# ------------------------------------------------------------------------------
+
+def plot_beta_rc_paper():
+    """
+    Plot the mass dependence of beta for the paper
+    """
+    with open('croston_500.p', 'rb') as f:
+        data_c = cPickle.load(f)
+    with open('eckert_500.p', 'rb') as f:
+        data_e = cPickle.load(f)
+
+    beta = np.concatenate([data_c['b'], data_e['b']], axis=0) / 3.
+    rc = np.concatenate([data_c['rc'], data_e['rc']], axis=0)
+    m500c = np.concatenate([data_c['m500c'], data_e['m500c']])
+
+    pl.set_style('mark')
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot(111)
+    ax.plot(data_e['m500c'], data_e['b'] / 3., label='Eckert+16')
+    ax.plot(data_c['m500c'], data_c['b'] / 3., label='Croston+08')
+    ax.axhline(y=np.median(beta), color='k')
+    ax.text(1.01 * m500c.min(), 1.01 * np.median(beta), s='median')
+    ax.set_xlabel(r'$m_\mathrm{500c} \,[\mathrm{M_\odot}]$')
+    ax.set_ylabel(r'$\beta$')
+    ax.set_xscale('log')
+    ax.legend()
+    plt.show()
+
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot(111)
+    ax.plot(data_e['m500c'], data_e['rc'], label='Eckert+16')
+    ax.plot(data_c['m500c'], data_c['rc'], label='Croston+08')
+    ax.axhline(y=np.median(rc), color='k')
+    ax.text(1.01 * m500c.min(), 1.01 * np.median(rc), s='median')
+    ax.set_xlabel(r'$m_\mathrm{500c} \,[\mathrm{M_\odot}]$')
+    ax.set_ylabel(r'$r_\mathrm{c}/r_\mathrm{500c}$')
+    ax.set_xscale('log')
+    ax.legend()
     plt.show()
 
 
