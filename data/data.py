@@ -76,17 +76,40 @@ def read_croston():
                          tools.m_h(prof[:idx_500+1],
                                    rx[idx][:idx_500+1]*r500[sysnum[idx]-1]))
         m500gas = np.append(m500gas, mgas500[sysnum[idx] - 1])
+        # print mgas[idx]
+        # print mgas500[sysnum[idx]-1]
+        # print '-----------'
 
-        # plt.plot(rx[idx], prof)
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.title('$m=10^{%.2f}\mathrm{M_\odot}$'%np.log10(m500[sysnum[idx] - 1]))
-        # plt.show()
+    #     plt.plot(rx[idx], prof)
+
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.show()
+
+    # ratio = mgas/m500gas
+    # pl.set_style('mark')
+    # plt.hist(ratio)
+    # # plt.plot(m500gas, ratio)
+    # # plt.axhline(y=1, color='k')
+    # plt.axvline(x=np.median(ratio), c='k', ls='-', label='median')
+    # plt.axvline(x=np.percentile(ratio, 15), c='k', ls='--',
+    #             label='$15-85^\mathrm{th}$ percentile')
+    # plt.axvline(x=np.percentile(ratio, 85), c='k', ls='--')
+    # # plt.xscale('log')
+    # # plt.xlabel(r'$m_\mathrm{500c,gas-measured} \, [M_\odot/h_{70}^{5/2}]$')
+    # # plt.xlabel(r'$\left(\int\,\rho(r)\,\mathrm{d}^3r\right)/m_\mathrm{500c,gas-measured}$',
+    # #            labelpad=-10)
+    # plt.xlabel(r'$m_\mathrm{500c,gas-integrated}/m_\mathrm{500c,gas-measured}$')
+    # plt.ylabel('Frequency')
+    # plt.title('Croston+08 mass determination')
+    # plt.legend()
+    # plt.show()
 
     data = {'m500gas': m500gas,
             'r500': r500,
             'rx': rx,
             'rho': rho}
+
     with open('croston.p', 'wb') as f:
         cPickle.dump(data, f)
 
@@ -130,7 +153,7 @@ def read_eckert():
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
     # n_He = Y/(4X) n_H
     # => n_gas = 2.31 n_H
-    n2rho = 2.31 * 0.61 * const.m_p.cgs * 1/u.cm**3 # in cgs
+    n2rho = 2.21 * 0.61 * const.m_p.cgs * 1/u.cm**3 # in cgs
     cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
 
     r500 = np.empty((0,), dtype=float)
@@ -141,9 +164,12 @@ def read_eckert():
     for f in files:
         # actual data
         data = fits.open(f)
-        # !!!! check whether this still needs correction factor from weak lensing
         r500 = np.append(r500, data[1].header['R500'] * 1e-3) # [Mpc]
         z = np.append(z, data[1].header['REDSHIFT'])
+        # !!!! check whether this still needs correction factor from weak lensing
+        # Currently included it, but biases the masses, since this wasn't done in
+        # measurement by Eckert, of course
+        # rx.append(data[1].data['RADIUS'] * (1.3)**(1./3))
         rx.append(data[1].data['RADIUS'])
         rho.append(data[1].data['NH'] * n2rho * cgs2cos)
         rho_err.append(data[1].data['ENH'] * n2rho * cgs2cos)
@@ -159,11 +185,35 @@ def read_eckert():
                           tools.m_h(prof[:idx_500+1], rx[idx][:idx_500+1] *
                                     r500[idx]))
         mdata2data = np.append(mdata2data, (num == numdata[idx]).nonzero()[0][0])
+        # print mgas[idx]
+        # print mgas500[mdata2data[idx]]
+        # print '------------'-
 
     m500gas = mgas500[mdata2data]
 
-    # print m500mt[mdata2data]
-    # print 4./3 * np.pi * 500 * p.prms.rho_crit * r500**3
+    ratio = mgas/m500gas
+    print 'median: ', np.median(ratio)
+    print 'q15:    ', np.percentile(ratio, q=15)
+    print 'q85:    ', np.percentile(ratio, q=85)
+    # pl.set_style('mark')
+    # plt.plot(m500gas, ratio)
+    # plt.axhline(y=1, color='k')
+    # plt.xscale('log')
+    # plt.xlabel(r'$m_\mathrm{500c,gas-measured} \, [M_\odot/h_{70}^{5/2}]$')
+    # plt.ylabel(r'$\left(\int\,\rho(r)\,\mathrm{d}^3r\right)/m_\mathrm{500c,gas-measured}$',
+    #            labelpad=-5)
+
+    plt.hist(ratio)
+    plt.axvline(x=np.median(ratio), c='k', ls='-', label='median')
+    plt.axvline(x=np.percentile(ratio, 15), c='k', ls='--',
+                label='$15-85^\mathrm{th}$ percentile')
+    plt.axvline(x=np.percentile(ratio, 85), c='k', ls='--')
+    plt.xlabel(r'$m_\mathrm{500c,gas-integrated}/m_\mathrm{500c,gas-measured}$')
+    plt.ylabel('Frequency')
+
+    plt.title('Eckert+16 mass determination')
+    plt.legend()
+    plt.show()
 
     data = {'m500gas': m500gas,
             'r500': r500,
@@ -1150,11 +1200,10 @@ def plot_fit_profiles():
 
     # pl.set_style()
     fig = plt.figure(figsize=(18,8))
-    fig2 = plt.figure(figsize=(18,8))
-    ax1 = fig.add_axes([0.1,0.1,0.4,0.8])
-    ax2 = fig.add_axes([0.5,0.1,0.4,0.8])
-    ax3 = fig.add_axes([0.1,0.1,0.4,0.8])
-    ax4 = fig.add_axes([0.5,0.1,0.4,0.8])
+    ax1 = fig.add_axes([0.1,0.1,0.4,0.4])
+    ax2 = fig.add_axes([0.5,0.1,0.4,0.4])
+    ax3 = fig.add_axes([0.1,0.5,0.4,0.4])
+    ax4 = fig.add_axes([0.5,0.5,0.4,0.4])
 
     rx_c = data_c['rx']
     rx_e = data_e['rx']
@@ -1171,23 +1220,38 @@ def plot_fit_profiles():
     for idx, r, prof in zip(np.arange(len(r500_c)), rx_c, rho_c):
         sl = ((prof > 0) & (rx_c[idx] >= 0.15))
         fit = prof_gas_hot(r, sl, a_c[idx], b_c[idx], msl_c[idx], r500_c[idx])
-        ax1.plot(r, (fit - prof) / prof, ls='-', lw=0.5, c='k')
+        ax3.plot(r[1:], (fit[1:] - prof[1:]) / prof[1:], ls='-', lw=0.5, c='k')
 
+        cum_mass_fit = np.array([tools.m_h(fit[:i], r[:i] * r500_c[idx])
+                                   for i in np.arange(1, r.shape[0])])
+        cum_mass_prof = np.array([tools.m_h(prof[:i], r[:i] * r500_c[idx])
+                                   for i in np.arange(1, r.shape[0])])
         m500_fit_c = np.append(m500_fit_c, tools.m_h(fit, r * r500_c[idx]))
         m500_prof_c = np.append(m500_prof_c, tools.m_h(prof, r * r500_c[idx]))
+
+        ax1.plot(r[1:], (cum_mass_fit - cum_mass_prof) / m500_prof_c[idx],
+                 ls='-', lw=0.5, c='k')
+
         # ax1.plot(r, fit, ls='--', lw=0.5, c='r')
 
 
-    ax1.set_ylim([-0.6, 0.4])
+    ax3.set_ylim([-0.6, 0.4])
+    ticks = ax3.get_yticklabels()
+    ticks[-6].set_visible(False)
+
+    ax3.set_xscale('log')
+    ax3.set_ylabel(r'$\rho_\mathrm{fit}(r)/\rho_\mathrm{obs}(r) - 1$')
+    ax3.set_xticklabels([])
+    ax3.set_title(r'Croston+08')
+
+    ax1.set_ylim([-0.2, 0.2])
     ticks = ax1.get_xticklabels()
     ticks[-5].set_visible(False)
 
     ax1.xaxis.set_tick_params(pad=8)
     ax1.set_xscale('log')
-    # ax1.set_yscale('log')
     ax1.set_xlabel(r'$r/r_\mathrm{500c}$')
-    ax1.set_ylabel(r'$\mathrm{(fit - observed) / observed}$')
-    ax1.set_title(r'Croston+08')
+    ax1.set_ylabel(r'$\frac{m_\mathrm{fit}(<r) - m_\mathrm{obs}(<r)}{m_\mathrm{gas,500c}}$')
 
     # get median binned profiles
     r_med, rho_med, m500_med, r500_med = bin_eckert()
@@ -1198,10 +1262,18 @@ def plot_fit_profiles():
     for idx, r, prof in zip(np.arange(len(r500_med)), r_med, rho_med):
         sl = ((prof > 0) & (r >= 0.15))
         fit = prof_gas_hot(r, sl, a_e[idx], b_e[idx], msl_e[idx], r500_med[idx])
-        ax2.plot(r, (fit - prof) / prof, ls='-', lw=0.5, c='k')
+        ax4.plot(r[1:], (fit[1:] - prof[1:]) / prof[1:], ls='-', lw=0.5, c='k')
 
+        cum_mass_fit = np.array([tools.m_h(fit[:i], r[:i] * r500_e[idx])
+                                   for i in np.arange(1, r.shape[0])])
+        cum_mass_prof = np.array([tools.m_h(prof[:i], r[:i] * r500_e[idx])
+                                   for i in np.arange(1, r.shape[0])])
         m500_fit_e = np.append(m500_fit_e, tools.m_h(fit, r * r500_e[idx]))
         m500_prof_e = np.append(m500_prof_e, tools.m_h(prof, r * r500_e[idx]))
+
+        ax2.plot(r[1:], (cum_mass_fit - cum_mass_prof) / m500_prof_e[idx],
+                 ls='-', lw=0.5, c='k')
+
         # ax2.plot(r, fit, ls='--', lw=0.5, c='k')
 
     # for r, prof in zip(r_med, rho_med):
@@ -1212,18 +1284,21 @@ def plot_fit_profiles():
     # print np.median(np.append(m500_fit_e / m500_prof_e,
     #                         m500_fit_c / m500_prof_c))
 
-    ax2.set_ylim([-0.6, 0.4])
+    ax4.set_ylim([-0.6, 0.4])
+    ax4.set_xscale('log')
+    ax4.set_xticklabels([])
+    ax4.set_yticklabels([])
+    ax4.set_title(r'Eckert+16')
+
+
+    ax2.set_ylim([-0.2, 0.2])
     ticks = ax2.get_xticklabels()
     ticks[-3].set_visible(False)
 
     ax2.xaxis.set_tick_params(pad=8)
     ax2.set_xscale('log')
-    # ax2.set_yscale('log')
     ax2.set_yticklabels([])
     ax2.set_xlabel(r'$r/r_\mathrm{500c}$')
-    # ax2.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
-    text = ax2.set_title(r'Eckert+16')
-    title_props = text.get_fontproperties()
     plt.show()
 
 # ------------------------------------------------------------------------------

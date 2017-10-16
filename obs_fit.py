@@ -46,10 +46,10 @@ def load_dm_dmo(prms=p.prms, save=True):
                 'profile_f': profs.profile_NFW_f,
                 'profile_args': {'c_x': c_x,
                                  'r_x': r_x,
-                                 'rho_mean': 1.},
+                                 'rho_mean': prms.rho_m},
                 'profile_f_args': {'c_x': c_x,
                                    'r_x': r_x,
-                                   'rho_mean': 1.},
+                                   'rho_mean': prms.rho_m},
                 'f_comp': f_dm}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
     # --------------------------------------------------------------------------
@@ -58,10 +58,10 @@ def load_dm_dmo(prms=p.prms, save=True):
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      'm_fn': prms.m_fn,
-                      'f_comp': f_dm,
-                      'bias_fn': bias.bias_Tinker10,
-                      'bias_fn_args': {'nu': prms.nu}}
+                      # 'm_fn': prms.m_fn,
+                      'f_comp': f_dm,}
+                      # 'bias_fn': bias.bias_Tinker10,
+                      # 'bias_fn_args': {'nu': prms.nu}}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
 
@@ -327,9 +327,10 @@ def load_gas(prms=p.prms):
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,
+                       'f_comp': f_gas}
                       # 'm_fn': p.prms.m_fn,
                       # 'bias_fn': bias.bias_Tinker10,
                       # 'bias_fn_args': {'nu': prms.nu}}
@@ -402,7 +403,7 @@ def load_gas_r500c(prms):
 # End of load_gas_r500c()
 # ------------------------------------------------------------------------------
 
-def load_gas_smooth_r500c(prms, fgas_500):
+def load_gas_smooth_r500c(prms=p.prms):
     '''
     Return smooth gas beyond r500c up to virial radius such that the total mass
     equals f_b
@@ -412,6 +413,9 @@ def load_gas_smooth_r500c(prms, fgas_500):
     m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
     r200m = prms.r_range_lin[:,-1]
+
+    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+    fgas_500 = d.f_gas(m500c, **fm_prms)
 
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
