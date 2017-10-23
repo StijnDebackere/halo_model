@@ -286,7 +286,7 @@ def prof_gas_hot(x, sl, a, b, m_sl, r500):
 
 def load_gas(prms=p.prms):
     '''
-    Return gas profiles for halo model
+    Return beta profiles with fgas_500c = f_obs, extrapolated to r200m
     '''
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
@@ -305,7 +305,6 @@ def load_gas(prms=p.prms):
     rx = r_range / r500c.reshape(-1,1)
 
     # gas fractions
-    f_b = 1 - prms.f_dm
     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
     f_gas500 = d.f_gas(m500c, **fm_prms)
 
@@ -344,9 +343,9 @@ def load_gas(prms=p.prms):
 # End of load_gas()
 # ------------------------------------------------------------------------------
 
-def load_gas_r500c(prms):
+def load_gas_obs(prms=p.prms):
     '''
-    Return gas profiles for halo model
+    Return beta profiles with fgas_500c = f_obs which only reach up until r500c
     '''
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': prms.m_range_lin,
@@ -365,16 +364,15 @@ def load_gas_r500c(prms):
     rx = r_range / r500c.reshape(-1,1)
 
     # gas fractions
-    f_b = 1 - prms.f_dm
     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
     f_gas500 = d.f_gas(m500c, **fm_prms)
 
     prof_gas = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
         sl = (rx[idx] <= 1.)
-        prof_gas[idx][sl] = prof_gas_hot(rx[idx], sl, rc, beta,
+        prof_gas[idx][sl] = prof_gas_hot(rx[idx][sl], sl[sl], rc, beta,
                                          f_gas500[idx] * m500c[idx],
-                                         r500c[idx])[sl]
+                                         r500c[idx])
 
     mgas200 = tools.m_h(prof_gas, prms.r_range_lin)
     f_gas = mgas200 / m_range
@@ -387,9 +385,10 @@ def load_gas_r500c(prms):
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,
+                       'f_comp': f_gas}
                       # 'm_fn': p.prms.m_fn,
                       # 'bias_fn': bias.bias_Tinker10,
                       # 'bias_fn_args': {'nu': prms.nu}}
@@ -400,13 +399,12 @@ def load_gas_r500c(prms):
     return comp_gas
 
 # ------------------------------------------------------------------------------
-# End of load_gas_r500c()
+# End of load_gas_obs()
 # ------------------------------------------------------------------------------
 
-def load_gas_smooth_r500c(prms=p.prms):
+def load_gas_smooth_r500c_r200m(prms=p.prms):
     '''
-    Return smooth gas beyond r500c up to virial radius such that the total mass
-    equals f_b
+    Return uniform profiles with fgas_500c = 0 and fgas_200m = f_b - f_obs
     '''
     # halo model parameters
     m_range = prms.m_range_lin
@@ -462,12 +460,200 @@ def load_gas_smooth_r500c(prms=p.prms):
     return comp_gas
 
 # ------------------------------------------------------------------------------
-# End of load_gas_smooth_r500c()
+# End of load_gas_smooth_r500c_r200m()
 # ------------------------------------------------------------------------------
 
-def load_gas_smooth(prms, fgas_200):
+def load_gas_5r500c(prms=p.prms):
     '''
-    Return smooth gas beyond virial radius such that the total mass equals f_b
+    Return beta profiles with fgas_200m = f_obs_extrapolated = fgas_5r500c
+    '''
+    # halo model parameters
+    m_range = prms.m_range_lin
+    m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
+    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+    r200m = prms.r_range_lin[:,-1]
+
+    r_min = p.prms.r_range_lin[:,0]
+    r_max = (5 * r500c)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), p.prms.r_bins)
+                        for i,rm in enumerate(r_max)])
+    rx = r_range / r500c.reshape(-1,1)
+
+    # profile now runs between 0 and 5r500c
+    profile_kwargs = {'r_range': r_range,
+                      'm_range': prms.m_range_lin,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
+    rc, beta = d.fit_prms()
+    # gas fractions
+    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+    f_gas500 = d.f_gas(m500c, **fm_prms)
+
+    # relative position of virial radius
+    x200m = r200m / r500c
+
+    prof_gas = np.zeros_like(rx)
+    for idx, prof in enumerate(prof_gas):
+        sl = (rx[idx] <= x200m[idx])
+        sl_500 = (rx[idx] <= 1.)
+        prof_gas[idx][sl] = prof_gas_hot(rx[idx], sl_500, rc, beta,
+                                         f_gas500[idx] * m500c[idx],
+                                         r500c[idx])[sl]
+
+    mgas = tools.m_h(prof_gas, r_range)
+    f_gas = mgas / (m_range)
+    # --------------------------------------------------------------------------
+    # specific gas extra kwargs -> need f_gas
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
+                 'f_comp': f_gas}
+    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
+    # --------------------------------------------------------------------------
+    # additional kwargs for comp.Component
+    comp_gas_kwargs = {'name': 'gas',
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,}
+                      # 'm_fn': p.prms.m_fn,
+                      # 'bias_fn': bias.bias_Tinker10,
+                      # 'bias_fn_args': {'nu': prms.nu}}
+
+    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
+
+    comp_gas = comp.Component(**gas_kwargs)
+    return comp_gas
+
+# ------------------------------------------------------------------------------
+# End of load_gas_5r500c()
+# ------------------------------------------------------------------------------
+
+def load_dm_5r500c(prms=p.prms):
+    '''
+    Return NFW profiles with up to r200m and 0 up to 5r500c
+    '''
+    # halo model parameters
+    m_range = prms.m_range_lin
+    m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
+    m200c = np.array([gas.m200m_to_m200c(m) for m in m_range])
+    r200c = tools.mass_to_radius(m200c, 200 * prms.rho_crit * prms.h**2)
+    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+    r200m = prms.r_range_lin[:,-1]
+
+    r_min = p.prms.r_range_lin[:,0]
+    r_max = (5 * r500c)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), p.prms.r_bins)
+                        for i,rm in enumerate(r_max)])
+    rx = r_range / r500c.reshape(-1,1)
+
+    # profile now runs between 0 and 5r500c
+    profile_kwargs = {'r_range': r_range,
+                      'm_range': prms.m_range_lin,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
+    f_dm = np.ones_like(m_range) * prms.f_dm
+    c_x = profs.c_correa(m200c, 0).reshape(-1) * prms.r_range_lin[:,-1]/r200c
+    r_x = r200m
+
+    # relative position of virial radius
+    x200m = r200m / r500c
+
+    prof_dm = np.zeros_like(rx)
+    for idx, prof in enumerate(prof_dm):
+        sl = (rx[idx] <= x200m[idx])
+        prof_dm[idx][sl] = profs.profile_NFW(r_range[idx][sl].reshape(1,-1),
+                                             m_range[idx].reshape(1,1),
+                                             c_x[idx], r_x[idx], p.prms.rho_m).reshape(-1)
+
+    # --------------------------------------------------------------------------
+    dm_extra = {'profile': prof_dm,
+                 'f_comp': f_dm}
+    prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
+    # --------------------------------------------------------------------------
+    # additional kwargs for comp.Component
+    comp_dm_kwargs = {'name': 'dm',
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,}
+                      # 'm_fn': p.prms.m_fn,
+                      # 'bias_fn': bias.bias_Tinker10,
+                      # 'bias_fn_args': {'nu': prms.nu}}
+
+    dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
+
+    comp_dm = comp.Component(**dm_kwargs)
+    return comp_dm
+
+# ------------------------------------------------------------------------------
+# End of load_dm_5r500c()
+# ------------------------------------------------------------------------------
+
+def load_gas_dmo_5r500c(prms=p.prms, save=True):
+    '''
+    Return beta profiles with fgas_500c = fgas_200m = f_b = fgas_5r500c
+    '''
+    # halo model parameters
+    m_range = prms.m_range_lin
+    m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
+    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+    r200m = prms.r_range_lin[:,-1]
+
+    r_min = p.prms.r_range_lin[:,0]
+    r_max = (5 * r500c)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), p.prms.r_bins)
+                        for i,rm in enumerate(r_max)])
+    rx = r_range / r500c.reshape(-1,1)
+
+    # relative position of virial radius
+    x200m = r200m / r500c
+
+    f_gas = (1 - prms.f_dm) * np.ones_like(prms.m_range_lin)
+    beta, rc, m500c, r, prof_h = d.beta_mass(f_gas, f_gas, prms)
+
+    prof_gas = np.zeros_like(rx)
+    for idx, prof in enumerate(prof_gas):
+        sl = (rx[idx] <= x200m[idx])
+        prof_gas[idx][sl] = prof_gas_hot(rx[idx][sl], sl[sl], rc[idx], beta[idx],
+                                         f_gas[idx] * m_range[idx],
+                                         r500c[idx])
+
+    # profile now runs between 0 and 5r500c
+    profile_kwargs = {'r_range': r_range,
+                      'm_range': prms.m_range_lin,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+    # --------------------------------------------------------------------------
+    # specific gas extra kwargs -> need f_gas
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
+                 'f_comp': f_gas}
+    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
+    # --------------------------------------------------------------------------
+    # additional kwargs for comp.Component
+    comp_gas_kwargs = {'name': 'gas',
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,
+                       'f_comp': f_gas,}
+                       # 'm_fn': p.prms.m_fn,
+                       # 'bias_fn': bias.bias_Tinker10,
+                       # 'bias_fn_args': {'nu': prms.nu}}
+
+    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
+
+    comp_gas = comp.Component(**gas_kwargs)
+
+    return comp_gas
+
+# ------------------------------------------------------------------------------
+# End of load_gas_dmo_5r500c()
+# ------------------------------------------------------------------------------
+
+def load_gas_smooth_r200m_5r500c(prms, fgas_200):
+    '''
+    Return uniform profiles with fgas_200m = 0 and fgas_5r500c = f_b - fgas_200
     '''
     # halo model parameters
     m_range = prms.m_range_lin
@@ -520,304 +706,304 @@ def load_gas_smooth(prms, fgas_200):
     return comp_gas
 
 # ------------------------------------------------------------------------------
-# End of load_gas_smooth()
+# End of load_gas_smooth_r200m_5r500c()
 # ------------------------------------------------------------------------------
 
-def load_gas_fb_fb(prms=p.prms):
-    '''
-    REFERENCE!!!
+# def load_gas_fb_fb(prms=p.prms):
+#     '''
+#     REFERENCE!!!
 
-    Load gas profile with f500c=f_b and f200m=f_b, since low mass
-    systems cannot increase fast enough, we assume them to be uniform density
+#     Load gas profile with f500c=f_b and f200m=f_b, since low mass
+#     systems cannot increase fast enough, we assume them to be uniform density
 
-    --> No missing mass here
-    '''
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
+#     --> No missing mass here
+#     '''
+#     # general profile kwargs to be used for all components
+#     profile_kwargs = {'r_range': prms.r_range_lin,
+#                       'm_range': prms.m_range_lin,
+#                       'k_range': prms.k_range_lin,
+#                       'n': 80,
+#                       'taylor_err': 1.e-50}
 
-    m_range = prms.m_range_lin
-    m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
-    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
-    rx = prms.r_range_lin / r500c.reshape(-1,1)
+#     m_range = prms.m_range_lin
+#     m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
+#     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+#     rx = prms.r_range_lin / r500c.reshape(-1,1)
 
-    f_b = (1 - prms.f_dm) * np.ones_like(m_range)
+#     f_b = (1 - prms.f_dm) * np.ones_like(m_range)
 
-    # fit parameters
-    beta, rc, m500c, r, prof_h = d.beta_mass(f_b, f_b)
+#     # fit parameters
+#     beta, rc, m500c, r, prof_h = d.beta_mass(f_b, f_b)
 
-    # good fit indices
-    idcs = ~((beta == 0) | (np.abs(beta - 3) < 1e-3))
+#     # good fit indices
+#     idcs = ~((beta == 0) | (np.abs(beta - 3) < 1e-3))
 
-    prof_gas_med = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_gas_med):
-        # good index
-        if idcs[idx]:
-            sl = (rx[idx] <= 1.)
-            prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl,
-                                              rc[idx], beta[idx],
-                                              f_b[idx] *
-                                              m500c[idx],
-                                              r500c[idx]))
-        else:
-            prof_gas_med[idx] = np.ones_like(rx[idx])
-            norm = tools.m_h(prof_gas_med[idx], prms.r_range_lin[idx])
-            # normalize profile to f_b * m200
-            prof_gas_med[idx] *= f_b[idx] * m_range[idx]/ norm
+#     prof_gas_med = np.zeros_like(rx)
+#     for idx, prof in enumerate(prof_gas_med):
+#         # good index
+#         if idcs[idx]:
+#             sl = (rx[idx] <= 1.)
+#             prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl,
+#                                               rc[idx], beta[idx],
+#                                               f_b[idx] *
+#                                               m500c[idx],
+#                                               r500c[idx]))
+#         else:
+#             prof_gas_med[idx] = np.ones_like(rx[idx])
+#             norm = tools.m_h(prof_gas_med[idx], prms.r_range_lin[idx])
+#             # normalize profile to f_b * m200
+#             prof_gas_med[idx] *= f_b[idx] * m_range[idx]/ norm
 
-    mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
-    f_gas_med = mgas200 / m_range
+#     mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
+#     f_gas_med = mgas200 / m_range
 
-    print f_gas_med
-    # --------------------------------------------------------------------------
-    # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
-                 'f_comp': f_gas_med}
-    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-    # --------------------------------------------------------------------------
-    # additional kwargs for comp.Component
-    comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+#     print f_gas_med
+#     # --------------------------------------------------------------------------
+#     # specific gas extra kwargs -> need f_gas
+#     gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
+#                  'f_comp': f_gas_med}
+#     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
+#     # --------------------------------------------------------------------------
+#     # additional kwargs for comp.Component
+#     comp_gas_kwargs = {'name': 'gas',
+#                       'p_lin': prms.p_lin,
+#                       'nu': prms.nu,
+#                       'fnu': prms.fnu,}
+#                       # 'm_fn': p.prms.m_fn,
+#                       # 'bias_fn': bias.bias_Tinker10,
+#                       # 'bias_fn_args': {'nu': prms.nu}}
 
-    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
+#     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
-    comp_gas_med = comp.Component(**gas_kwargs)
+#     comp_gas_med = comp.Component(**gas_kwargs)
 
-    return comp_gas_med
+#     return comp_gas_med
 
-# ------------------------------------------------------------------------------
-# End of load_gas_f500_f200()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of load_gas_f500_f200()
+# # ------------------------------------------------------------------------------
 
-def load_gas_f500_fb(prms=p.prms):
-    '''
-    Load gas profile with f500c=f500c_obs and f200m=f_b, since low mass
-    systems cannot increase fast enough, we assume them to be uniform density
+# def load_gas_f500_fb(prms=p.prms):
+#     '''
+#     Load gas profile with f500c=f500c_obs and f200m=f_b, since low mass
+#     systems cannot increase fast enough, we assume them to be uniform density
 
-    --> No missing mass here
-    '''
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
+#     --> No missing mass here
+#     '''
+#     # general profile kwargs to be used for all components
+#     profile_kwargs = {'r_range': prms.r_range_lin,
+#                       'm_range': prms.m_range_lin,
+#                       'k_range': prms.k_range_lin,
+#                       'n': 80,
+#                       'taylor_err': 1.e-50}
 
-    m_range = prms.m_range_lin
-    m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
-    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
-    rx = prms.r_range_lin / r500c.reshape(-1,1)
+#     m_range = prms.m_range_lin
+#     m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
+#     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+#     rx = prms.r_range_lin / r500c.reshape(-1,1)
 
-    # gas fractions
-    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+#     # gas fractions
+#     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
 
-    # only fit median values
-    f_prms = fm_prms
+#     # only fit median values
+#     f_prms = fm_prms
 
-    f_gas500 = d.f_gas(m500c, **f_prms)
-    f_b = (1 - prms.f_dm) * np.ones_like(f_gas500)
+#     f_gas500 = d.f_gas(m500c, **f_prms)
+#     f_b = (1 - prms.f_dm) * np.ones_like(f_gas500)
 
-    # fit parameters
-    beta, rc, m500c, r, prof_h = d.beta_mass(f_gas500, f_b)
+#     # fit parameters
+#     beta, rc, m500c, r, prof_h = d.beta_mass(f_gas500, f_b)
 
-    # good fit indices
-    idcs = ~((beta == 0) | (np.abs(beta - 3) < 1e-3))
+#     # good fit indices
+#     idcs = ~((beta == 0) | (np.abs(beta - 3) < 1e-3))
 
-    prof_gas_med = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_gas_med):
-        # good index
-        if idcs[idx]:
-            sl = (rx[idx] <= 1.)
-            prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl,
-                                              rc[idx], beta[idx],
-                                              f_gas500[idx] *
-                                              m500c[idx],
-                                              r500c[idx]))
-        else:
-            prof_gas_med[idx] = np.ones_like(rx[idx])
-            norm = tools.m_h(prof_gas_med[idx], prms.r_range_lin[idx])
-            # normalize profile to f_b * m200
-            prof_gas_med[idx] *= f_b[idx] * m_range[idx]/ norm
+#     prof_gas_med = np.zeros_like(rx)
+#     for idx, prof in enumerate(prof_gas_med):
+#         # good index
+#         if idcs[idx]:
+#             sl = (rx[idx] <= 1.)
+#             prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl,
+#                                               rc[idx], beta[idx],
+#                                               f_gas500[idx] *
+#                                               m500c[idx],
+#                                               r500c[idx]))
+#         else:
+#             prof_gas_med[idx] = np.ones_like(rx[idx])
+#             norm = tools.m_h(prof_gas_med[idx], prms.r_range_lin[idx])
+#             # normalize profile to f_b * m200
+#             prof_gas_med[idx] *= f_b[idx] * m_range[idx]/ norm
 
-    mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
-    f_gas_med = mgas200 / m_range
+#     mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
+#     f_gas_med = mgas200 / m_range
 
-    print f_gas500
-    print f_gas_med
-    # --------------------------------------------------------------------------
-    # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
-                 'f_comp': f_gas_med}
-    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-    # --------------------------------------------------------------------------
-    # additional kwargs for comp.Component
-    comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+#     print f_gas500
+#     print f_gas_med
+#     # --------------------------------------------------------------------------
+#     # specific gas extra kwargs -> need f_gas
+#     gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
+#                  'f_comp': f_gas_med}
+#     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
+#     # --------------------------------------------------------------------------
+#     # additional kwargs for comp.Component
+#     comp_gas_kwargs = {'name': 'gas',
+#                       'p_lin': prms.p_lin,
+#                       'nu': prms.nu,
+#                       'fnu': prms.fnu,}
+#                       # 'm_fn': p.prms.m_fn,
+#                       # 'bias_fn': bias.bias_Tinker10,
+#                       # 'bias_fn_args': {'nu': prms.nu}}
 
-    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
+#     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
-    comp_gas_med = comp.Component(**gas_kwargs)
+#     comp_gas_med = comp.Component(**gas_kwargs)
 
-    return comp_gas_med
+#     return comp_gas_med
 
-# ------------------------------------------------------------------------------
-# End of load_gas_f500_fb()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of load_gas_f500_fb()
+# # ------------------------------------------------------------------------------
 
-def load_gas_f500_fb_plaw(prms=p.prms):
-    '''
-    Load gas profile with f500c=f500c_obs and f200m=f_b, since low mass
-    systems cannot increase fast enough, we assume them to be uniform density
+# def load_gas_f500_fb_plaw(prms=p.prms):
+#     '''
+#     Load gas profile with f500c=f500c_obs and f200m=f_b, since low mass
+#     systems cannot increase fast enough, we assume them to be uniform density
 
-    --> No missing mass here
-    '''
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
+#     --> No missing mass here
+#     '''
+#     # general profile kwargs to be used for all components
+#     profile_kwargs = {'r_range': prms.r_range_lin,
+#                       'm_range': prms.m_range_lin,
+#                       'k_range': prms.k_range_lin,
+#                       'n': 80,
+#                       'taylor_err': 1.e-50}
 
-    m_range = prms.m_range_lin
-    m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
-    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
-    rx = prms.r_range_lin / r500c.reshape(-1,1)
+#     m_range = prms.m_range_lin
+#     m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
+#     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+#     rx = prms.r_range_lin / r500c.reshape(-1,1)
 
-    # gas fractions
-    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+#     # gas fractions
+#     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
 
-    # only fit median values
-    f_prms = fm_prms
+#     # only fit median values
+#     f_prms = fm_prms
 
-    f_gas500 = d.f_gas(m500c, **f_prms)
-    f_b = (1 - prms.f_dm) * np.ones_like(f_gas500)
+#     f_gas500 = d.f_gas(m500c, **f_prms)
+#     f_b = (1 - prms.f_dm) * np.ones_like(f_gas500)
 
-    # fit parameters
-    beta, rc, m500c, r, prof_h = d.beta_mass(f_gas500, f_b)
+#     # fit parameters
+#     beta, rc, m500c, r, prof_h = d.beta_mass(f_gas500, f_b)
 
-    # good fit indices
-    idcs = ~((beta == 0) | (np.abs(beta - 3) < 1e-3))
+#     # good fit indices
+#     idcs = ~((beta == 0) | (np.abs(beta - 3) < 1e-3))
 
-    prof_gas_med = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_gas_med):
-        # good index
-        if idcs[idx]:
-            sl = (rx[idx] <= 1.)
-            prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl,
-                                              rc[idx], beta[idx],
-                                              f_gas500[idx] *
-                                              m500c[idx],
-                                              r500c[idx]))
-        else:
-            prof_gas_med[idx] = np.ones_like(rx[idx])
-            norm = tools.m_h(prof_gas_med[idx], prms.r_range_lin[idx])
-            # normalize profile to f_b * m200
-            prof_gas_med[idx] *= f_b[idx] * m_range[idx]/ norm
+#     prof_gas_med = np.zeros_like(rx)
+#     for idx, prof in enumerate(prof_gas_med):
+#         # good index
+#         if idcs[idx]:
+#             sl = (rx[idx] <= 1.)
+#             prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl,
+#                                               rc[idx], beta[idx],
+#                                               f_gas500[idx] *
+#                                               m500c[idx],
+#                                               r500c[idx]))
+#         else:
+#             prof_gas_med[idx] = np.ones_like(rx[idx])
+#             norm = tools.m_h(prof_gas_med[idx], prms.r_range_lin[idx])
+#             # normalize profile to f_b * m200
+#             prof_gas_med[idx] *= f_b[idx] * m_range[idx]/ norm
 
-    mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
-    f_gas_med = mgas200 / m_range
+#     mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
+#     f_gas_med = mgas200 / m_range
 
-    print f_gas500
-    print f_gas_med
-    # --------------------------------------------------------------------------
-    # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
-                 'f_comp': f_gas_med}
-    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-    # --------------------------------------------------------------------------
-    # additional kwargs for comp.Component
-    comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+#     print f_gas500
+#     print f_gas_med
+#     # --------------------------------------------------------------------------
+#     # specific gas extra kwargs -> need f_gas
+#     gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
+#                  'f_comp': f_gas_med}
+#     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
+#     # --------------------------------------------------------------------------
+#     # additional kwargs for comp.Component
+#     comp_gas_kwargs = {'name': 'gas',
+#                       'p_lin': prms.p_lin,
+#                       'nu': prms.nu,
+#                       'fnu': prms.fnu,}
+#                       # 'm_fn': p.prms.m_fn,
+#                       # 'bias_fn': bias.bias_Tinker10,
+#                       # 'bias_fn_args': {'nu': prms.nu}}
 
-    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
+#     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
-    comp_gas_med = comp.Component(**gas_kwargs)
+#     comp_gas_med = comp.Component(**gas_kwargs)
 
-    return comp_gas_med
+#     return comp_gas_med
 
-# ------------------------------------------------------------------------------
-# End of load_gas_f500_fb_plaw()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of load_gas_f500_fb_plaw()
+# # ------------------------------------------------------------------------------
 
-def load_gas_hmf_mod(prms=p.prms):
-    '''
-    Put missing mass
-    '''
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
+# def load_gas_hmf_mod(prms=p.prms):
+#     '''
+#     Put missing mass
+#     '''
+#     # general profile kwargs to be used for all components
+#     profile_kwargs = {'r_range': prms.r_range_lin,
+#                       'm_range': prms.m_range_lin,
+#                       'k_range': prms.k_range_lin,
+#                       'n': 80,
+#                       'taylor_err': 1.e-50}
 
-    m_range = prms.m_range_lin
-    m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
-    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
-    rx = prms.r_range_lin / r500c.reshape(-1,1)
+#     m_range = prms.m_range_lin
+#     m500c = np.array([gas.m200m_to_m500c(m) for m in m_range])
+#     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+#     rx = prms.r_range_lin / r500c.reshape(-1,1)
 
-    # gas fractions
-    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
-    f_prms = fm_prms
+#     # gas fractions
+#     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+#     f_prms = fm_prms
 
-    f_gas500 = d.f_gas(m500c, **f_prms)
+#     f_gas500 = d.f_gas(m500c, **f_prms)
 
-    # fit parameters
-    corr_prms, rc_min, rc_max, rc_med, beta_med = d.prof_prms()
+#     # fit parameters
+#     corr_prms, rc_min, rc_max, rc_med, beta_med = d.prof_prms()
 
-    prof_gas_med = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_gas_med):
-        sl = (rx[idx] <= 1.)
-        prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl, rc_med, beta_med,
-                                       f_gas500[idx] * m500c[idx],
-                                       r500c[idx]))
+#     prof_gas_med = np.zeros_like(rx)
+#     for idx, prof in enumerate(prof_gas_med):
+#         sl = (rx[idx] <= 1.)
+#         prof_gas_med[idx] = (prof_gas_hot(rx[idx], sl, rc_med, beta_med,
+#                                        f_gas500[idx] * m500c[idx],
+#                                        r500c[idx]))
 
-    mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
-    f_gas_med = mgas200 / m_range
+#     mgas200 = tools.m_h(prof_gas_med, prms.r_range_lin)
+#     f_gas_med = mgas200 / m_range
 
-    print f_gas500
-    print f_gas_med
-    # --------------------------------------------------------------------------
-    # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
-                 'f_comp': f_gas_med}
-    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-    # --------------------------------------------------------------------------
-    # additional kwargs for comp.Component
-    comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+#     print f_gas500
+#     print f_gas_med
+#     # --------------------------------------------------------------------------
+#     # specific gas extra kwargs -> need f_gas
+#     gas_extra = {'profile': prof_gas_med / f_gas_med.reshape(-1,1),
+#                  'f_comp': f_gas_med}
+#     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
+#     # --------------------------------------------------------------------------
+#     # additional kwargs for comp.Component
+#     comp_gas_kwargs = {'name': 'gas',
+#                       'p_lin': prms.p_lin,
+#                       'nu': prms.nu,
+#                       'fnu': prms.fnu,}
+#                       # 'm_fn': p.prms.m_fn,
+#                       # 'bias_fn': bias.bias_Tinker10,
+#                       # 'bias_fn_args': {'nu': prms.nu}}
 
-    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
+#     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
-    comp_gas_med = comp.Component(**gas_kwargs3)
+#     comp_gas_med = comp.Component(**gas_kwargs3)
 
-    return comp_gas_med
+#     return comp_gas_med
 
-# ------------------------------------------------------------------------------
-# End of load_gas_hmf_mod()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of load_gas_hmf_mod()
+# # ------------------------------------------------------------------------------
 
 def load_saved():
     with open('obs_comp_dm.p', 'rb') as f:
