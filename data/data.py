@@ -294,7 +294,7 @@ def bin_croston():
 # ------------------------------------------------------------------------------
 
 def bin_eckert():
-    with open('eckert.p', 'rb') as f:
+    with open('data/eckert.p', 'rb') as f:
         data_eckert = cPickle.load(f)
 
     r500 = data_eckert['r500']
@@ -303,7 +303,7 @@ def bin_eckert():
     rho = data_eckert['rho']
 
     # number of points to mass bin
-    n_m = 10
+    n_m = 11 # bin edges, not centers -> +1
     m_bins = np.logspace(np.log10(m500g).min(), np.log10(m500g).max(), n_m)
     m_bin_idx = np.digitize(m500g, m_bins)
 
@@ -382,7 +382,7 @@ def fit_croston():
     '''
     Fit profiles to the observations
     '''
-    with open('croston.p', 'rb') as f:
+    with open('data/croston.p', 'rb') as f:
         data_croston = cPickle.load(f)
 
     r500 = data_croston['r500']
@@ -401,15 +401,22 @@ def fit_croston():
     berr = np.empty((0,), dtype=float)
     # cerr = np.empty((0,), dtype=float)
     for idx, prof in enumerate(rho):
-        # sl = (rx[idx] >= 0.05)
-        sl = ((prof > 0) & (rx[idx] >= 0.15))
+        sl = ((prof > 0) & (rx[idx] >= 0.15) & (rx[idx] <= 1.))
+        sl_500 = ((prof > 0) & (rx[idx] <= 1.))
+
         r = rx[idx]
+
+        # Determine different profile masses
         mass = tools.m_h(prof[sl], r[sl] * r500[idx])
-        # mass_actual = tools.m_h(prof[prof > 0], r[prof > 0] * r500[idx])
+        mass_actual = tools.m_h(prof[sl], r[sl] * r500[idx])
         # print 'f_gas,500c_actual :', mass_actual / m500[idx]
         # print 'f_gas,500c_fitted :', mass / m500[idx]
         # print '-------------------'
+        m500gas = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
+        m500gas_actual = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
 
+        # Need to perform the fit for [0.15,1] r500c -> mass within this region
+        # need to match
         sl_fit = np.ones(sl.sum(), dtype=bool)
         popt, pcov = opt.curve_fit(lambda r, a, b: \
                                    # , c:\
@@ -422,16 +429,17 @@ def fit_croston():
                                                             [1, 5]))
 
         # plt.plot(r, prof)
-        # plt.plot(r, prof_gas_hot(r, sl, popt[0], popt[1], # , popt[2],
-        #                          mass, r500[idx]))
+        # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # , popt[2],
+        #                          m500gas, r500[idx]))
         # plt.title('%i'%idx)
         # plt.xscale('log')
         # plt.yscale('log')
         # plt.show()
 
+        # Final fit will need to reproduce the m500gas mass
         a = np.append(a, popt[0])
         b = np.append(b, popt[1])
-        m_sl = np.append(m_sl, mass)
+        m_sl = np.append(m_sl, m500gas)
         # c = np.append(c, popt[2])
         aerr = np.append(aerr, np.sqrt(np.diag(pcov)))[0]
         berr = np.append(berr, np.sqrt(np.diag(pcov)))[1]
@@ -465,15 +473,23 @@ def fit_eckert():
     berr = np.empty((0,), dtype=float)
     # cerr = np.empty((0,), dtype=float)
     for idx, prof in enumerate(rho):
-        # sl = (rx[idx] >= 0.05)
-        sl = ((prof > 0) & (rx[idx] >= 0.15))
+        sl = ((prof > 0) & (rx[idx] >= 0.15) & (rx[idx] <= 1.))
+        sl_500 = ((prof > 0) & (rx[idx] <= 1.))
+
         r = rx[idx]
+
+        # Determine different profile masses
         mass = tools.m_h(prof[sl], r[sl] * r500[idx])
-        mass_actual = tools.m_h(prof[prof > 0], r[prof > 0] * r500[idx])
+        mass_actual = tools.m_h(prof[sl], r[sl] * r500[idx])
         # print 'm_gas500/m_gas500_actual - 1', (mass - mass_actual) / mass_actual
         # print 'f_gas,500c_actual :', mass_actual / m500[idx]
         # print 'f_gas,500c_fitted :', mass / m500[idx]
         # print '-------------------'
+        m500gas = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
+        m500gas_actual = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
+
+        # Need to perform the fit for [0.15,1] r500c -> mass within this region
+        # need to match
         sl_fit = np.ones(sl.sum(), dtype=bool)
         popt, pcov = opt.curve_fit(lambda r, a, b: \
                                    # , c:\
@@ -484,17 +500,18 @@ def fit_eckert():
                                    r[sl], prof[sl], bounds=([0, 0],
                                                             [1, 5]))
 
-        # plt.plot(r, r**2 * prof)
-        # plt.plot(r, r**2 * prof_gas_hot(r, sl, popt[0], popt[1], # popt[2],
-        #                                 mass, r500[idx]))
+        # plt.plot(r, prof)
+        # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # popt[2],
+        #                          m500gas, r500[idx]))
         # plt.title('%i'%idx)
         # plt.xscale('log')
         # plt.yscale('log')
         # plt.show()
 
+        # Final fit will need to reproduce the m500gas mass
         a = np.append(a, popt[0])
         b = np.append(b, popt[1])
-        m_sl = np.append(m_sl, mass)
+        m_sl = np.append(m_sl, m500gas)
         # c = np.append(c, popt[2])
         aerr = np.append(aerr, np.sqrt(np.diag(pcov)))[0]
         berr = np.append(berr, np.sqrt(np.diag(pcov)))[1]
@@ -1218,10 +1235,10 @@ def plot_gas_fractions():
 # End of plot_gas_fractions()
 # ------------------------------------------------------------------------------
 
-def plot_fit_profiles():
-    with open('croston.p', 'rb') as f:
+def plot_fit_profiles_paper():
+    with open('data/croston.p', 'rb') as f:
         data_c = cPickle.load(f)
-    with open('eckert.p', 'rb') as f:
+    with open('data/eckert.p', 'rb') as f:
         data_e = cPickle.load(f)
 
     a_e, aerr_e, b_e, berr_e, msl_e, m500g_e = fit_eckert()
@@ -1247,7 +1264,7 @@ def plot_fit_profiles():
     m500_fit_c = np.empty((0), dtype=float)
     m500_prof_c = np.empty((0), dtype=float)
     for idx, r, prof in zip(np.arange(len(r500_c)), rx_c, rho_c):
-        sl = ((prof > 0) & (rx_c[idx] >= 0.15))
+        sl = ((prof > 0) & (r <= 1.))
         fit = prof_gas_hot(r, sl, a_c[idx], b_c[idx], msl_c[idx], r500_c[idx])
         ax3.plot(r[1:], (fit[1:] - prof[1:]) / prof[1:], ls='-', lw=0.5, c='k')
 
@@ -1279,7 +1296,7 @@ def plot_fit_profiles():
 
     ax1.xaxis.set_tick_params(pad=8)
     ax1.set_xscale('log')
-    ax1.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax1.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-8)
     ax1.set_ylabel(r'$\frac{m_\mathrm{fit}(<r) - m_\mathrm{obs}(<r)}{m_\mathrm{gas,500c}}$')
 
     # get median binned profiles
@@ -1289,7 +1306,7 @@ def plot_fit_profiles():
     m500_fit_e = np.empty((0), dtype=float)
     m500_prof_e = np.empty((0), dtype=float)
     for idx, r, prof in zip(np.arange(len(r500_med)), r_med, rho_med):
-        sl = ((prof > 0) & (r >= 0.15))
+        sl = ((prof > 0) & (r <= 1.))
         fit = prof_gas_hot(r, sl, a_e[idx], b_e[idx], msl_e[idx], r500_med[idx])
         ax4.plot(r[1:], (fit[1:] - prof[1:]) / prof[1:], ls='-', lw=0.5, c='k')
 
@@ -1327,7 +1344,7 @@ def plot_fit_profiles():
     ax2.xaxis.set_tick_params(pad=8)
     ax2.set_xscale('log')
     ax2.set_yticklabels([])
-    ax2.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax2.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-8)
     plt.show()
 
 # ------------------------------------------------------------------------------
