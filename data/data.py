@@ -303,7 +303,7 @@ def bin_eckert():
     rho = data_eckert['rho']
 
     # number of points to mass bin
-    n_m = 15
+    n_m = 10
     m_bins = np.logspace(np.log10(m500g).min(), np.log10(m500g).max(), n_m)
     m_bin_idx = np.digitize(m500g, m_bins)
 
@@ -1032,6 +1032,35 @@ def mass_diff(alpha, x_range, mass_ratio):
 # End of mass_diff()
 # ------------------------------------------------------------------------------
 
+def massdiff_dmo2bar(m_bar, m_dmo):
+    '''
+    Return the mass difference between the measured halo mass and the dark matter only
+    equivalent mass according to the relation
+
+        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+    '''
+    f_b = 1 - p.prms.f_dm
+    fm, f1, f2 = f_gas_prms()
+    f_g = f_gas(m_bar, **fm)
+
+    return (1 - (f_b - f_g)) * m_dmo - m_bar
+
+def m200dmo_to_m200b(m_dmo):
+    '''
+    Invert the relation between the measured halo mass and the dark matter only
+    equivalent mass according to the relation
+
+        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+    '''
+
+    m200_b = opt.brentq(massdiff_dmo2bar, 1e5, 1e19, args=(m_dmo))
+
+    return m200_b
+
+# ------------------------------------------------------------------------------
+# End of m200dmo_to_m200b()
+# ------------------------------------------------------------------------------
+
 def plot_profiles():
     with open('croston.p', 'rb') as f:
         data_c = cPickle.load(f)
@@ -1739,3 +1768,35 @@ def plot_missing_mass_paper(comp_gas):
 # ------------------------------------------------------------------------------
 # End of plot_missing_mass_paper()
 # ------------------------------------------------------------------------------
+
+def plot_masses_hist_paper():
+    with open('data/croston.p', 'rb') as f:
+        data_c = cPickle.load(f)
+    with open('data/eckert.p', 'rb') as f:
+        data_e = cPickle.load(f)
+
+    m500g_c = data_c['m500gas']
+    m500g_e = data_e['m500gas']
+
+    m500cc = gas.mgas_to_m500c(m500g_c)
+    m500ce = gas.mgas_to_m500c(m500g_e)
+    m200mc = np.array([gas.m500c_to_m200m(m) for m in m500cc])
+    m200me = np.array([gas.m500c_to_m200m(m) for m in m500ce])
+
+    mn = np.min(np.hstack([m200mc, m200me]))
+    mx = np.max(np.hstack([m200mc, m200me]))
+
+    bins = np.logspace(np.log10(mn), np.log10(mx), 10)
+
+    pl.set_style('line')
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.hist([m200mc, m200me], bins=bins, stacked=True, histtype='barstacked',
+            label=['Croston+2008', 'Eckert+2016'])
+    ax.set_xlabel(r'$m_\mathrm{200m} \, [\mathrm{M_\odot}/h]$')
+    ax.set_ylabel(r'Frequency')
+    ax.set_xscale('log')
+    ax.legend(loc='best')
+
+    plt.show()
