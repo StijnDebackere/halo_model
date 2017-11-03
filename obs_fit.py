@@ -22,6 +22,8 @@ import halo.model.power as power
 import halo.data.bahamas as b
 import halo.data.data as d
 
+import numpy as np
+
 import pdb
 
 def load_dm_dmo(prms=p.prms, save=True):

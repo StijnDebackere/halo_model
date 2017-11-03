@@ -1290,7 +1290,7 @@ def plot_fit_profiles_paper():
     ax3.set_xticklabels([])
     ax3.set_title(r'Croston+08')
 
-    ax1.set_ylim([-0.2, 0.2])
+    ax1.set_ylim([-0.1,0.1])
     ticks = ax1.get_xticklabels()
     ticks[-5].set_visible(False)
 
@@ -1337,7 +1337,7 @@ def plot_fit_profiles_paper():
     ax4.set_title(r'Eckert+16')
 
 
-    ax2.set_ylim([-0.2, 0.2])
+    ax2.set_ylim([-0.1,0.1])
     ticks = ax2.get_xticklabels()
     ticks[-3].set_visible(False)
 
