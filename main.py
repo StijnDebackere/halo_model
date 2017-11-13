@@ -25,7 +25,7 @@ prms = p.prms
 
 # general profile kwargs to be used for all components
 profile_kwargs = {'r_range': prms.r_range_lin,
-                  'm_range': prms.m_range_lin,
+                  'm_range': prms.m200m,
                   'k_range': prms.k_range_lin,
                   'n': 80,
                   'taylor_err': 1.e-50}
@@ -33,16 +33,16 @@ profile_kwargs = {'r_range': prms.r_range_lin,
 # ------------------------------------------------------------------------------
 def load_dm():
     # Fit NFW profile with c(z,M) relation from Correa et al (2015c)
-    # f_dm = 1. * np.ones_like(prms.m_range_lin)
-    f_dm = 1 - prms.omegab/prms.omegam * np.ones_like(prms.m_range_lin)
+    # f_dm = 1. * np.ones_like(prms.m200m)
+    f_dm = 1 - prms.omegab/prms.omegam * np.ones_like(prms.m200m)
 
     # concentration and virial radius -> needed for profile_NFW
     # c_correa want [M_sun], not [M_sun/h]
     ############################################################################
-    # c_x = profs.c_correa(f_dm * prms.m_range_lin, z_range=0.)
-    c_x = profs.c_correa(prms.m_range_lin / prms.h, z_range=0.)
+    # c_x = tools.c_correa(f_dm * prms.m200m, z_range=0.)
+    c_x = tools.c_correa(prms.m200m / prms.h, z_range=0.)
     ############################################################################
-    r_x = prms.r_h
+    r_x = prms.r200m
 
     # DM profile
     # specific dm extra kwargs
@@ -76,12 +76,12 @@ def load_dm():
 # ------------------------------------------------------------------------------
 
 def load_sat():
-    f_sat = stars.f_s(prms.m_range_lin)
+    f_sat = stars.f_s(prms.m200m)
     # Satellite profile
     # generalized NFW profile determined by van der Burg, Hoekstra et al. (2015)
     prof_sat = profs.profile_gNFW(prms.r_range_lin, c_x=0.64*np.ones(prms.m_bins),
-                                  alpha=1.63, r_x=prms.r_h,
-                                  m_s=prms.m_range_lin)
+                                  alpha=1.63, r_x=prms.r200m,
+                                  m_s=prms.m200m)
 
     sat_extra = {'profile': prof_sat,
                  'profile_f': None}
@@ -105,31 +105,31 @@ def load_sat():
 # ------------------------------------------------------------------------------
 
 def load_bcg():
-    f_cen = stars.f_c(prms.m_range_lin)
+    f_cen = stars.f_c(prms.m200m)
 
     # # BCG profile
     # # Kravtsov (2014) -> r1/2 = 0.015 r200
-    # prof_bcg = profs.profile_BCG(prms.r_range_lin, prms.m_range_lin,#st.m_cen_fit,
+    # prof_bcg = profs.profile_BCG(prms.r_range_lin, prms.m200m,#st.m_cen_fit,
     #                              r_half=0.015*prms.r_range_lin[:,-1])
 
     # quite arbitrary...
-    n1_idx = (prms.m_range_lin * f_cen < 1e11)
-    n4_idx = (prms.m_range_lin * f_cen >= 1e11)
+    n1_idx = (prms.m200m * f_cen < 1e11)
+    n4_idx = (prms.m200m * f_cen >= 1e11)
 
     # Fit sersic profile with n=1 for M<1e11 and n=4 for M>=1e11
     # Kravtsov (2014) -> r1/2 = 0.015 r200
     prof_bcg_n1 = profs.profile_sersic(prms.r_range_lin[n1_idx],
-                                       prms.m_range_lin[n1_idx],
+                                       prms.m200m[n1_idx],
                                        r_eff=0.015*prms.r_range_lin[n1_idx,-1],
                                        p=1)
     prof_bcg_n4 = profs.profile_sersic(prms.r_range_lin[n4_idx],
-                                       prms.m_range_lin[n4_idx],
+                                       prms.m200m[n4_idx],
                                        r_eff=0.015*prms.r_range_lin[n4_idx,-1],
                                        p=4)
     prof_bcg = np.concatenate([prof_bcg_n1, prof_bcg_n4], axis=0)
 
-    # prof_bcg = profs.profile_delta(prms.r_range_lin, prms.m_range_lin)
-    # prof_bcg_f = profs.profile_delta_f(prms.k_range_lin, prms.m_range_lin)
+    # prof_bcg = profs.profile_delta(prms.r_range_lin, prms.m200m)
+    # prof_bcg_f = profs.profile_delta_f(prms.k_range_lin, prms.m200m)
     bcg_extra = {'profile': prof_bcg,
                  'profile_f' : None}
                  # 'profile_f': prof_bcg_f}
@@ -155,9 +155,9 @@ def load_bcg():
 # ------------------------------------------------------------------------------
 
 def load_icl():
-    f_cen = stars.f_c(prms.m_range_lin)
+    f_cen = stars.f_c(prms.m200m)
     # ICL profile
-    prof_icl = profs.profile_ICL(prms.r_range_lin, prms.m_range_lin,
+    prof_icl = profs.profile_ICL(prms.r_range_lin, prms.m200m,
                                  r_half=0.015*prms.r_range_lin[:,-1], n=5)
 
     icl_extra = {'profile': prof_icl,
@@ -182,8 +182,8 @@ def load_icl():
 # ------------------------------------------------------------------------------
 
 def load_gas():
-    c_x = profs.c_correa(prms.m_range_lin / 0.7, z_range=0).reshape(-1)
-    m500c = np.array([gas.m200m_to_m500c(m / 0.7) for m in prms.m_range_lin])
+    c_x = tools.c_correa(prms.m200m / 0.7, z_range=0).reshape(-1)
+    m500c = np.array([tools.m200m_to_m500c(m / 0.7) for m in prms.m200m])
     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * 0.7**2)
 
     r_range = prms.r_range_lin / (0.7 * r500c.reshape(-1,1))
@@ -241,7 +241,7 @@ def load_gas():
                                     prms.r_range_lin[idx, :i_500+1] / 0.7)
                           for idx, i_500 in enumerate(idx_500)])
     # correct gas mass!
-    norm = prms.m_range_lin / m200_prof
+    norm = prms.m200m / m200_prof
 
     # profile has to integrate to m200m
     prof_gas *= norm.reshape(-1,1)
@@ -259,9 +259,9 @@ def load_gas():
     # ax1 = fig.add_subplot(111)
     # l1, = ax1.plot(m500c, f_gas500, ls='-')
     # ax2 = ax1.twiny()
-    # l2, = ax2.plot(prms.m_range_lin, f_gas, ls='--')
+    # l2, = ax2.plot(prms.m200m, f_gas, ls='--')
     # ax1.set_xlim([m500c.min(), m500c.max()])
-    # ax2.set_xlim([prms.m_range_lin.min(), prms.m_range_lin.max()])
+    # ax2.set_xlim([prms.m200m.min(), prms.m200m.max()])
     # ax1.set_xscale('log')
     # ax2.set_xscale('log')
     # ax1.set_xlabel(r'$m_{500c} \, [M_\odot]$')

@@ -63,7 +63,7 @@ class Power(Cache):
         nu = comp_1.nu.reshape(m,1)
         fnu = comp_1.fnu.reshape(m,1)
         # r_x = comp_1.r_range[:,-1].reshape(m,1)
-        r_x = p.prms.r_h.reshape(m,1)
+        r_x = p.prms.r200m.reshape(m,1)
         m_range = comp_1.m_range.reshape(m,1)
         f_comp_1 = comp_1.f_comp.reshape(m,1)
         f_comp_2 = comp_2.f_comp.reshape(m,1)

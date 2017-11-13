@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.integrate
 import scipy.optimize as opt
+import commah
 
 import pdb
 
@@ -140,6 +141,123 @@ def median_slices(data, medians, bins):
 # # End of running_mean()
 # # ------------------------------------------------------------------------------
 
+def c_correa(m_range, z_range=0, cosmology='WMAP9'):
+    '''
+    Returns the mass-concentration relation from Correa et al (2015c)
+    through the commah code.
+
+    Parameters
+    ----------
+    m_range : (m,) array
+      array containing masses to compute NFW profile for (mass at z=0)
+    z_range : (z,) array
+      redshift to evaluate mass-concentration relation at
+    cosmology : string or dict for commah
+      cosmological parameters for commah
+
+    Returns
+    -------
+    c : (m,z) array
+      array containing concentration for each (m,z)
+    '''
+    # (m,z) array
+    c = commah.run(cosmology=cosmology, Mi=m_range, z=z_range, mah=False)['c']
+    return c
+
+# ------------------------------------------------------------------------------
+# End of c_correa()
+# ------------------------------------------------------------------------------
+
+def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
+    '''
+    Returns the mass-concentration relation from Duffy et al (2008).
+
+        c = A * (m/m_pivot)^B * (1+z)^C
+
+    Parameters
+    ----------
+    m_range : (m,) array
+      array containing masses to compute NFW profile for (mass at z=0)
+    z_range : (z,) array
+      redshift to evaluate mass-concentration relation at
+    m_pivot : float (same units as m_range)
+      pivot scale for fit
+    A : float
+      scale parameter for fit
+    B : float
+      mass parameter for fit
+    C : float
+      redshift parameter for fit
+
+    Returns
+    -------
+    c : (m,z) array
+      array containing concentration for each (m,z)
+    '''
+    m = m_range.shape[0]
+    z = np.array(np.array(z_range).shape)
+
+    m_range = m_range.reshape([m] + list(z/z))
+    z_range = np.array(z_range).reshape([1] + list(z))
+
+    c = A * (m_range/m_pivot)**B * (1+z_range)**C
+    return c
+
+# ------------------------------------------------------------------------------
+# End of c_duffy()
+# ------------------------------------------------------------------------------
+
+def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
+    '''
+    Returns an NFW profile for m_range along axis 0 and r_range along
+    axis 1 (with optional z_range along axis 2).
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each M (with r_range[:,-1] = r_vir)
+    m_range : (m,) array
+      array containing masses to compute NFW profile for (mass at z=0)
+    c_x : (m,) or (m,z) array
+      array containing mass-concentration relation
+    r_x : (m,) or (m,z) array
+      array containing r_x to evaluate r_s from r_s = r_x/c_x
+    rho_mean : float
+      mean dark matter density
+    z_range : float/array (default=0)
+      redshift range
+    Delta : float (default=200.)
+      critical overdensity for collapse
+
+    Returns
+    -------
+    profile : (m,r)
+      array containing NFW profile
+    or (if z is an array)
+    profile : (m,r,z)
+      array containing NFW profile
+    '''
+    m = m_range.shape[0]
+    r = r_range.shape[-1]
+    # want an empty array for scalar z so we can easily construct shapes
+    # later on
+    z = np.array(np.array(z_range).shape)
+
+    # (m,z) array
+    r_s = r_x.reshape([m] + list(z))/c_x.reshape([m] + list(z))
+    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+
+    # (m,r,z) array
+    x = r_range.reshape([m,r] + list(z/z)) / r_s.reshape([m,1] + list(z))
+
+    profile = rho_s.reshape([m,1] + list(z)) / (x * (1+x)**2)
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_NFW()
+# ------------------------------------------------------------------------------
+
 def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
     '''
     Calculate the mass of the density profile between over r_range, or between
@@ -232,6 +350,217 @@ def radius_to_mass(r, mean_dens):
 
 # ------------------------------------------------------------------------------
 # End of radius_to_mass()
+# ------------------------------------------------------------------------------
+
+def massdiff_2m5c(m200m, m500c, rhoc, rhom):
+    '''
+    Integrate an NFW halo with m200m up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r_range = np.logspace(-4, np.log10(r500c), 1000)
+
+    r200m = mass_to_radius(m200m, 200 * rhom)
+    m200c = m200m_to_m200c(m200m, rhoc, rhom)
+    dens = profile_NFW(r_range, np.array([m200m]),
+                       c_correa(m200c, 0).reshape(-1),
+                       np.array([r200m]),
+                       rhom,
+                       Delta=200)
+    mass_int = m_h(dens, r_range)
+
+    return mass_int - m500c
+
+def m500c_to_m200m(m500c, rhoc, rhom):
+    '''
+    Give the virial mass for the halo corresponding to m500c
+
+    Parameters
+    ----------
+    m500c : float
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    # We take a more conservative lower limit, since we will need to determine
+    # m200c for this m200m which will always be lower than m200m and it starts
+    # at m200c=1e5
+    m200m = opt.brentq(massdiff_2m5c, 1e7, 1e19, args=(m500c, rhoc, rhom))
+
+    return m200m
+
+# ------------------------------------------------------------------------------
+# End of m500c_to_m200m()
+# ------------------------------------------------------------------------------
+
+def massdiff_5c2m(m500c, m200m, rhoc, rhom):
+    '''
+    Integrate an NFW halo with m200m up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r_range = np.logspace(-4, np.log10(r500c), 1000)
+
+    r200m = mass_to_radius(m200m, 200 * rhom)
+    m200c = m200m_to_m200c(m200m, rhoc, rhom)
+    dens = profile_NFW(r_range, np.array([m200m]),
+                       c_correa(m200c, 0).reshape(-1),
+                       np.array([r200m]),
+                       rhom,
+                       Delta=200)
+    mass_int = m_h(dens, r_range)
+
+    return mass_int - m500c
+
+def m200m_to_m500c(m200m, rhoc, rhom):
+    '''
+    Give m500c for the an m200m virial mass halo
+
+    Parameters
+    ----------
+    m200m : float
+      halo virial mass
+
+    Returns
+    -------
+    m500c : float
+      halo mass at 500 times the universe critical density
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m500c = opt.brentq(massdiff_5c2m, 1e5, 1e19, args=(m200m, rhoc, rhom))
+
+    return m500c
+
+# ------------------------------------------------------------------------------
+# End of m200m_to_m500c()
+# ------------------------------------------------------------------------------
+
+def massdiff_2m2c(m200m, m200c, rhoc, rhom):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
+    r_range = np.logspace(-4, np.log10(r200c), 1000)
+
+    r200m = mass_to_radius(m200m, 200 * rhom)
+    dens = profile_NFW(r_range, np.array([m200m]),
+                             c_correa(m200c, 0).reshape(-1),
+                             np.array([r200m]),
+                             rhom,
+                             Delta=200)
+    mass_int = m_h(dens, r_range)
+
+    return mass_int - m200c
+
+def m200c_to_m200m(m200c, rhoc, rhom):
+    '''
+    Give the virial mass for the halo corresponding to m200c
+
+    Parameters
+    ----------
+    m200c : float
+      halo mass at 200 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200m = opt.brentq(massdiff_2m2c, 1e5, 1e19, args=(m200c, rhoc, rhom))
+
+    return m200m
+
+# ------------------------------------------------------------------------------
+# End of m200c_to_m200m()
+# ------------------------------------------------------------------------------
+
+def massdiff_2c2m(m200c, m200m, rhoc, rhom):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
+    r_range = np.logspace(-4, np.log10(r200c), 1000)
+
+    r200m = mass_to_radius(m200m, 200 * rhom)
+    dens = profile_NFW(r_range, np.array([m200m]),
+                       c_correa(m200c, 0).reshape(-1),
+                       np.array([r200m]),
+                       rhom,
+                       Delta=200)
+    mass_int = m_h(dens, r_range)
+
+    return mass_int - m200c
+
+def m200m_to_m200c(m200m, rhoc, rhom):
+    '''
+    Give m200c for the an m200m virial mass halo
+
+    Parameters
+    ----------
+    m200m : float
+      halo virial mass
+
+    Returns
+    -------
+    m200c : float
+      halo mass at 200 times the universe critical density
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200c = opt.brentq(massdiff_2c2m, 1e5, 1e19, args=(m200m, rhoc, rhom))
+
+    return m200c
+
+# ------------------------------------------------------------------------------
+# End of m200m_to_m200c()
+# ------------------------------------------------------------------------------
+
+def massdiff_2c5c(m200c, m500c, rhoc, rhom):
+    '''
+    Integrate an NFW halo with m200c up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r_range = np.logspace(-4, np.log10(r500c), 1000)
+
+    m200m = m200c_to_m200m(m200c, rhoc, rhom)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+    dens = profile_NFW(r_range, np.array([m200m]),
+                             c_correa(m200c, 0).reshape(-1),
+                             np.array([r200m]),
+                             rhom,
+                             Delta=200)
+    mass_int = m_h(dens, r_range)
+
+    return mass_int - m500c
+
+def m500c_to_m200c(m500c, rhoc, rhom):
+    '''
+    Give m200c for the an m500c virial mass halo
+
+    Parameters
+    ----------
+    m500c : float
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    m200c : float
+      halo mass at 200 times the universe critical density
+    '''
+    # 1e19 Msun is ~maximum for c_correa
+    m200c = opt.brentq(massdiff_2c5c, 1e5, 1e19, args=(m500c, rhoc, rhom))
+
+    return m200c
+
+# ------------------------------------------------------------------------------
+# End of m500c_to_m200c()
 # ------------------------------------------------------------------------------
 
 def find_bounds(f, y, start=1.):

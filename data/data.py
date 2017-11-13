@@ -24,7 +24,7 @@ import halo.gas as gas
 
 import pdb
 
-ddir = '/Volumes/Data/stijn/Documents/Leiden/MR/code/halo/data/'
+ddir = '~/Documents/Leiden/MR/code/halo/data/'
 prms = p.prms
 
 def h(z):
@@ -110,7 +110,7 @@ def read_croston():
             'rx': rx,
             'rho': rho}
 
-    with open('croston.p', 'wb') as f:
+    with open('data/croston.p', 'wb') as f:
         cPickle.dump(data, f)
 
     return m500gas, r500, rx, rho
@@ -164,13 +164,13 @@ def read_eckert():
     for f in files:
         # actual data
         data = fits.open(f)
-        r500 = np.append(r500, data[1].header['R500'] * 1e-3) # [Mpc]
         z = np.append(z, data[1].header['REDSHIFT'])
         # !!!! check whether this still needs correction factor from weak lensing
         # Currently included it, but biases the masses, since this wasn't done in
         # measurement by Eckert, of course
-        # rx.append(data[1].data['RADIUS'] * (1.3)**(1./3))
-        rx.append(data[1].data['RADIUS'])
+        r500 = np.append(r500, data[1].header['R500'] * 1e-3) # [Mpc]
+        rx.append(data[1].data['RADIUS'] * (1.3)**(1./3))
+        # rx.append(data[1].data['RADIUS'])
         rho.append(data[1].data['NH'] * n2rho * cgs2cos)
         rho_err.append(data[1].data['ENH'] * n2rho * cgs2cos)
         data.close()
@@ -182,19 +182,30 @@ def read_eckert():
     for idx, prof in enumerate(rho):
         idx_500 = np.argmin(np.abs(rx[idx] - 1))
         mgas = np.append(mgas,
-                          tools.m_h(prof[:idx_500+1], rx[idx][:idx_500+1] *
-                                    r500[idx]))
+                         tools.m_h(prof[:idx_500+1], rx[idx][:idx_500+1] *
+                                   r500[idx]))
         mdata2data = np.append(mdata2data, (num == numdata[idx]).nonzero()[0][0])
         # print mgas[idx]
         # print mgas500[mdata2data[idx]]
         # print '------------'-
 
     m500gas = mgas500[mdata2data]
+    m500 = m500mt[mdata2data]
 
     ratio = mgas/m500gas
+    print 'Derived gas masses:'
     print 'median: ', np.median(ratio)
     print 'q15:    ', np.percentile(ratio, q=15)
     print 'q85:    ', np.percentile(ratio, q=85)
+
+    # pl.set_style('mark')
+    # plt.plot(m500, mgas/m500)
+    # plt.xlabel(r'$m_\mathrm{500c,M-T}$')
+    # plt.ylabel(r'$f_\mathrm{gas,500c}$')
+    # plt.ylim([0.02,0.18])
+    # plt.xscale('log')
+    # plt.show()
+
     # pl.set_style('mark')
     # plt.plot(m500gas, ratio)
     # plt.axhline(y=1, color='k')
@@ -203,24 +214,24 @@ def read_eckert():
     # plt.ylabel(r'$\left(\int\,\rho(r)\,\mathrm{d}^3r\right)/m_\mathrm{500c,gas-measured}$',
     #            labelpad=-5)
 
-    plt.hist(ratio)
-    plt.axvline(x=np.median(ratio), c='k', ls='-', label='median')
-    plt.axvline(x=np.percentile(ratio, 15), c='k', ls='--',
-                label='$15-85^\mathrm{th}$ percentile')
-    plt.axvline(x=np.percentile(ratio, 85), c='k', ls='--')
-    plt.xlabel(r'$m_\mathrm{500c,gas-integrated}/m_\mathrm{500c,gas-measured}$')
-    plt.ylabel('Frequency')
+    # plt.hist(ratio)
+    # plt.axvline(x=np.median(ratio), c='k', ls='-', label='median')
+    # plt.axvline(x=np.percentile(ratio, 15), c='k', ls='--',
+    #             label='$15-85^\mathrm{th}$ percentile')
+    # plt.axvline(x=np.percentile(ratio, 85), c='k', ls='--')
+    # plt.xlabel(r'$m_\mathrm{500c,gas-integrated}/m_\mathrm{500c,gas-measured}$')
+    # plt.ylabel('Frequency')
 
-    plt.title('Eckert+16 mass determination')
-    plt.legend()
-    plt.show()
+    # plt.title('Eckert+16 mass determination')
+    # plt.legend()
+    # plt.show()
 
     data = {'m500gas': m500gas,
             'r500': r500,
             'rx': rx,
             'rho': rho}
 
-    with open('eckert.p', 'wb') as f:
+    with open('data/eckert.p', 'wb') as f:
         cPickle.dump(data, f)
 
     return m500gas, r500, rx, rho
@@ -230,7 +241,7 @@ def read_eckert():
 # ------------------------------------------------------------------------------
 
 def bin_croston():
-    with open('croston.p', 'rb') as f:
+    with open('data/croston.p', 'rb') as f:
         data_croston = cPickle.load(f)
 
     r500 = data_croston['r500']
@@ -313,6 +324,7 @@ def bin_eckert():
     n_r = 20
     r_ranges = np.empty((n_m-1, n_r), dtype=float)
     rho_med = np.empty((n_m-1, n_r), dtype=float)
+    rho_std = np.empty((n_m-1, 2, n_r), dtype=float)
     m500_med = np.empty((n_m-1), dtype=float)
     r500_med = np.empty((n_m-1), dtype=float)
 
@@ -339,19 +351,24 @@ def bin_eckert():
 
         r_ranges[idx_m] = r_range
         rho_med[idx_m] = np.median(rho_new, axis=0)
+        rho_std[idx_m][0] = np.percentile(rho_new, 15, axis=0)
+        rho_std[idx_m][1] = np.percentile(rho_new, 85, axis=0)
 
         # for t in rho_new:
         #     print t
         #     t[t <= 0] = np.nan
         #     if (t <= 0).sum() == 0:
-        #         plt.plot(r_range, t)
+        #         plt.plot(r_range, t, c='k')
         # plt.plot(r_range, rho_med[idx_m], label=r'median')
+        # plt.fill_between(r_range, rho_std[idx_m][0], rho_std[idx_m][1],
+        #                  color='r', alpha=0.2,
+        #                  label=r'$15^\mathrm{th}-85^\mathrm{th}$ percentile')
         # plt.xscale('log')
         # plt.yscale('log')
         # plt.legend(loc='best')
         # plt.show()
 
-    return r_ranges, rho_med, m500_med, r500_med
+    return r_ranges, rho_med, rho_std, m500_med, r500_med
 
 # ------------------------------------------------------------------------------
 # End of bin_eckert()
@@ -386,11 +403,19 @@ def fit_croston():
         data_croston = cPickle.load(f)
 
     r500 = data_croston['r500']
-    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit)
-    m500g = data_croston['m500gas']
     rx = data_croston['rx']
     rho = data_croston['rho']
-    # rx, rho, m500g, r500 = bin_croston()
+    m500g = data_croston['m500gas']
+
+    # r500 is in Mpc but was normalized with r/h_70
+    # we need r in terms of Mpc/h for halo model -> need to ``unnormalise''
+    r500 = r500 * 0.7
+    # same for rho, we need it in terms of density * h**2
+    rho = [r / 0.7**2 for r in rho]
+    # same for m500g, in terms of mass / h
+    m500g = m500g * 0.7
+
+    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit)
 
     pl.set_style()
     a = np.empty((0,), dtype=float)
@@ -428,12 +453,14 @@ def fit_croston():
                                    r[sl], prof[sl], bounds=([0, 0],
                                                             [1, 5]))
 
-        # plt.plot(r, prof)
+        # plt.plot(r, prof, label='obs')
         # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # , popt[2],
-        #                          m500gas, r500[idx]))
+        #                          m500gas, r500[idx]),
+        #          label='fit')
         # plt.title('%i'%idx)
         # plt.xscale('log')
         # plt.yscale('log')
+        # plt.legend()
         # plt.show()
 
         # Final fit will need to reproduce the m500gas mass
@@ -445,7 +472,7 @@ def fit_croston():
         berr = np.append(berr, np.sqrt(np.diag(pcov)))[1]
         # cerr = np.append(cerr, np.sqrt(np.diag(pcov)))[2]
 
-    return a, aerr, b, berr, m_sl, m500g # c, cerr, m500g
+    return a, aerr, b, berr, m_sl, m500g, r500 # c, cerr, m500g
 
 # ------------------------------------------------------------------------------
 # End of fit_croston()
@@ -460,7 +487,16 @@ def fit_eckert():
     # m500g = data_eckert['m500gas']
     # rx = data_eckert['rx']
     # rho = data_eckert['rho']
-    rx, rho, m500g, r500 = bin_eckert()
+    rx, rho, rho_std, m500g, r500 = bin_eckert()
+
+    # r500 is in Mpc but was normalized with r/h_70
+    # we need r in terms of Mpc/h for halo model -> need to ``unnormalise''
+    r500 = r500 * 0.7
+    # same for rho, we need it in terms of density * h**2
+    rho = rho / 0.7**2
+    rho_std = rho_std / 0.7**2
+    # same for m500g, in terms of mass / h
+    m500g = m500g * 0.7
 
     m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit)
 
@@ -500,12 +536,14 @@ def fit_eckert():
                                    r[sl], prof[sl], bounds=([0, 0],
                                                             [1, 5]))
 
-        # plt.plot(r, prof)
+        # plt.plot(r, prof, label='obs')
         # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # popt[2],
-        #                          m500gas, r500[idx]))
+        #                          m500gas, r500[idx]),
+        #          label='fit')
         # plt.title('%i'%idx)
         # plt.xscale('log')
         # plt.yscale('log')
+        # plt.legend()
         # plt.show()
 
         # Final fit will need to reproduce the m500gas mass
@@ -518,7 +556,7 @@ def fit_eckert():
         # cerr = np.append(cerr, np.sqrt(np.diag(pcov)))[2]
 
 
-    return a, aerr, b, berr, m_sl, m500g # c, cerr, m500g
+    return a, aerr, b, berr, m_sl, m500g, r500 # c, cerr, m500g
 
 # ------------------------------------------------------------------------------
 # End of fit_eckert()
@@ -530,14 +568,32 @@ def convert_hm():
     '''
     # rcc, rccerr, bc, bcerr, rxc, rxcerr, mgc = fit_croston()
     # rce, rceerr, be, beerr, rxe, rxeerr, mge = fit_eckert()
-    rcc, rccerr, bc, bcerr, mslc, mgc = fit_croston()
-    rce, rceerr, be, beerr, msle, mge = fit_eckert()
+    rcc, rccerr, bc, bcerr, mslc, mgc, r500c = fit_croston()
+    rce, rceerr, be, beerr, msle, mge, r500e = fit_eckert()
+
+    # m500 values determined by observers
+    m500c = tools.radius_to_mass(r500c, 500 * p.prms.rho_crit)
+    m500e = tools.radius_to_mass(r500e, 500 * p.prms.rho_crit)
 
     # Get 500crit values
     m500cc = gas.mgas_to_m500c(mgc)
     m500ce = gas.mgas_to_m500c(mge)
-    r500cc = tools.mass_to_radius(m500cc, 500 * p.prms.rho_crit * p.prms.h**2)
-    r500ce = tools.mass_to_radius(m500ce, 500 * p.prms.rho_crit * p.prms.h**2)
+    r500cc = tools.mass_to_radius(m500cc, 500 * p.prms.rho_crit)
+    r500ce = tools.mass_to_radius(m500ce, 500 * p.prms.rho_crit)
+
+    m_range = np.logspace(np.log10(np.min(m500e)),
+                          np.log10(np.max(m500c)), 100)
+
+    # pl.set_style('mark')
+    # plt.plot(m500c, m500cc, label='Croston+08')
+    # plt.plot(m500e, m500ce, label='Eckert+16')
+    # plt.plot(m_range, m_range, lw=1, ls='-', markersize=0, c='k')
+    # plt.xlabel('$m_\mathrm{obs,500c}$')
+    # plt.ylabel('$m_\mathrm{hm,500c}$')
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.legend()
+    # plt.show()
 
     data_croston = {'rc': rcc,
                     'rcerr': rccerr,
@@ -554,18 +610,20 @@ def convert_hm():
                    # 'rxerr': rxeerr,
                    'm500c': m500ce}
 
-    with open('croston_500.p', 'wb') as f:
+    with open('data/croston_500.p', 'wb') as f:
         cPickle.dump(data_croston, f)
 
-    with open('eckert_500.p', 'wb') as f:
+    with open('data/eckert_500.p', 'wb') as f:
         cPickle.dump(data_eckert, f)
 
     # Get 200mean values
-    m200mc = np.array([gas.m500c_to_m200m(m) for m in m500cc])
-    m200me = np.array([gas.m500c_to_m200m(m) for m in m500ce])
-    r200mc = tools.mass_to_radius(m200mc, 200 * p.prms.rho_crit * p.prms.h**2 *
+    m200mc = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m)
+                       for m in m500cc])
+    m200me = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m)
+                       for m in m500ce])
+    r200mc = tools.mass_to_radius(m200mc, 200 * p.prms.rho_crit *
                                   p.prms.omegam)
-    r200me = tools.mass_to_radius(m200me, 200 * p.prms.rho_crit * p.prms.h**2 *
+    r200me = tools.mass_to_radius(m200me, 200 * p.prms.rho_crit *
                                   p.prms.omegam)
 
     rcc *= r500cc/r200mc
@@ -592,10 +650,10 @@ def convert_hm():
                    # 'rxerr': rxeerr,
                    'm200m': m200me}
 
-    with open('croston_200.p', 'wb') as f:
+    with open('data/croston_200.p', 'wb') as f:
         cPickle.dump(data_croston, f)
 
-    with open('eckert_200.p', 'wb') as f:
+    with open('data/eckert_200.p', 'wb') as f:
         cPickle.dump(data_eckert, f)
 
 # ------------------------------------------------------------------------------
@@ -604,14 +662,14 @@ def convert_hm():
 
 def plot_parameters(mean=False):
     if mean:
-        with open('croston_200.p', 'rb') as f:
+        with open('data/croston_200.p', 'rb') as f:
             data_c = cPickle.load(f)
-        with open('eckert_200.p', 'rb') as f:
+        with open('data/eckert_200.p', 'rb') as f:
             data_e = cPickle.load(f)
     else:
-        with open('croston_500.p', 'rb') as f:
+        with open('data/croston_500.p', 'rb') as f:
             data_c = cPickle.load(f)
-        with open('eckert_500.p', 'rb') as f:
+        with open('data/eckert_500.p', 'rb') as f:
             data_e = cPickle.load(f)
 
     m500c = np.append(data_c['m500c'], data_e['m500c'])
@@ -787,6 +845,10 @@ def f_gas_prms():
     m500_obs, f_obs = np.loadtxt(ddir +
                                  'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                                  unpack=True)
+
+    # data assumed h=0.7
+    m500_obs = m500_obs * 0.7
+
     n_m = 15
     m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m)
     m = tools.bins2center(m_bins)
@@ -830,14 +892,14 @@ def f_gas_prms():
 
 def prof_prms(mean=False):
     if mean:
-        with open('croston_200.p', 'rb') as f:
+        with open('data/croston_200.p', 'rb') as f:
             data_c = cPickle.load(f)
-        with open('eckert_200.p', 'rb') as f:
+        with open('data/eckert_200.p', 'rb') as f:
             data_e = cPickle.load(f)
     else:
-        with open('croston_500.p', 'rb') as f:
+        with open('data/croston_500.p', 'rb') as f:
             data_c = cPickle.load(f)
-        with open('eckert_500.p', 'rb') as f:
+        with open('data/eckert_500.p', 'rb') as f:
             data_e = cPickle.load(f)
 
     m500c = np.append(data_c['m500c'], data_e['m500c'])
@@ -902,10 +964,10 @@ def beta_mass(f500c, f200m, prms=p.prms):
     f500c and f200m
     '''
     r = prms.r_range_lin#[::5]
-    m200m = prms.m_range_lin#[::5]
+    m200m = prms.m200m#[::5]
     r200m = tools.mass_to_radius(m200m, 200 * prms.omegam * prms.rho_crit *
                                  prms.h**2)
-    m500c = np.array([gas.m200m_to_m500c(m) for m in m200m])
+    m500c = np.array([tools.m200m_to_m500c(m) for m in m200m])
     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
 
     # # Gas fractions
@@ -960,10 +1022,10 @@ def beta_mass(f500c, f200m, prms=p.prms):
 #     equals f200m x m200m
 #     '''
 #     r = prms.r_range_lin
-#     m200m = prms.m_range_lin
+#     m200m = prms.m200m
 #     r200m = tools.mass_to_radius(m200m, 200 * prms.omegam * prms.rho_crit *
 #                                  prms.h**2)
-#     m500c = np.array([gas.m200m_to_m500c(m) for m in m200m])
+#     m500c = np.array([tools.m200m_to_m500c(m) for m in m200m])
 #     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
 
 #     # # Gas fractions
@@ -1016,9 +1078,9 @@ def fit_prms():
     '''
     Return observational beta profile fit parameters
     '''
-    with open('croston_500.p', 'rb') as f:
+    with open('data/croston_500.p', 'rb') as f:
         data_c = cPickle.load(f)
-    with open('eckert_500.p', 'rb') as f:
+    with open('data/eckert_500.p', 'rb') as f:
         data_e = cPickle.load(f)
 
     rc_e = data_e['rc']
@@ -1079,18 +1141,19 @@ def m200dmo_to_m200b(m_dmo):
 # ------------------------------------------------------------------------------
 
 def plot_profiles():
-    with open('croston.p', 'rb') as f:
+    with open('data/croston.p', 'rb') as f:
         data_c = cPickle.load(f)
-    with open('eckert.p', 'rb') as f:
+    with open('data/eckert.p', 'rb') as f:
         data_e = cPickle.load(f)
 
     pl.set_style()
+    # fig = plt.figure(figsize=(16,8))
+    # ax1 = fig.add_axes([0.1,0.1,0.4,0.8])
+    # ax2 = fig.add_axes([0.5,0.1,0.4,0.8])
     fig = plt.figure(figsize=(18,8))
-    ax1 = fig.add_axes([0.1,0.1,0.4,0.8])
-    ax2 = fig.add_axes([0.5,0.1,0.4,0.8])
-    # ax1 = fig.add_axes([0.05,0.1,0.3,0.8])
-    # ax2 = fig.add_axes([0.35,0.1,0.3,0.8])
-    # ax3 = fig.add_axes([0.65,0.1,0.3,0.8])
+    ax1 = fig.add_axes([0.1,0.1,0.266,0.8])
+    ax2 = fig.add_axes([0.366,0.1,0.266,0.8])
+    ax3 = fig.add_axes([0.632,0.1,0.266,0.8])
 
     rx_c = data_c['rx']
     rx_e = data_e['rx']
@@ -1102,6 +1165,7 @@ def plot_profiles():
     for r, prof in zip(rx_c, rho_c):
         ax1.plot(r, prof, ls='-', lw=0.5, c='k')
 
+    ax1.set_xlim([3e-3, 2])
     ax1.set_ylim([1e11, 1e16])
     ticks = ax1.get_xticklabels()
     ticks[-5].set_visible(False)
@@ -1109,31 +1173,47 @@ def plot_profiles():
     ax1.xaxis.set_tick_params(pad=8)
     ax1.set_xscale('log')
     ax1.set_yscale('log')
-    ax1.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax1.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-10)
     ax1.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
     ax1.set_title(r'Croston+08')
 
     # get median binned profiles
-    r_med, rho_med, m500_med, r500_med = bin_eckert()
+    r_med, rho_med, rho_std, m500_med, r500_med = bin_eckert()
 
     ax2.set_prop_cycle(cycler(c='k', lw=[0.5]))
     for r, prof in zip(rx_e, rho_e):
         ax2.plot(r, prof, ls='-', lw=0.5, c='k')
 
-    # for r, prof in zip(r_med, rho_med):
-    #     ax2.plot(r, prof, ls='-', lw=2, c='r')
-
+    ax2.set_xlim([3e-3, 2])
     ax2.set_ylim([1e11, 1e16])
-    ticks = ax2.get_xticklabels()
-    ticks[-3].set_visible(False)
+    # ticks = ax2.get_xticklabels()
+    # ticks[-3].set_visible(False)
 
     ax2.xaxis.set_tick_params(pad=8)
     ax2.set_xscale('log')
     ax2.set_yscale('log')
     ax2.set_yticklabels([])
-    ax2.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax2.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-10)
     # ax2.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
     text = ax2.set_title(r'Eckert+16')
+    title_props = text.get_fontproperties()
+
+    for r, prof, std in zip(r_med, rho_med, rho_std):
+        ax3.plot(r, prof, ls='-', lw=2, c='k')
+        ax3.fill_between(r, std[0], std[1], color='k', alpha=0.2)
+
+    ax3.set_xlim([3e-3, 2])
+    ax3.set_ylim([1e11, 1e16])
+    # ticks = ax3.get_xticklabels()
+    # ticks[-3].set_visible(False)
+
+    ax3.xaxis.set_tick_params(pad=8)
+    ax3.set_xscale('log')
+    ax3.set_yscale('log')
+    ax3.set_yticklabels([])
+    ax3.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-10)
+    # ax3.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
+    text = ax3.set_title(r'Eckert+16 binned')
     title_props = text.get_fontproperties()
 
     plt.show()
@@ -1171,7 +1251,7 @@ def plot_gas_fractions():
     # need it in this order to get correct yticks with log scale, since
     # twin instance seems to mess things up...
     axs = ax3.twiny()
-    m200 = np.array([gas.m500c_to_m200m(mass) for mass in m])
+    m200 = np.array([tools.m500c_to_m200m(mass) for mass in m])
     axs.plot(m200, m200)
     axs.cla()
 
@@ -1211,8 +1291,8 @@ def plot_gas_fractions():
     leg = ax3.legend(loc='best', numpoints=1, frameon=True, framealpha=0.8)
     leg.get_frame().set_linewidth(0.0)
 
-    axs.set_xlim(gas.m500c_to_m200m(ax3.get_xlim()[0]),
-                 gas.m500c_to_m200m(ax3.get_xlim()[-1]))
+    axs.set_xlim(tools.m500c_to_m200m(ax3.get_xlim()[0]),
+                 tools.m500c_to_m200m(ax3.get_xlim()[-1]))
     axs.set_xscale('log')
 
     axs.set_xlabel(r'$m_{\mathrm{200m}} \, [\mathrm{M_\odot}]$', labelpad=10)
@@ -1241,8 +1321,8 @@ def plot_fit_profiles_paper():
     with open('data/eckert.p', 'rb') as f:
         data_e = cPickle.load(f)
 
-    a_e, aerr_e, b_e, berr_e, msl_e, m500g_e = fit_eckert()
-    a_c, aerr_c, b_c, berr_c, msl_c, m500g_c = fit_croston()
+    a_e, aerr_e, b_e, berr_e, msl_e, m500g_e, r500_e = fit_eckert()
+    a_c, aerr_c, b_c, berr_c, msl_c, m500g_c, r500_c = fit_croston()
 
     # pl.set_style()
     fig = plt.figure(figsize=(18,8))
@@ -1300,7 +1380,7 @@ def plot_fit_profiles_paper():
     ax1.set_ylabel(r'$\frac{m_\mathrm{fit}(<r) - m_\mathrm{obs}(<r)}{m_\mathrm{gas,500c}}$')
 
     # get median binned profiles
-    r_med, rho_med, m500_med, r500_med = bin_eckert()
+    r_med, rho_med, rho_std, m500_med, r500_med = bin_eckert()
 
     ax2.set_prop_cycle(cycler(c='k', lw=[0.5]))
     m500_fit_e = np.empty((0), dtype=float)
@@ -1355,9 +1435,9 @@ def corr_fit(x, a, b):
     return a + b * x
 
 def plot_correlation():
-    with open('croston_500.p', 'rb') as f:
+    with open('data/croston_500.p', 'rb') as f:
         data_c = cPickle.load(f)
-    with open('eckert_500.p', 'rb') as f:
+    with open('data/eckert_500.p', 'rb') as f:
         data_e = cPickle.load(f)
     beta, rc, m500c, r, prof_h = beta_mass()
 
@@ -1454,7 +1534,7 @@ def plot_correlation():
 # ------------------------------------------------------------------------------
 
 def plot_profiles_croston_presentation():
-    with open('croston.p', 'rb') as f:
+    with open('data/croston.p', 'rb') as f:
         data_c = cPickle.load(f)
 
     fig1 = plt.figure(1,figsize=(10,9))
@@ -1484,7 +1564,7 @@ def plot_profiles_croston_presentation():
 # ------------------------------------------------------------------------------
 
 def plot_profiles_eckert_presentation():
-    with open('eckert.p', 'rb') as f:
+    with open('data/eckert.p', 'rb') as f:
         data_e = cPickle.load(f)
 
     pl.set_style('line')
@@ -1585,10 +1665,10 @@ def plot_profiles_fgas_presentation():
 # End of plot_profiles_presentation()
 # ------------------------------------------------------------------------------
 
-def plot_fit_prms_presentation():
-    with open('croston_200.p', 'rb') as f:
+def plot_fit_prms_paper():
+    with open('data/croston_200.p', 'rb') as f:
         data_c = cPickle.load(f)
-    with open('eckert_200.p', 'rb') as f:
+    with open('data/eckert_200.p', 'rb') as f:
         data_e = cPickle.load(f)
 
     rc_e = data_e['rc']
@@ -1613,7 +1693,7 @@ def plot_fit_prms_presentation():
     ax.axhline(y=np.median(rc), ls='-', c='k')
     ax.annotate('median', xy=(1.05 * m200m.min(), 1.05 * np.median(rc)))
     ax.set_xscale('log')
-    ax.set_xlabel('$m_{\mathrm{200m}}\, [\mathrm{M_\odot}]$')
+    ax.set_xlabel('$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$')
     ax.set_ylabel('$r_\mathrm{c}/r_{\mathrm{200m}}$')
     ax.legend(loc='best')
     plt.savefig('obs_rc_fit.pdf', transparent=True)
@@ -1627,7 +1707,7 @@ def plot_fit_prms_presentation():
     ax.axhline(y=np.median(beta), ls='-', c='k')
     ax.annotate('median', xy=(1.05 * m200m.min(), 1.05 * np.median(beta)))
     ax.set_xscale('log')
-    ax.set_xlabel('$m_{\mathrm{200m}}\, [\mathrm{M_\odot}]$')
+    ax.set_xlabel('$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$')
     ax.set_ylabel(r'$\beta$')
     ax.legend(loc='best')
     plt.savefig('obs_beta_fit.pdf', transparent=True)
@@ -1637,9 +1717,9 @@ def plot_fit_prms_presentation():
 # ------------------------------------------------------------------------------
 
 def plot_correlation_presentation():
-    with open('croston_500.p', 'rb') as f:
+    with open('data/croston_500.p', 'rb') as f:
         data_c = cPickle.load(f)
-    with open('eckert_500.p', 'rb') as f:
+    with open('data/eckert_500.p', 'rb') as f:
         data_e = cPickle.load(f)
     beta, rc, m500c, r, prof_h = beta_mass()
 
@@ -1716,27 +1796,27 @@ def plot_correlation_presentation():
 # ------------------------------------------------------------------------------
 
 def plot_beta_presentation():
-    with open('croston.p', 'rb') as f:
+    with open('data/croston.p', 'rb') as f:
         data_croston = cPickle.load(f)
 
-    r500 = data_croston['r500']
-    m500g = data_croston['m500gas']
+    r500 = data_croston['r500'] * 0.7
+    m500g = data_croston['m500gas'] * 0.7
     rx = data_croston['rx']
     rho = data_croston['rho']
-
+    rho = [r / 0.7**2 for r in rho]
     idx = 25
 
     r = rx[idx]
     prof = rho[idx]
 
-    rc, rc_err, beta, beta_err, m_sl, m500g = fit_croston()
+    rc, rc_err, beta, beta_err, m_sl, m500g, r500 = fit_croston()
 
     fig = plt.figure(figsize=(10,9))
     ax = fig.add_subplot(111)
 
     sl = ((prof > 0) & (r >= 0.05))
     mass = tools.m_h(prof[sl], r[sl] * r500[idx])
-    print '%e'%tools.radius_to_mass(r500[idx], 500 * p.prms.rho_crit * p.prms.h**2)
+    print '%e'%tools.radius_to_mass(r500[idx], 500 * p.prms.rho_crit)
 
     pl.set_style('mark')
     ax.plot(r, prof, lw=0, marker='o')
@@ -1745,7 +1825,7 @@ def plot_beta_presentation():
     ax.set_xscale('log')
     ax.set_yscale('log')
     ax.set_xlabel(r'$r/r_\mathrm{500c}$')
-    ax.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
+    ax.set_ylabel(r'$\rho(r) \, [h^2 \, \mathrm{M_\odot/Mpc^3}]$')
 
     plt.savefig('obs_beta.pdf', transparent=True)
     plt.show()
@@ -1768,7 +1848,7 @@ def plot_missing_mass_paper(comp_gas):
     f_dm = p.prms.f_dm * np.ones_like(m_range)
     f_gas = comp_gas.m_h / m_range
 
-    m500c = np.array([gas.m200m_to_m500c(mass) for mass in m_range[::5]])
+    m500c = np.array([tools.m200m_to_m500c(mass) for mass in m_range[::5]])
     f500c = d.f_gas(m500c, **d.f_gas_prms()[0])
 
     ax.plot(m_range, f_dm, label='$f_{\mathrm{dm}}$')
@@ -1797,8 +1877,8 @@ def plot_masses_hist_paper():
 
     m500cc = gas.mgas_to_m500c(m500g_c)
     m500ce = gas.mgas_to_m500c(m500g_e)
-    m200mc = np.array([gas.m500c_to_m200m(m) for m in m500cc])
-    m200me = np.array([gas.m500c_to_m200m(m) for m in m500ce])
+    m200mc = np.array([tools.m500c_to_m200m(m) for m in m500cc])
+    m200me = np.array([tools.m500c_to_m200m(m) for m in m500ce])
 
     mn = np.min(np.hstack([m200mc, m200me]))
     mx = np.max(np.hstack([m200mc, m200me]))

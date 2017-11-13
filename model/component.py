@@ -251,7 +251,7 @@ class Component(dens.Profile):
 
         # HM way
         # r_x = self.r_range[:,-1].reshape(m,1)
-        r_x = p.prms.r_h.reshape(m,1)
+        r_x = p.prms.r200m.reshape(m,1)
         prefactor = 4./3 * np.pi * 200.
         result = Integrate(y=fnu * f_comp**2 * np.abs(self.rho_k)**2 * r_x**3,
                            x=nu,

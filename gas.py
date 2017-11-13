@@ -21,7 +21,7 @@ import halo.tools as tools
 
 import pdb
 
-ddir = '/Volumes/Data/stijn/Documents/Leiden/MR/code/halo/data/'
+ddir = '/Users/stijn/Documents/Leiden/MR/code/halo/data/'
 prms = p.prms
 
 def T2Mgas(T):
@@ -299,7 +299,7 @@ def fit_beta_bahamas():
     '''
     Fit beta profiles to the bahamas bins
     '''
-    binned = h5py.File('/Volumes/Data/stijn/Documents/Universiteit/MR/code/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500.hdf5 ', 'r')
+    binned = h5py.File('~/stijn/Documents/Universiteit/MR/code/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500.hdf5 ', 'r')
 
     rho = binned['PartType0/MedianDensity'][:]
     q16 = binned['PartType0/Q16'][:]
@@ -374,7 +374,7 @@ def f_gas(M_halo, M_trans, a, f_0):
 # End of f_gas()
 # ------------------------------------------------------------------------------
 
-def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
+def f_gas_fit(m_range=p.prms.m200m, n_bins=10):
     '''
     Fit the f_gas-M_500 relation
     '''
@@ -389,7 +389,7 @@ def f_gas_fit(m_range=p.prms.m_range_lin, n_bins=10):
                                                    statistic=np.std,
                                                    bins=n_bins)
     m500 = np.power(10, m500)
-    # c_x = profs.c_correa(m_range, z_range=0).reshape(-1)
+    # c_x = tools.c_correa(m_range, z_range=0).reshape(-1)
     # m500_model = m_range * tools.Mx_to_My(1., 200, 500, c_x, p.prms.rho_m * 0.7**2)
 
     # m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
@@ -501,7 +501,7 @@ def fit_sun_profile():
 
     # M = 2.5e14
     M = rhogas_sun.M
-    m200m = m500c_to_m200m(M)
+    m200m = tools.m500c_to_m200m(M)
     r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
     r500c = tools.mass_to_radius(M, 500 * p.prms.rho_crit * 0.7**2)
 
@@ -633,174 +633,4 @@ def fit_croston_profile():
 
 # ------------------------------------------------------------------------------
 # End of fit_croston_profile()
-# ------------------------------------------------------------------------------
-
-def massdiff_5c2m(m500c, m200m):
-    '''
-    Integrate an NFW halo with m200m up to r500c and return the mass difference
-    between the integral and m500c
-    '''
-    r500c = (m500c / (4./3 * np.pi * 500 * p.prms.rho_crit * p.prms.h**2))**(1./3)
-    r_range = np.logspace(-4, np.log10(r500c), 1000)
-
-    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
-                                 * p.prms.h**2)
-    dens = profs.profile_NFW(r_range, np.array([m200m]),
-                             profs.c_correa(m200m, 0).reshape(-1),
-                             np.array([r200m]),
-                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
-                             Delta=200)
-    mass_int = tools.m_h(dens, r_range)
-
-    return mass_int - m500c
-
-
-def massdiff_2m5c(m200m, m500c):
-    '''
-    Integrate an NFW halo with m200m up to r500c and return the mass difference
-    between the integral and m500c
-    '''
-    r500c = (m500c / (4./3 * np.pi * 500 * p.prms.rho_crit * p.prms.h**2))**(1./3)
-    r_range = np.logspace(-4, np.log10(r500c), 1000)
-
-    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
-                                 * p.prms.h**2)
-    dens = profs.profile_NFW(r_range, np.array([m200m]),
-                             profs.c_correa(m200m, 0).reshape(-1),
-                             np.array([r200m]),
-                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
-                             Delta=200)
-    mass_int = tools.m_h(dens, r_range)
-
-    return mass_int - m500c
-
-def m500c_to_m200m(m500c):
-    '''
-    Give the virial mass for the halo corresponding to m500c
-
-    Parameters
-    ----------
-    m500c : float
-      halo mass at 500 times the universe critical density
-
-    Returns
-    -------
-    m200m : float
-      corresponding halo model halo virial mass
-    '''
-    # 1e19 Msun is ~maximum for c_correa
-    m200m = opt.brentq(massdiff_2m5c, 1e5, 1e19, args=(m500c))
-
-    return m200m
-
-# ------------------------------------------------------------------------------
-# End of m500c_to_m200m()
-# ------------------------------------------------------------------------------
-
-def m200m_to_m500c(m200m):
-    '''
-    Give m500c for the an m200m virial mass halo
-
-    Parameters
-    ----------
-    m200m : float
-      halo virial mass
-
-    Returns
-    -------
-    m500c : float
-      halo mass at 500 times the universe critical density
-    '''
-    # 1e19 Msun is ~maximum for c_correa
-    m500c = opt.brentq(massdiff_5c2m, 1e5, 1e19, args=(m200m))
-
-    return m500c
-
-# ------------------------------------------------------------------------------
-# End of m200m_to_m500c()
-# ------------------------------------------------------------------------------
-
-def massdiff_2c2m(m200c, m200m):
-    '''
-    Integrate an NFW halo with m200m up to r200c and return the mass difference
-    between the integral and m200c
-    '''
-    r200c = (m200c / (4./3 * np.pi * 200 * p.prms.rho_crit * p.prms.h**2))**(1./3)
-    r_range = np.logspace(-4, np.log10(r200c), 1000)
-
-    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
-                                 * p.prms.h**2)
-    dens = profs.profile_NFW(r_range, np.array([m200m]),
-                             profs.c_correa(m200m, 0).reshape(-1),
-                             np.array([r200m]),
-                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
-                             Delta=200)
-    mass_int = tools.m_h(dens, r_range)
-
-    return mass_int - m200c
-
-
-def massdiff_2m2c(m200m, m200c):
-    '''
-    Integrate an NFW halo with m200m up to r200c and return the mass difference
-    between the integral and m200c
-    '''
-    r200c = (m200c / (4./3 * np.pi * 200 * p.prms.rho_crit * p.prms.h**2))**(1./3)
-    r_range = np.logspace(-4, np.log10(r200c), 1000)
-
-    r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.omegam
-                                 * p.prms.h**2)
-    dens = profs.profile_NFW(r_range, np.array([m200m]),
-                             profs.c_correa(m200m, 0).reshape(-1),
-                             np.array([r200m]),
-                             p.prms.rho_crit * p.prms.omegam * p.prms.h**2,
-                             Delta=200)
-    mass_int = tools.m_h(dens, r_range)
-
-    return mass_int - m200c
-
-def m200c_to_m200m(m200c):
-    '''
-    Give the virial mass for the halo corresponding to m200c
-
-    Parameters
-    ----------
-    m200c : float
-      halo mass at 500 times the universe critical density
-
-    Returns
-    -------
-    m200m : float
-      corresponding halo model halo virial mass
-    '''
-    # 1e19 Msun is ~maximum for c_correa
-    m200m = opt.brentq(massdiff_2m2c, 1e5, 1e19, args=(m200c))
-
-    return m200m
-
-# ------------------------------------------------------------------------------
-# End of m200c_to_m200m()
-# ------------------------------------------------------------------------------
-
-def m200m_to_m200c(m200m):
-    '''
-    Give m200c for the an m200m virial mass halo
-
-    Parameters
-    ----------
-    m200m : float
-      halo virial mass
-
-    Returns
-    -------
-    m200c : float
-      halo mass at 500 times the universe critical density
-    '''
-    # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c2m, 1e5, 1e19, args=(m200m))
-
-    return m200c
-
-# ------------------------------------------------------------------------------
-# End of m200m_to_m200c()
 # ------------------------------------------------------------------------------

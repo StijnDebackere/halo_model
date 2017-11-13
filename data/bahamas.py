@@ -618,7 +618,7 @@ def compare_temperature_censat(r2=True):
                          for idx in range(cum_index.shape[0] - 1)])
 
     m500c = tools.radius_to_mass(r500_med, 500 * p.prms.rho_crit * p.prms.h**2)
-    m200m = np.array([gas.m500c_to_m200m(i) for i in m500c])
+    m200m = np.array([tools.m500c_to_m200m(i) for i in m500c])
     r200 = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.h**2 *
                                 p.prms.omegab)
     # get radial range
@@ -819,7 +819,7 @@ def compare_censat(r2=True):
                          for idx in range(1, cum_index.shape[0] - 1)])
 
     m500c = tools.radius_to_mass(r500_med, 500 * p.prms.rho_crit * p.prms.h**2)
-    m200m = np.array([gas.m500c_to_m200m(i) for i in m500c])
+    m200m = np.array([tools.m500c_to_m200m(i) for i in m500c])
     r200 = tools.mass_to_radius(m200m, 200 * p.prms.rho_crit * p.prms.h**2 *
                                 p.prms.omegab)
 

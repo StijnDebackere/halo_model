@@ -147,7 +147,7 @@ def c_dmo(m):
     return plaw
 
 def load_dm_dmo1(prms):
-    m_range = mdmo_to_m200(prms.m_range_lin)
+    m_range = mdmo_to_m200(prms.m200m)
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
                       'm_range': m_range,
@@ -196,13 +196,13 @@ def load_dm_dmo1(prms):
 def load_dm_dmo2(prms):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
+                      'm_range': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
 
 
-    m_range = prms.m_range_lin
+    m_range = prms.m200m
     # --------------------------------------------------------------------------
     # DMO fit
     f_dm = np.ones_like(m_range)
@@ -242,13 +242,13 @@ def load_dm_dmo2(prms):
 def load_dm(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
+                      'm_range': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
 
 
-    m_range = prms.m_range_lin
+    m_range = prms.m200m
     # # --------------------------------------------------------------------------
     # # DMO fit
     # f_dm = np.ones_like(m_range)
@@ -364,7 +364,7 @@ def fit_alpha(k_range, P1, P2, power):
 def load_gas(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
+                      'm_range': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
@@ -372,15 +372,15 @@ def load_gas(prms=p.prmst):
     rw_prms, sw_prms, rc_prms, b_prms, rs_prms, ss_prms, mw_prms, mc_prms, ms_prms, r0w_prms, r0s_prms = b.plot_gas_fit_bahamas_median()
 
 
-    f_w = b.gas_warm_mw_fit(prms.m_range_lin, **mw_prms)
-    fc_h = b.gas_hot_mc_fit(prms.m_range_lin, **mc_prms)
-    fs_h = b.gas_hot_ms_fit(prms.m_range_lin, **ms_prms)
+    f_w = b.gas_warm_mw_fit(prms.m200m, **mw_prms)
+    fc_h = b.gas_hot_mc_fit(prms.m200m, **mc_prms)
+    fs_h = b.gas_hot_ms_fit(prms.m200m, **ms_prms)
 
     # # reshape profile parameters
-    # r_x = (prms.r_h / prms.h)
-    # m = (prms.m_range_lin / prms.h)
-    m = prms.m_range_lin
-    r_x = prms.r_h
+    # r_x = (prms.r200m / prms.h)
+    # m = (prms.m200m / prms.h)
+    m = prms.m200m
+    r_x = prms.r200m
 
     ############################################################################
     # Need to slice with r0
@@ -473,7 +473,7 @@ def load_gas(prms=p.prmst):
 def load_stars(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m_range_lin,
+                      'm_range': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
@@ -481,15 +481,15 @@ def load_stars(prms=p.prmst):
     as_prms, bs_prms, r0_prms, ms_prms, ac_prms, bc_prms, cc_prms, mc_prms = b.plot_stars_fit_bahamas_median()
 
 
-    fc = b.stars_mc_fit(prms.m_range_lin, **mc_prms)
-    fs = b.stars_ms_fit(prms.m_range_lin, **ms_prms)
+    fc = b.stars_mc_fit(prms.m200m, **mc_prms)
+    fs = b.stars_ms_fit(prms.m200m, **ms_prms)
     f_cold = 0.4 * fc
 
     # # reshape profile parameters
-    # r_x = (prms.r_h / prms.h)
-    # m = (prms.m_range_lin / prms.h)
-    r_x = prms.r_h
-    m = prms.m_range_lin
+    # r_x = (prms.r200m / prms.h)
+    # m = (prms.m200m / prms.h)
+    r_x = prms.r200m
+    m = prms.m200m
 
     ############################################################################
     # Satellites

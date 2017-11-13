@@ -1,9 +1,9 @@
-'''
-Main definitions to ease use of the package
+'''Main definitions to ease use of the package
 
 TODO
 ----
 add methods to Parameters docstring
+
 '''
 
 import numpy as np
@@ -75,8 +75,11 @@ class Parameters(Cache):
     dlog10m : float
       log10m mass interval for mass function
 
+    rho_m : float [units Msun h^2 / Mpc^3]
+      mean matter density of the universe
+
     '''
-    def __init__(self, m_range_lin, #m_range_mfn,
+    def __init__(self, m200m, #m_range_mfn,
                  m_min=10, m_max=15, m_bins=101,
                  r_min=-4.0, r_bins=1000,
                  k_min=-1.8, k_max=2., k_bins=1000,
@@ -95,8 +98,8 @@ class Parameters(Cache):
                  delta_wrt='mean', delta_c=1.686,
                  rho_crit=2.7763458 * (10.0**11.0)):
         super(Parameters, self).__init__()
-        self.m_range_lin = m_range_lin
-        # self.m_range_mfn = m_range_lin
+        self.m200m = m200m
+        # self.m_range_mfn = m200m
         self.m_min = m_min
         self.m_max = m_max
         self.m_bins = m_bins
@@ -128,7 +131,7 @@ class Parameters(Cache):
     # Parameters
     #===========================================================================
     @parameter
-    def m_range_lin(self, val):
+    def m200m(self, val):
         return val
 
     # @parameter
@@ -248,6 +251,37 @@ class Parameters(Cache):
     #===========================================================================
     # Methods
     #===========================================================================
+    @cached_property('m200m', 'rho_m')
+    def r200m(self):
+        return tools.mass_to_radius(self.m200m, self.rho_m * 200)
+
+    @cached_property('m200m', 'rho_crit', 'rho_m')
+    def m200c(self):
+        return np.array([tools.m200m_to_m200c(m, self.rho_crit, self.rho_m)
+                         for m in self.m200m])
+
+    @cached_property('m200c', 'rho_crit')
+    def r200c(self):
+        return tools.mass_to_radius(self.m200c, 200 * self.rho_crit)
+
+    @cached_property('m200m', 'rho_crit', 'rho_m')
+    def m500c(self):
+        return np.array([tools.m200m_to_m500c(m, self.rho_crit, self.rho_m)
+                         for m in self.m200m])
+
+    @cached_property('m500c', 'rho_crit')
+    def r500c(self):
+        return tools.mass_to_radius(self.m500c, 500 * self.rho_crit)
+
+    @cached_property('m200c', 'h', 'r200c', 'r200m')
+    def c_correa(self):
+        '''
+        The density profiles always assume cosmology dependent variables
+        '''
+        return (np.array([tools.c_correa(m/self.h)
+                         for m in self.m200c]).reshape(-1)
+                * self.r200m / self.r200c)
+
     @cached_property('omegab', 'omegac')
     def omegam(self):
         return self.omegab + self.omegac
@@ -292,7 +326,7 @@ class Parameters(Cache):
                      'delta_wrt', 'delta_c', 'trans_prms')
     def m_fn_prms(self):
         massf = {
-            # "m_range": self.m_range_lin,
+            # "m_range": self.m200m,
             "Mmin": self.m_min,
             "Mmax": self.m_max,
             "dlog10m": self.dlog10m,
@@ -316,31 +350,6 @@ class Parameters(Cache):
         plin = p_int(self.k_range_lin)
         return plin
 
-    # @staticmethod
-    # def _MF_ST(nu):
-    #     '''Returns Sheth-Tormen mass function'''
-    #     p=0.3
-    #     q=0.707
-
-    #     mfn=0.21616*(1.+((q*nu*nu)**(-p)))*np.exp(-q*nu*nu/2.)
-    #     return mfn
-
-    # @staticmethod
-    # def _MF_Tinker10(nu):
-    #     '''Returns Tinker (2010) mass function'''
-    #     a = 0.368
-    #     b = 0.589
-    #     p = -0.729
-    #     e = -0.243
-    #     g = 0.864
-    #     # N = 1.5104431117066848
-
-    #     # N tuned to integrate to rho_m in halo model
-    #     # mfn = N * a * (1 + (b*nu)**(-2*p)) * nu**(2*e) * np.exp(-g*nu**2/2.)
-    #     mfn = a * (1 + (b*nu)**(-2*p)) * nu**(2*e) * np.exp(-g*nu**2/2.)
-
-    #     return mfn
-
     @cached_property('nu_file', 'm_fn')
     def nu(self):
         nu, fnu = np.loadtxt(self.nu_file, unpack=True)
@@ -353,42 +362,9 @@ class Parameters(Cache):
         # fnu = self.m_fn.fsigma / self.nu
         return fnu
 
-    # @cached_property('m_range_lin', 'm_fn_prms')
-    # def rho_m(self):
-    #     return tools.Integrate(self.m_fn.dndlnm, self.m_range_lin)
-
     @cached_property('omegab', 'omegac', 'rho_crit', 'h')
     def rho_m(self):
         return (self.omegab + self.omegac) * self.rho_crit
-
-    @staticmethod
-    def _E(a, omegam, omegav):
-        return np.sqrt(omegam * a**(-3) + omegav)
-
-    @staticmethod
-    def growth(z, omegam, omegav):
-        dlna = 0.001
-        a_0 = 0.0001
-        a_1 = 1. / (1 + z)
-
-        if z != 0:
-            # values for z
-            a_r = np.exp(np.arange(np.log(a_0), np.log(a_1), dlna))
-            E_r = Parameters._E(a_r, omegam, omegav)
-            E_a = Parameters._E(a_1, omegam, omegav)
-
-            # values for normalization
-            a_n = np.exp(np.arange(np.log(a_0), np.log(1), dlna))
-            E_n = Parameters._E(a_n, omegam, omegav)
-
-            dz = E_a * tools.Integrate(1./(a_r**3 * E_r**3), a_r)
-            d0 = tools.Integrate(1./(a_n**3 * E_n**3), a_n)
-
-        else:
-            dz = 1.
-            d0 = 1.
-
-        return dz/d0
 
     @cached_property('omegab', 'omegam')
     def f_dm(self):
@@ -398,14 +374,10 @@ class Parameters(Cache):
     def rho_dm(self):
         return self.f_dm * self.rho_m
 
-    @cached_property('m_range_lin', 'rho_m', 'delta_h')
-    def r_h(self):
-        return tools.mass_to_radius(self.m_range_lin, self.rho_m * self.delta_h)
-
     @cached_property('r_min', 'r_h', 'r_bins')
     def r_range_lin(self):
         return np.array([np.logspace(self.r_min, np.log10(r_max), self.r_bins)
-                         for r_max in self.r_h])
+                         for r_max in self.r200m])
 
     @cached_property('H0')
     def h(self):
@@ -418,45 +390,45 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m_range_lin=np.logspace(10,11,101),
+prms1 = Parameters(m200m=np.logspace(10,11,101),
                    m_min=10., m_max=11.,
                    nu_file='HMcode/nu_fnu_dmo_10_11.dat',
                    fnu_file='HMcode/nu_fnu_dmo_10_11.dat',
                    p_lin_file='HMcode/plin.dat')
-prms2 = Parameters(m_range_lin=np.logspace(11,12,101),
+prms2 = Parameters(m200m=np.logspace(11,12,101),
                    m_min=11., m_max=12.,
                    nu_file='HMcode/nu_fnu_dmo_11_12.dat',
                    fnu_file='HMcode/nu_fnu_dmo_11_12.dat',
                    p_lin_file='HMcode/plin.dat')
-prms3 = Parameters(m_range_lin=np.logspace(12,13,101),
+prms3 = Parameters(m200m=np.logspace(12,13,101),
                    m_min=12., m_max=13.,
                    nu_file='HMcode/nu_fnu_dmo_12_13.dat',
                    fnu_file='HMcode/nu_fnu_dmo_12_13.dat',
                    p_lin_file='HMcode/plin.dat')
-prms4 = Parameters(m_range_lin=np.logspace(13,14,101),
+prms4 = Parameters(m200m=np.logspace(13,14,101),
                    m_min=13., m_max=14.,
                    nu_file='HMcode/nu_fnu_dmo_13_14.dat',
                    fnu_file='HMcode/nu_fnu_dmo_13_14.dat',
                    p_lin_file='HMcode/plin.dat')
-prms5 = Parameters(m_range_lin=np.logspace(14,15,101),
+prms5 = Parameters(m200m=np.logspace(14,15,101),
                    m_min=14., m_max=15.,
                    nu_file='HMcode/nu_fnu_dmo_14_15.dat',
                    fnu_file='HMcode/nu_fnu_dmo_14_15.dat',
                    p_lin_file='HMcode/plin.dat')
-prmst = Parameters(m_range_lin=np.logspace(10,15,101),
+prmst = Parameters(m200m=np.logspace(10,15,101),
                    m_min=10., m_max=15.,
                    nu_file='HMcode/nu_fnu_dmo_10_15.dat',
                    fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
                    p_lin_file='HMcode/plin.dat')
 
-prms = Parameters(m_range_lin=np.logspace(11,15,101),
+prms = Parameters(m200m=np.logspace(11,15,101),
                   m_min=11, m_max=15,
                   k_min=-1.8, k_max=2, k_bins=1000,
                   nu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
                   fnu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
                   p_lin_file='HMcode/plin_k-1p8_2.dat')
 
-# prms_comp = Parameters(m_range_lin=np.logspace(10,15,101),
+# prms_comp = Parameters(m200m=np.logspace(10,15,101),
 #                        m_min=10, m_max=15,
 #                        # ~ 0.001 < kR < 100
 #                        k_min=-3, k_max=2, k_bins=1000,

@@ -11,7 +11,6 @@ example.
 import numpy as np
 import scipy.special
 import scipy.optimize as opt
-import commah
 
 import matplotlib.pyplot as plt
 
@@ -20,72 +19,6 @@ import halo.sersic as sersic
 import halo.model.density as dens
 
 import pdb
-
-def c_correa(m_range,z_range,cosmology='WMAP9'):
-    '''
-    Returns the mass-concentration relation from Correa et al (2015c)
-    through the commah code.
-
-    Parameters
-    ----------
-    m_range : (m,) array
-      array containing masses to compute NFW profile for (mass at z=0)
-    z_range : (z,) array
-      redshift to evaluate mass-concentration relation at
-    cosmology : string or dict for commah
-      cosmological parameters for commah
-
-    Returns
-    -------
-    c : (m,z) array
-      array containing concentration for each (m,z)
-    '''
-    # (m,z) array
-    c = commah.run(cosmology=cosmology, Mi=m_range, z=z_range, mah=False)['c']
-    return c
-
-# ------------------------------------------------------------------------------
-# End of c_correa()
-# ------------------------------------------------------------------------------
-
-def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
-    '''
-    Returns the mass-concentration relation from Duffy et al (2008).
-
-        c = A * (m/m_pivot)^B * (1+z)^C
-
-    Parameters
-    ----------
-    m_range : (m,) array
-      array containing masses to compute NFW profile for (mass at z=0)
-    z_range : (z,) array
-      redshift to evaluate mass-concentration relation at
-    m_pivot : float (same units as m_range)
-      pivot scale for fit
-    A : float
-      scale parameter for fit
-    B : float
-      mass parameter for fit
-    C : float
-      redshift parameter for fit
-
-    Returns
-    -------
-    c : (m,z) array
-      array containing concentration for each (m,z)
-    '''
-    m = m_range.shape[0]
-    z = np.array(np.array(z_range).shape)
-
-    m_range = m_range.reshape([m] + list(z/z))
-    z_range = np.array(z_range).reshape([1] + list(z))
-
-    c = A * (m_range/m_pivot)**B * (1+z_range)**C
-    return c
-
-# ------------------------------------------------------------------------------
-# End of c_duffy()
-# ------------------------------------------------------------------------------
 
 def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     '''

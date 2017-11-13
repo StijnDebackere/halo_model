@@ -31,11 +31,11 @@ prms = m.prms
 prms.m_min = 11.0
 prms.m_max = 14.0
 
-d_s = f_ds(prms.m_range_lin)
-r_s = f_rs(prms.m_range_lin)
-d_i = f_di(prms.m_range_lin)
-r_i = f_ri(prms.m_range_lin)
-r_h = f_rh(prms.m_range_lin)
+d_s = f_ds(prms.m200m)
+r_s = f_rs(prms.m200m)
+d_i = f_di(prms.m200m)
+r_i = f_ri(prms.m200m)
+r_h = f_rh(prms.m200m)
 
 r_range_lin = np.array([np.linspace(0.005 * rh, rh, prms.r_bins) for rh in r_h])
 m_range_lin = tools.radius_to_mass(r_h, prms.rho_crit)
@@ -67,7 +67,7 @@ prof_schaller = comp.Component(m_fn=prms.m_fn, f_comp=1.,
 
 # rho_k = profs.profile_Schaller_f(k_range=prms.k_range_lin,
 #                                  r_range=prms.r_range_lin,
-#                                  m_range=prms.m_range_lin,
+#                                  m_range=prms.m200m,
 #                                  rho_mean=prms.rho_m,
 #                                  omegam=prms.omegam,
 #                                  r_i=r_i,
@@ -76,7 +76,7 @@ prof_schaller = comp.Component(m_fn=prms.m_fn, f_comp=1.,
 
 # profile_kwargs = {
 #     'r_range': prms.r_range_lin,
-#     'm_range': prms.m_range_lin,
+#     'm_range': prms.m200m,
 #     'k_range': prms.k_range_lin,
 #     'profile': rho_r,
 #     'profile_f': rho_k
