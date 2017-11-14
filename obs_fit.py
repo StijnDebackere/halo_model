@@ -30,21 +30,20 @@ def load_dm_dmo(prms=p.prms):
     '''
     Pure dark matter only component with NFW profile and f_dm = 1
     '''
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-
-    m_range = prms.m200m
+    m200m = prms.m200m
     m200c = prms.m200c
     r200c = prms.r200c
-    # --------------------------------------------------------------------------
-    # Correa
+
     f_dm = np.ones_like(m_range)
     c200m = prms.c_correa
     r200m = prms.r200m
+
+    # general profile kwargs to be used for all components
+    profile_kwargs = {'r_range': prms.r_range_lin,
+                      'm_bar': prms.m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
     # specific dm extra kwargs
     dm_extra = {'profile': profs.profile_NFW,
                 'profile_f': profs.profile_NFW_f,
@@ -53,19 +52,17 @@ def load_dm_dmo(prms=p.prms):
                                  'rho_mean': prms.rho_m},
                 'profile_f_args': {'c_x': c200m,
                                    'r_x': r200m,
-                                   'rho_mean': prms.rho_m},
-                'f_comp': f_dm}
+                                   'rho_mean': prms.rho_m}}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
+                      'r200m': r200m,
+                      'm200m': m200m,
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      # 'm_fn': prms.m_fn,
                       'f_comp': f_dm,}
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
 
@@ -80,21 +77,20 @@ def load_dm(prms=p.prms):
     '''
     Dark matter profile with NFW profile and f_dm = 1 - f_b
     '''
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-
-    m_range = prms.m200m
+    m200m = prms.m200m
     m200c = prms.m200c
     r200c = prms.r200c
-    # --------------------------------------------------------------------------
-    # Correa
+
     f_dm = np.ones_like(m_range) * prms.f_dm
     c200m = prms.c_correa
     r200m = prms.r200m
+
+    # general profile kwargs to be used for all components
+    profile_kwargs = {'r_range': prms.r_range_lin,
+                      'm_bar': prms.m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
     # specific dm extra kwargs
     dm_extra = {'profile': profs.profile_NFW,
                 'profile_f': profs.profile_NFW_f,
@@ -103,19 +99,17 @@ def load_dm(prms=p.prms):
                                  'rho_mean': prms.rho_m},
                 'profile_f_args': {'c_x': c200m,
                                    'r_x': r200m,
-                                   'rho_mean': prms.rho_m},
-                'f_comp': f_dm}
+                                   'rho_mean': prms.rho_m},}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
+                      'r200m': r200m,
+                      'm200m': m200m,
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,
-                      # 'm_fn': prms.m_fn,
                       'f_comp': f_dm,}
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
 
@@ -136,32 +130,30 @@ def load_gas_dmo(prms=p.prms):
     '''
     Gas component in beta profile with fgas_500c = fgas_200m = f_b
     '''
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-
     f_gas = (1 - prms.f_dm) * np.ones_like(prms.m200m)
     beta, rc, m500c, r, prof_h = d.beta_mass(f_gas, f_gas, prms)
     print beta / 3.
     print rc
+
+    # general profile kwargs to be used for all components
+    profile_kwargs = {'r_range': prms.r_range_lin,
+                      'm_bar': prms.m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
-    # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_h / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    # specific gas extra kwargs -> need to renormalize f_gas to halo mass
+    gas_extra = {'profile': prof_h / f_gas.reshape(-1,1),}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
+                       'r200m': prms.r200m,
+                       'm200m': prms.m200m,
                        'p_lin': prms.p_lin,
                        'nu': prms.nu,
                        'fnu': prms.fnu,
                        'f_comp': f_gas,}
-                       # 'm_fn': p.prms.m_fn,
-                       # 'bias_fn': bias.bias_Tinker10,
-                       # 'bias_fn_args': {'nu': prms.nu}}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -221,31 +213,29 @@ def load_gas(prms=p.prms, bar2dmo=True):
     # need to update profile parameters
     if bar2dmo == False:
         profile_kwargs = {'r_range': r_range,
-                          'm_range': prms.m200m,
+                          'm_bar': prms.m200m,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     else:
         profile_kwargs = {'r_range': r_range_dmo,
-                          'm_range': m_dmo,
+                          'm_bar': m_dmo,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
+                       'r200m': r200m,
+                       'm200m': m200m,
                        'p_lin': prms.p_lin,
                        'nu': prms.nu,
                        'fnu': prms.fnu,
                        'f_comp': f_gas}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -260,12 +250,6 @@ def load_gas_obs(prms=p.prms):
     '''
     Return beta profiles with fgas_500c = f_obs which only reach up until r500c
     '''
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-
     rc, beta = d.fit_prms()
 
     # halo model parameters
@@ -291,21 +275,24 @@ def load_gas_obs(prms=p.prms):
     mgas200 = tools.m_h(prof_gas, prms.r_range_lin)
     f_gas = mgas200 / m_range
 
+    profile_kwargs = {'r_range': prms.r_range_lin,
+                      'm_bar': prms.m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
+                       'r200m': r200m,
+                       'm200m': m200m,
                        'p_lin': prms.p_lin,
                        'nu': prms.nu,
                        'fnu': prms.fnu,
                        'f_comp': f_gas}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -333,12 +320,6 @@ def load_gas_smooth_r500c_r200m(prms=p.prms):
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
 
-    profile_kwargs = {'r_range': r_range,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-
     # gas fractions
     f_b = 1 - prms.f_dm
     # relative position of virial radius
@@ -353,20 +334,24 @@ def load_gas_smooth_r500c_r200m(prms=p.prms):
 
     mgas = tools.m_h(prof_gas, r_range)
     f_gas = mgas / (m_range)
+
+    profile_kwargs = {'r_range': r_range,
+                      'm_bar': prms.m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'smooth',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+                       'r200m': r200m,
+                       'm200m': m200m,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -425,30 +410,28 @@ def load_gas_5r500c(prms=p.prms, bar2dmo=True):
     # profile now runs between 0 and 5r500c
     if bar2dmo == False:
         profile_kwargs = {'r_range': r_range,
-                          'm_range': prms.m200m,
+                          'm_bar': prms.m200m,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     else:
         profile_kwargs = {'r_range': r_range_dmo,
-                          'm_range': m_dmo,
+                          'm_bar': m_dmo,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+                       'r200m': r200m,
+                       'm200m': m200m,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -522,30 +505,28 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms, bar2dmo=True):
     # profile now runs between 0 and 5r500c
     if bar2dmo == False:
         profile_kwargs = {'r_range': r_range,
-                          'm_range': prms.m200m,
+                          'm_bar': prms.m200m,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     else:
         profile_kwargs = {'r_range': r_range_dmo,
-                          'm_range': m_dmo,
+                          'm_bar': m_dmo,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+                       'r200m': r200m,
+                       'm200m': m200m,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -599,29 +580,27 @@ def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
     # profile now runs between 0 and 5r500c
     if bar2dmo == False:
         profile_kwargs = {'r_range': r_range,
-                          'm_range': prms.m200m,
+                          'm_bar': prms.m200m,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     else:
         profile_kwargs = {'r_range': r_range_dmo,
-                          'm_range': m_dmo,
+                          'm_bar': m_dmo,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
-    dm_extra = {'profile': prof_dm,
-                 'f_comp': f_dm}
+    dm_extra = {'profile': prof_dm}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_dm_kwargs = {'name': 'dm',
+                      'r200m': r200m,
+                      'm200m': m200m,
                       'p_lin': prms.p_lin,
                       'nu': prms.nu,
                       'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
 
@@ -663,25 +642,23 @@ def load_gas_dmo_5r500c(prms=p.prms):
 
     # profile now runs between 0 and 5r500c
     profile_kwargs = {'r_range': r_range,
-                      'm_range': prms.m200m,
+                      'm_bar': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'gas',
+                       'r200m': r200m,
+                       'm200m': m200m,
                        'p_lin': prms.p_lin,
                        'nu': prms.nu,
                        'fnu': prms.fnu,
                        'f_comp': f_gas,}
-                       # 'm_fn': p.prms.m_fn,
-                       # 'bias_fn': bias.bias_Tinker10,
-                       # 'bias_fn_args': {'nu': prms.nu}}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -737,30 +714,28 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
     # profile now runs between 0 and 5r500c
     if bar2dmo == False:
         profile_kwargs = {'r_range': r_range,
-                          'm_range': prms.m200m,
+                          'm_bar': prms.m200m,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     else:
         profile_kwargs = {'r_range': r_range_dmo,
-                          'm_range': m_dmo,
+                          'm_bar': m_dmo,
                           'k_range': prms.k_range_lin,
                           'n': 80,
                           'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
-                 'f_comp': f_gas}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     comp_gas_kwargs = {'name': 'smooth',
-                      'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,}
-                      # 'm_fn': p.prms.m_fn,
-                      # 'bias_fn': bias.bias_Tinker10,
-                      # 'bias_fn_args': {'nu': prms.nu}}
+                       'r200m': r200m,
+                       'm200m': m200m,
+                       'p_lin': prms.p_lin,
+                       'nu': prms.nu,
+                       'fnu': prms.fnu,}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
 
@@ -782,7 +757,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     '''
 #     # general profile kwargs to be used for all components
 #     profile_kwargs = {'r_range': prms.r_range_lin,
-#                       'm_range': prms.m200m,
+#                       'm_bar': prms.m200m,
 #                       'k_range': prms.k_range_lin,
 #                       'n': 80,
 #                       'taylor_err': 1.e-50}
@@ -854,7 +829,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     '''
 #     # general profile kwargs to be used for all components
 #     profile_kwargs = {'r_range': prms.r_range_lin,
-#                       'm_range': prms.m200m,
+#                       'm_bar': prms.m200m,
 #                       'k_range': prms.k_range_lin,
 #                       'n': 80,
 #                       'taylor_err': 1.e-50}
@@ -934,7 +909,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     '''
 #     # general profile kwargs to be used for all components
 #     profile_kwargs = {'r_range': prms.r_range_lin,
-#                       'm_range': prms.m200m,
+#                       'm_bar': prms.m200m,
 #                       'k_range': prms.k_range_lin,
 #                       'n': 80,
 #                       'taylor_err': 1.e-50}
@@ -1011,7 +986,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     '''
 #     # general profile kwargs to be used for all components
 #     profile_kwargs = {'r_range': prms.r_range_lin,
-#                       'm_range': prms.m200m,
+#                       'm_bar': prms.m200m,
 #                       'k_range': prms.k_range_lin,
 #                       'n': 80,
 #                       'taylor_err': 1.e-50}

@@ -28,7 +28,7 @@ def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each m
     m_range : (m,) array
       array containing masses to compute NFW profile for (mass at z=0)
     c_x : (m,) or (m,z) array
@@ -155,7 +155,7 @@ def profile_Schaller(r_range, r_s, d_s, r_i, d_i, rho_crit):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each m
     r_s : float (same units as r_range)
       value for r_s in Schaller profile (~constant)
     d_s : (m,) array
@@ -203,7 +203,7 @@ def profile_gNFW(r_range, c_x, alpha, r_x, m_s):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each r
     m_range : (m,) array
       array containing masses to compute NFW profile for (mass at z=0)
     c_x : (m,)
@@ -306,7 +306,7 @@ def profile_BCG(r_range, m_range, r_half):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each m
     m_range : (m,) array
       array containing masses to compute profile for (mass at z=0)
     r_half : (m,) array
@@ -344,7 +344,7 @@ def profile_ICL(r_range, m_range, r_half, n):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each m
     m_range : (m,) array
       array containing masses to compute profile for (mass at z=0)
     r_half : (m,) array
@@ -386,7 +386,7 @@ def profile_beta(r_range, m_x, r_x, beta, r_c):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each m
     m_x : (m,) array
       array containing masses to match at r_x
     r_x : (m,) array
@@ -434,7 +434,7 @@ def profile_beta_gamma(r_range, m_x, r_x, beta, gamma, r_c):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each m
     m_x : (m,) array
       array containing masses to match at r_x
     r_x : (m,) array
@@ -488,7 +488,7 @@ def profile_beta_plaw(r_range, m_x, r_x, beta, gamma, r_c):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
+      array containing r_range for each m
     m_x : (m,) array
       array containing masses to match at r_x
     r_x : (m,) array

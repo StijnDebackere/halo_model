@@ -20,9 +20,10 @@ class Profile(Cache):
     Parameters
     ----------
     r_range : (m,r) array
-      array containing r_range for each M (with r_range[:,-1] = r_vir)
-    m_range : (m,) array
-      array containing masses to compute profile for
+      array containing r_range for each m
+    m_bar : (m,) array
+      array containing total halo mass (this needn't be m200m )to compute
+      profile for
     k_range : (k,) array
       array containing wavevectors to compute profile for
     profile : function or array
@@ -59,7 +60,7 @@ class Profile(Cache):
     m_h : (m,) array
       array containing the halo mass for each halo, obtained by integration
     '''
-    def __init__(self, r_range, m_range, k_range, profile,
+    def __init__(self, r_range, m_bar, k_range, profile,
                  profile_f=None, n=84,
                  taylor_err=1e-50, profile_args=None, profile_f_args=None,
                  cpus=multiprocessing.cpu_count()):
@@ -70,7 +71,7 @@ class Profile(Cache):
         super(Profile, self).__init__()
         # Set all given parameters.
         self.r_range = r_range
-        self.m_range = m_range
+        self.m_bar = m_bar
         self.k_range = k_range
         self.n = n
         self.cpus = cpus
@@ -88,7 +89,7 @@ class Profile(Cache):
         return val
 
     @parameter
-    def m_range(self, val):
+    def m_bar(self, val):
         return val
 
     @parameter
@@ -130,7 +131,7 @@ class Profile(Cache):
     #===========================================================================
     # Methods
     #===========================================================================
-    @cached_property('r_range', 'm_range','profile', 'profile_args')
+    @cached_property('r_range', 'm_bar','profile', 'profile_args')
     def rho_r(self):
         '''
         Computes the density profile either by calling the function with its args,
@@ -143,7 +144,7 @@ class Profile(Cache):
         '''
         if hasattr(self.profile,'__call__'):
             dens_profile = self.profile(self.r_range,
-                                        self.m_range,
+                                        self.m_bar,
                                         **self.profile_args)
         else:
             dens_profile = self.profile
@@ -154,7 +155,7 @@ class Profile(Cache):
         else:
             return dens_profile
 
-    @cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'm_range',
+    @cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'm_bar',
                      'taylor_err', 'profile_f', 'profile_f_args', 'rho_k_T')
     def rho_k(self):
         '''
@@ -168,7 +169,7 @@ class Profile(Cache):
         '''
         if hasattr(self.profile_f,'__call__'):
             dens_profile_f = self.profile_f(self.k_range,
-                                            self.m_range,
+                                            self.m_bar,
                                             **self.profile_f_args)
         elif self.profile_f != None:
             dens_profile_f = self.profile_f
@@ -276,7 +277,7 @@ class Profile(Cache):
 
         return taylor_coefs
 
-    @cached_property('rho_r', 'n', 'r_range', 'k_range', 'm_range')
+    @cached_property('rho_r', 'n', 'r_range', 'k_range', 'm_bar')
     def F_n(self):
         '''
         Computes the Taylor coefficients in the Fourier expansion:
@@ -290,10 +291,10 @@ class Profile(Cache):
         '''
         # define shapes for readability
         n = self.n
-        m = self.m_range.shape[0]
+        m = self.m_bar.shape[0]
         k = self.k_range.shape[0]
         # Prefactor only changes along axis 0 (Mass)
-        prefactor = (4.0 * np.pi) / self.m_range.reshape(m,1)
+        prefactor = (4.0 * np.pi) / self.m_bar.reshape(m,1)
 
         # F_n is (m,n+1) array
         F_n = Profile._taylor_expansion_multi(n=self.n, r_range=self.r_range,
@@ -303,7 +304,7 @@ class Profile(Cache):
 
         return F_n
 
-    @cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'm_range',
+    @cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'm_bar',
                      'taylor_err')
     def rho_k_T(self):
         '''
@@ -319,7 +320,7 @@ class Profile(Cache):
         '''
         # define shapes for readability
         n = self.n
-        m = self.m_range.shape[0]
+        m = self.m_bar.shape[0]
         k = self.k_range.shape[0]
 
         Fn = self.F_n

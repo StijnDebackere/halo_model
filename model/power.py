@@ -17,30 +17,36 @@ class Power(Cache):
     ----------
     components : list
       list of components
-
+    name : str
+      name for this Power instance
 
     Methods
     -------
 
     '''
-    def __init__(self, components, p_lin, name):
+    def __init__(self, components, name):
         super(Power, self).__init__()
         self.name = name
         self.comps = {}
         self.r_range = components[0].r_range
-        self.m_range = components[0].m_range
+        self.r200m = components[0].r200m
+        self.m200m = components[0].m200m
         self.k_range = components[0].k_range
+        self.p_lin = components[0].p_lin
         for comp in components:
             self.comps[comp.name] = comp
             r_range = comp.r_range
-            m_range = comp.m_range
+            r200m = comp.r200m
+            m200m = comp.m200m
             k_range = comp.k_range
+            p_lin = comp.p_lin
             if not (np.allclose(r_range, self.r_range) or
-                    np.allclose(m_range, self.m_range) or
-                    np.allclose(k_range, self.k_range)):
-                raise AttributeError('m_range/r_range/k_range need to be equal')
+                    np.allclose(r200m, self.r200m) or
+                    np.allclose(m200m, self.m200m) or
+                    np.allclose(k_range, self.k_range) or
+                    np.allclose(p_lin, self.p_lin)):
+                raise AttributeError('m200m/r200m/r_range/k_range/p_lin need to be equal')
 
-        self.p_lin = p_lin
 
     #===========================================================================
     # Parameters
@@ -54,10 +60,24 @@ class Power(Cache):
         return val
 
     @parameter
-    def p_lin(self, val):
+    def r_range(self, val):
         return val
 
     @parameter
+    def r200m(self, val):
+        return val
+
+    @parameter
+    def m200m(self, val):
+        return val
+
+    @parameter
+    def k_range(self, val):
+        return val
+
+    @parameter
+    def p_lin(self, val):
+        return val
 
     #===========================================================================
     # Methods
@@ -68,34 +88,34 @@ class Power(Cache):
         Compute the 1-halo cross-correlation between comp_1 and comp_2
         '''
         # define shapes for readability
-        m = comp_1.m_range.shape[0]
+        m = comp_1.m200m.shape[0]
         k = comp_1.k_range.shape[0]
 
         # dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
         nu = comp_1.nu.reshape(m,1)
         fnu = comp_1.fnu.reshape(m,1)
-        # r_x = comp_1.r_range[:,-1].reshape(m,1)
-        r_x = p.prms.r200m.reshape(m,1)
-        m_range = comp_1.m_range.reshape(m,1)
+        r200m = comp_1.r200m.reshape(m,1)
+
+        m200m = comp_1.m200m.reshape(m,1)
         f_comp_1 = comp_1.f_comp.reshape(m,1)
         f_comp_2 = comp_2.f_comp.reshape(m,1)
 
         prefactor = 4./3 * np.pi * 200.
         # prefactor = 1./(p.prms.rho)
         result = Integrate(y=fnu * f_comp_1 * comp_1.rho_k *
-                           f_comp_2 * comp_2.rho_k * r_x**3,
+                           f_comp_2 * comp_2.rho_k * r200m**3,
                            x=nu,
                            axis=0)
         # # print (f_comp_1.reshape(-1) * comp_1.rho_k[:,0] *
         # #        f_comp_2.reshape(-1) *
         # #        comp_2.rho_k[:,0] *
-        # #        (r_x**3).reshape(-1))
+        # #        (r200m**3).reshape(-1))
         # try:
         #     print Integrate(fnu.reshape(-1) * (f_comp_1.reshape(-1) *
         #                                        comp_1.rho_k[:,0] *
         #                                        f_comp_2.reshape(-1) *
         #                                        comp_2.rho_k[:,0] *
-        #                                        (r_x**3).reshape(-1)),
+        #                                        (r200m**3).reshape(-1)),
         #                     nu,
         #                     axis=0)
 
@@ -103,7 +123,7 @@ class Power(Cache):
         #                               comp_1.rho_k[:,0] *
         #                               f_comp_2.reshape(-1) *
         #                               comp_2.rho_k[:,0] *
-        #                               (r_x**3).reshape(-1)))
+        #                               (r200m**3).reshape(-1)))
         #     plt.xscale('log')
         #     plt.yscale('log')
         #     plt.show()
@@ -121,7 +141,7 @@ class Power(Cache):
     #     comp_2
     #     '''
     #     # define shapes for readability
-    #     m = comp_1.m_range.shape[0]
+    #     m = comp_1.m200m.shape[0]
     #     k = comp_1.k_range.shape[0]
 
     #     # dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
@@ -149,14 +169,14 @@ class Power(Cache):
         '''
         Compute the cross-correlation between comp_1 and comp_2.
         '''
-        # P_2h = Power._cross_2halo(comp_1, comp_2)
-        P_1h = Power._cross_1halo(comp_1, comp_2)
-        P_tot = P_1h #+ P_2h
+        # p_2h = Power._cross_2halo(comp_1, comp_2)
+        p_1h = Power._cross_1halo(comp_1, comp_2)
+        p_tot = p_1h #+ p_2h
 
-        return P_tot
+        return p_tot
 
     @cached_property('comps')
-    def cross_P(self):
+    def cross_p(self):
         '''
         Compute all cross-correlation terms between different components.
         '''
@@ -173,14 +193,14 @@ class Power(Cache):
 
         return cross
 
-    @cached_property('cross_P')
+    @cached_property('cross_p')
     def cross_delta(self):
         '''
         Compute dimensionless power spectrum
         '''
         k_range = self.comps[self.comps.keys()[0]].k_range
         cross_d = {}
-        for key, item in self.cross_P.iteritems():
+        for key, item in self.cross_p.iteritems():
             cross_d[key] = 1./(2*np.pi**2) * k_range**3 * item
 
         return cross_d
@@ -194,45 +214,45 @@ class Power(Cache):
 
         return 0.5 / np.pi**2 * k_range**3 * self.p_lin
 
-    @cached_property('cross_P', 'comps', 'p_lin')
-    def P_tot(self):
+    @cached_property('cross_p', 'comps', 'p_lin')
+    def p_tot(self):
         '''
         Return total power including correlations
         '''
         rho = p.prms.rho_m
-        P_tot = self.p_lin
+        p_tot = self.p_lin
         for key, comp in self.comps.iteritems():
             k_range = comp.k_range
 
-            P_tot += comp.P_1h
+            p_tot += comp.p_1h
 
-        for key, cross_comp in self.cross_P.iteritems():
+        for key, cross_comp in self.cross_p.iteritems():
             c1, c2 = key.split('-')
 
             k_range = self.comps[c1].k_range
 
-            P_cross = 2 * cross_comp
-            P_tot += P_cross
+            p_cross = 2 * cross_comp
+            p_tot += p_cross
 
-        return P_tot
+        return p_tot
 
     @cached_property('cross_delta', 'comps', 'p_lin')
     def delta_tot(self):
         '''
         Return total dimensionless power including correlations
         '''
-        D_tot = 0.
+        d_tot = 0.
         for key, comp in self.comps.iteritems():
             k_range = comp.k_range
-            D_tot += comp.Delta_1h
+            d_tot += comp.delta_1h
 
         for key, cross_comp in self.cross_delta.iteritems():
             c1, c2 = key.split('-')
 
-            D_cross = 2 * cross_comp
-            D_tot += D_cross
+            d_cross = 2 * cross_comp
+            d_tot += d_cross
 
-        D_lin = 0.5 / np.pi**2 * k_range**3 * self.p_lin
-        D_tot += D_lin
+        d_lin = 0.5 / np.pi**2 * k_range**3 * self.p_lin
+        d_tot += d_lin
 
-        return D_tot
+        return d_tot

@@ -25,7 +25,7 @@ prms = p.prms
 
 # general profile kwargs to be used for all components
 profile_kwargs = {'r_range': prms.r_range_lin,
-                  'm_range': prms.m200m,
+                  'm_bar': prms.m200m,
                   'k_range': prms.k_range_lin,
                   'n': 80,
                   'taylor_err': 1.e-50}

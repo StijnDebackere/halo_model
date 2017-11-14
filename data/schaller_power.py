@@ -51,7 +51,7 @@ rho_r = profs.profile_Schaller(r_range=r_range_lin,
                                rho_crit=prms.rho_crit)
 
 profile_kwargs = {'r_range': r_range_lin,
-                  'm_range': m_range_lin,
+                  'm_bar': m_range_lin,
                   'k_range': prms.k_range_lin,
                   'profile': rho_r,
                   'profile_f': None,
@@ -76,7 +76,7 @@ prof_schaller = comp.Component(m_fn=prms.m_fn, f_comp=1.,
 
 # profile_kwargs = {
 #     'r_range': prms.r_range_lin,
-#     'm_range': prms.m200m,
+#     'm_bar': prms.m200m,
 #     'k_range': prms.k_range_lin,
 #     'profile': rho_r,
 #     'profile_f': rho_k

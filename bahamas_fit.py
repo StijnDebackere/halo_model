@@ -150,7 +150,7 @@ def load_dm_dmo1(prms):
     m_range = mdmo_to_m200(prms.m200m)
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': m_range,
+                      'm_bar': m_range,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
@@ -196,7 +196,7 @@ def load_dm_dmo1(prms):
 def load_dm_dmo2(prms):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
+                      'm_bar': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
@@ -242,7 +242,7 @@ def load_dm_dmo2(prms):
 def load_dm(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
+                      'm_bar': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
@@ -364,7 +364,7 @@ def fit_alpha(k_range, P1, P2, power):
 def load_gas(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
+                      'm_bar': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
@@ -473,7 +473,7 @@ def load_gas(prms=p.prmst):
 def load_stars(prms=p.prmst):
     # general profile kwargs to be used for all components
     profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
+                      'm_bar': prms.m200m,
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
