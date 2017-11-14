@@ -69,6 +69,9 @@ class Parameters(Cache):
     delta_c : float
       Linear critical overdensity for collapse
     rho_crit : float [units Msun h^2 / Mpc^3]
+      Critical density of the universe
+    hmcode : bool
+      Use HMcode linear power spectrum and halo mass function or hmf version
 
     Methods
     -------
@@ -96,7 +99,8 @@ class Parameters(Cache):
                  delta_h=200.,
                  mf_fit='Tinker10', cut_fit=False,
                  delta_wrt='mean', delta_c=1.686,
-                 rho_crit=2.7763458 * (10.0**11.0)):
+                 rho_crit=2.7763458 * (10.0**11.0),
+                 hmcode=False):
         super(Parameters, self).__init__()
         self.m200m = m200m
         # self.m_range_mfn = m200m
@@ -126,6 +130,7 @@ class Parameters(Cache):
         self.delta_wrt = delta_wrt
         self.delta_c = delta_c
         self.rho_crit = rho_crit
+        self.hmcode = hmcode
 
     #===========================================================================
     # Parameters
@@ -247,6 +252,10 @@ class Parameters(Cache):
             return val
         else:
             raise ValueError('rho_crit needs to be > 0')
+
+    @parameter
+    def hmcode(self, val):
+        return val
 
     #===========================================================================
     # Methods

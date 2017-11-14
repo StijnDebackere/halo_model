@@ -47,19 +47,15 @@ class Component(dens.Profile):
     Delta_tot: (k,) array
       dimensionless power spectrum
     '''
-    def __init__(self, name, p_lin, nu, fnu,
-                 f_comp, # m_fn,
+    def __init__(self, name, p_lin, nu, fnu, f_comp,
                  # bias_fn, bias_fn_args,
                  **profile_kwargs):
         super(Component, self).__init__(**profile_kwargs)
-        # self.dndlnm = m_fn.dndlnm
-        # self.power_lin = m_fn.power
         self.name = name
         self.p_lin = p_lin
         self.f_comp = f_comp
         self.nu = nu
         self.fnu = fnu
-        # self.m_fn = m_fn
         # self.bias_fn = bias_fn
         # self.bias_fn_args = bias_fn_args
 
@@ -101,10 +97,6 @@ class Component(dens.Profile):
     #===========================================================================
     # Parameters
     #===========================================================================
-    # @parameter
-    # def dndlnm(self, val):
-    #     return val
-
     @parameter
     def name(self, val):
         return val
@@ -121,20 +113,13 @@ class Component(dens.Profile):
     def fnu(self, val):
         return val
 
-    @parameter
-    def m_fn(self, val):
-        if not isinstance(val, hmf.MassFunction):
-            raise TypeError('m_fn should be hmf.MassFunction instance.')
-        else:
-            return val
+    # @parameter
+    # def bias_fn(self, val):
+    #     return val
 
-    @parameter
-    def bias_fn(self, val):
-        return val
-
-    @parameter
-    def bias_fn_args(self, val):
-        return val
+    # @parameter
+    # def bias_fn_args(self, val):
+    #     return val
 
     #===========================================================================
     # Methods
