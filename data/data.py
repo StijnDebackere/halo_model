@@ -15,7 +15,7 @@ import sys
 import cPickle
 
 # allow import of plot
-sys.path.append('~/Documents/Universiteit/MR/code')
+sys.path.append('/Users/stijn/Documents/Universiteit/MR/code')
 import plot as pl
 
 import halo.parameters as p
@@ -24,7 +24,7 @@ import halo.gas as gas
 
 import pdb
 
-ddir = '~/Documents/Leiden/MR/code/halo/data/'
+ddir = '/Users/stijn/Documents/Leiden/MR/code/halo/data/'
 prms = p.prms
 
 def h(z):
@@ -838,40 +838,39 @@ def plot_parameters(mean=False):
 # End of plot_parameters()
 # ------------------------------------------------------------------------------
 
-def f_gas(m, mc, a, f0):
-    return (p.prms.omegab/p.prms.omegam - f0) * (m/mc)**a/ (1 + (m/mc)**a) + f0
+def f_gas(m, mc, a, f0, prms):
+    return (prms.omegab/prms.omegam - f0) * (m/mc)**a/ (1 + (m/mc)**a) + f0
 
-def f_gas_prms():
+def f_gas_prms(prms):
     m500_obs, f_obs = np.loadtxt(ddir +
                                  'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                                  unpack=True)
 
-    # data assumed h=0.7
-    m500_obs = m500_obs * 0.7
-
     n_m = 15
-    m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m)
+
+    # data assumed h=0.7
+    m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m) * 0.7
     m = tools.bins2center(m_bins)
-    m_bin_idx = np.digitize(10**(m500_obs), m_bins)
+    m_bin_idx = np.digitize(10**(m500_obs) * 0.7, m_bins)
 
     f_med = np.array([np.median(f_obs[m_bin_idx == m_bin])
                       for m_bin in np.arange(1, len(m_bins))])
-    f_q16 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 16)
+    f_q15 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 15)
                       for m_bin in np.arange(1, len(m_bins))])
-    f_q84 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 84)
+    f_q85 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 85)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fmopt, fmcov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0.),
+    fmopt, fmcov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0., prms),
                                  m[m>1e14], f_med[m>1e14],
-                                 bounds=([1e5, 0],
+                                 bounds=([1e10, 0],
                                          [1e15, 10]))
-    f1opt, f1cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0.),
-                                 m[m>1e14], f_q16[m>1e14],
-                                 bounds=([1e5, 0],
+    f1opt, f1cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0., prms),
+                                 m[m>1e14], f_q15[m>1e14],
+                                 bounds=([1e10, 0],
                                          [1e15, 10]))
-    f2opt, f2cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0.),
-                                 m[m>1e14], f_q84[m>1e14],
-                                 bounds=([1e5, 0],
+    f2opt, f2cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0., prms),
+                                 m[m>1e14], f_q85[m>1e14],
+                                 bounds=([1e10, 0],
                                          [1e15, 10]))
 
     fm_prms = {"mc": fmopt[0],
@@ -963,15 +962,14 @@ def beta_mass(f500c, f200m, prms=p.prms):
     Compute the fit parameters for the beta profile going through
     f500c and f200m
     '''
-    r = prms.r_range_lin#[::5]
-    m200m = prms.m200m#[::5]
-    r200m = tools.mass_to_radius(m200m, 200 * prms.omegam * prms.rho_crit *
-                                 prms.h**2)
-    m500c = np.array([tools.m200m_to_m500c(m) for m in m200m])
-    r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
+    r = prms.r_range_lin
+    m200m = prms.m200m
+    r200m = prms.r200m
+    m500c = prms.m500c
+    r500c = prms.r500c
 
     # # Gas fractions
-    # gas_prms = f_gas_prms()
+    # gas_prms = f_gas_prms(prms)
     # f200m = 1 - prms.f_dm
     # f500c = f_gas(m500c, **gas_prms[0])
 
@@ -979,10 +977,10 @@ def beta_mass(f500c, f200m, prms=p.prms):
     rc = np.empty((0,), dtype=float)
     for idx, f in enumerate(f500c):
         sl500 = (r[idx] <= r500c[idx])
-        res = opt.minimize(minimize, [1.2, 3./2],
+        res = opt.minimize(minimize, [0.5, 3./2],
                            args=(sl500, f * m500c[idx], f200m[idx] * m200m[idx],
                                  r[idx]),
-                           bounds=((0,10), (0,3)))
+                           bounds=((0,10), (0,5)))
         # print res.x
         rc = np.append(rc, res.x[0])
         beta = np.append(beta, res.x[1])
@@ -1029,7 +1027,7 @@ def beta_mass(f500c, f200m, prms=p.prms):
 #     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
 
 #     # # Gas fractions
-#     # gas_prms = f_gas_prms()
+#     # gas_prms = f_gas_prms(prms)
 #     # f200m = 1 - prms.f_dm
 #     # f500c = f_gas(m500c, **gas_prms[0])
 
@@ -1111,28 +1109,29 @@ def mass_diff(alpha, x_range, mass_ratio):
 # End of mass_diff()
 # ------------------------------------------------------------------------------
 
-def massdiff_dmo2bar(m_bar, m_dmo):
+def massdiff_dmo2bar(m_bar, m_dmo, f_b, prms, fm):
     '''
-    Return the mass difference between the measured halo mass and the dark matter only
-    equivalent mass according to the relation
+    Return the mass difference between the measured halo mass and the
+    dark matter only equivalent mass according to the relation
 
         m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+
     '''
-    f_b = 1 - p.prms.f_dm
-    fm, f1, f2 = f_gas_prms()
-    f_g = f_gas(m_bar, **fm)
+    f_g = f_gas(m_bar, prms=prms, **fm)
 
     return (1 - (f_b - f_g)) * m_dmo - m_bar
 
-def m200dmo_to_m200b(m_dmo):
+def m200dmo_to_m200b(m_dmo, prms):
     '''
     Invert the relation between the measured halo mass and the dark matter only
     equivalent mass according to the relation
 
         m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
     '''
-
-    m200_b = opt.brentq(massdiff_dmo2bar, 1e5, 1e19, args=(m_dmo))
+    f_b = 1 - prms.f_dm
+    fm, f1, f2 = f_gas_prms(prms)
+    m200_b = opt.brentq(massdiff_dmo2bar, m_dmo / 10., m_dmo,
+                        args=(m_dmo, f_b, prms, fm))
 
     return m200_b
 
@@ -1140,7 +1139,23 @@ def m200dmo_to_m200b(m_dmo):
 # End of m200dmo_to_m200b()
 # ------------------------------------------------------------------------------
 
-def plot_profiles():
+def m200b_to_m200dmo(m_b, f_gas, prms):
+    '''
+    Get the relation between the measured halo mass and the dark matter only
+    equivalent mass according to the relation
+
+        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+    '''
+    f_b = 1 - prms.f_dm
+    m200dmo = m_b / (1 - (f_b - f_gas))
+
+    return m200dmo
+
+# ------------------------------------------------------------------------------
+# End of m200b_to_m200dmo()
+# ------------------------------------------------------------------------------
+
+def plot_profiles_paper():
     with open('data/croston.p', 'rb') as f:
         data_c = cPickle.load(f)
     with open('data/eckert.p', 'rb') as f:
@@ -1244,7 +1259,7 @@ def plot_gas_fractions():
     f_q84 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 84)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fm_prms, f1_prms, f2_prms = f_gas_prms()
+    fm_prms, f1_prms, f2_prms = f_gas_prms(prms)
 
     ##########################################################################
     # Get shadow twiny instance for ratio plot, to also have m200m
@@ -1614,7 +1629,7 @@ def plot_profiles_fgas_presentation():
     f_q84 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 84)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fm_prms, f1_prms, f2_prms = f_gas_prms()
+    fm_prms, f1_prms, f2_prms = f_gas_prms(prms)
 
     ax3.set_prop_cycle(pl.cycle_mark())
     ax3.plot(10**(m500_obs[23:33]), f_obs[23:33], marker='o',
@@ -1641,15 +1656,6 @@ def plot_profiles_fgas_presentation():
     title_props = text.get_fontproperties()
 
     f_bar = p.prms.omegab/p.prms.omegam
-    ax3.axhline(y=f_bar, c='k', ls='--')
-    # add annotation to f_bar
-    ax3.annotate(r'$f_{\mathrm{b}}$',
-                 # xy=(1e14, 0.16), xycoords='data',
-                 # xytext=(1e14, 0.15), textcoords='data',
-                 xy=(10**(13), f_bar), xycoords='data',
-                 xytext=(1.2 * 10**(13),
-                         f_bar * 0.95), textcoords='data',
-                 fontproperties=title_props)
 
     ax3.set_xlim([1e13, 10**(15.5)])
     ax3.set_ylim([0.01, 0.17])
@@ -1849,7 +1855,7 @@ def plot_missing_mass_paper(comp_gas):
     f_gas = comp_gas.m_h / m_range
 
     m500c = np.array([tools.m200m_to_m500c(mass) for mass in m_range[::5]])
-    f500c = d.f_gas(m500c, **d.f_gas_prms()[0])
+    f500c = d.f_gas(m500c, **d.f_gas_prms(prms)[0])
 
     ax.plot(m_range, f_dm, label='$f_{\mathrm{dm}}$')
     ax.plot(m_range, f_dm + f_gas, label='$f_{\mathrm{dm}} + f_{\mathrm{gas,200m}}$')

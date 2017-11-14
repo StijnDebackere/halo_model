@@ -202,8 +202,8 @@ def load_gas(prms=p.prms):
     rx = r_range / r500c.reshape(-1,1)
 
     # gas fractions
-    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
-    f_gas500 = d.f_gas(m500c, **fm_prms)
+    fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
+    f_gas500 = d.f_gas(m500c, prms=prms, **fm_prms)
 
     prof_gas = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
@@ -262,8 +262,8 @@ def load_gas_obs(prms=p.prms):
     rx = r_range / r500c.reshape(-1,1)
 
     # gas fractions
-    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
-    f_gas500 = d.f_gas(m500c, **fm_prms)
+    fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
+    f_gas500 = d.f_gas(m500c, prms=prms, **fm_prms)
 
     prof_gas = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
@@ -301,6 +301,7 @@ def load_gas_obs(prms=p.prms):
 # ------------------------------------------------------------------------------
 
 def load_gas_smooth_r500c_r200m(prms=p.prms):
+
     '''
     Return uniform profiles with fgas_500c = 0 and fgas_200m = f_b - f_obs
     '''
@@ -310,8 +311,8 @@ def load_gas_smooth_r500c_r200m(prms=p.prms):
     r500c = prms.r500c
     r200m = prms.r200m
 
-    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
-    fgas_500 = d.f_gas(m500c, **fm_prms)
+    fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
+    fgas_500 = d.f_gas(m500c, prms=prms, **fm_prms)
 
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
@@ -366,28 +367,24 @@ def load_gas_5r500c(prms=p.prms):
     Return beta profiles with fgas_200m = f_obs_extrapolated = fgas_5r500c
     '''
     # halo model parameters
+    # ! WATCH OUT ! These are the SPH equivalent masses and do thus not
+    # correspond to the DMO case, unless f_gas,200m = f_b
     m_range = prms.m200m
     m500c = prms.m500c
     r500c = prms.r500c
     r200m = prms.r200m
 
-    r_min = p.prms.r_range_lin[:,0]
+    r_min = prms.r_range_lin[:,0]
     r_max = (5 * r500c)
-    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), p.prms.r_bins)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
-    # profile now runs between 0 and 5r500c
-    profile_kwargs = {'r_range': r_range,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
 
     rc, beta = d.fit_prms()
     # gas fractions
-    fm_prms, f1_prms, f2_prms = d.f_gas_prms()
-    f_gas500 = d.f_gas(m500c, **fm_prms)
+    fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
+    f_gas500 = d.f_gas(m500c, prms=prms, **fm_prms)
 
     # relative position of virial radius
     x200m = r200m / r500c
@@ -400,8 +397,24 @@ def load_gas_5r500c(prms=p.prms):
                                          f_gas500[idx] * m500c[idx],
                                          r500c[idx])[sl]
 
+    # can integrate entire profile, since it's zero for r>r200m
     mgas = tools.m_h(prof_gas, r_range)
     f_gas = mgas / (m_range)
+
+    # Now we can determine the equivalent DMO masses from the f_gas - m relation
+    m_dmo = d.m200b_to_m200dmo(m_range, f_gas, prms)
+    r_dmo = tools.mass_to_radius(m_dmo, 200 * prms.rho_m)
+
+    # renormalize radial range
+    r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
+
+    # profile now runs between 0 and 5r500c
+    profile_kwargs = {'r_range': r_range,#r_range_dmo,
+                      'm_range': prms.m200m,#m_dmo,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
     gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
@@ -426,6 +439,87 @@ def load_gas_5r500c(prms=p.prms):
 # End of load_gas_5r500c()
 # ------------------------------------------------------------------------------
 
+def load_gas_r500c_r200m_5r500c(prms=p.prms):
+    '''
+    Return beta profiles with fgas_200m = f_obs = fgas_5r500c
+    '''
+    # halo model parameters
+    m_range = prms.m200m
+    m500c = prms.m500c
+    r500c = prms.r500c
+    r200m = prms.r200m
+
+    r_min = prms.r_range_lin[:,0]
+    r_max = (5 * r500c)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
+                        for i,rm in enumerate(r_max)])
+    rx = r_range / r500c.reshape(-1,1)
+
+    # profile now runs between 0 and 5r500c
+    profile_kwargs = {'r_range': r_range,
+                      'm_range': prms.m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
+    rc, beta = d.fit_prms()
+    # gas fractions
+    fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
+    f_gas500 = d.f_gas(m500c, prms=prms, **fm_prms)
+    f_b = 1 - prms.f_dm
+
+    # relative position of virial radius
+    x200m = r200m / r500c
+
+    prof_gas = np.zeros_like(rx)
+    for idx, prof in enumerate(prof_gas):
+        # radial range between r500c and r200m
+        sl_500_200 = ((rx[idx] >= 1.) & (rx[idx] <= x200m[idx]))
+        sl_gt200 = (rx[idx] >= x200m[idx])
+        sl_gt500 = (rx[idx] >= 1.)
+        # radial range upto r500c
+        sl_500 = (rx[idx] <= 1.)
+
+        # use beta profile upto r500c
+        prof_gas[idx][sl_500] = prof_gas_hot(rx[idx], sl_500, rc, beta,
+                                             f_gas500[idx] * m500c[idx],
+                                             r500c[idx])[sl_500]
+
+        m_gas500 = tools.m_h(prof_gas[idx], r_range[idx])
+        # put remaining mass in smooth component outside r500c upto r200m
+        prof_gas[idx][sl_gt500] = 1.
+        mass_gt500 = tools.m_h(prof_gas[idx][sl_gt500], r_range[idx][sl_gt500])
+        prof_gas[idx][sl_gt500] *= ((f_b - m_gas500 / m_range[idx]) *
+                                    m_range[idx] / mass_gt500)
+        prof_gas[idx][sl_gt200] = 0.
+
+    # can integrate entire profile, since it's zero for r>r200m
+    mgas = tools.m_h(prof_gas, r_range)
+    f_gas = mgas / (m_range)
+    # --------------------------------------------------------------------------
+    # specific gas extra kwargs -> need f_gas
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
+                 'f_comp': f_gas}
+    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
+    # --------------------------------------------------------------------------
+    # additional kwargs for comp.Component
+    comp_gas_kwargs = {'name': 'gas',
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,}
+                      # 'm_fn': p.prms.m_fn,
+                      # 'bias_fn': bias.bias_Tinker10,
+                      # 'bias_fn_args': {'nu': prms.nu}}
+
+    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
+
+    comp_gas = comp.Component(**gas_kwargs)
+    return comp_gas
+
+# ------------------------------------------------------------------------------
+# End of load_gas_r500c_r200m_5r500c()
+# ------------------------------------------------------------------------------
+
 def load_dm_5r500c(prms=p.prms):
     '''
     Return NFW profiles with up to r200m and 0 up to 5r500c
@@ -438,9 +532,9 @@ def load_dm_5r500c(prms=p.prms):
     r500c = prms.r500c
     r200m = prms.r200m
 
-    r_min = p.prms.r_range_lin[:,0]
+    r_min = prms.r_range_lin[:,0]
     r_max = (5 * r500c)
-    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), p.prms.r_bins)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
@@ -464,7 +558,7 @@ def load_dm_5r500c(prms=p.prms):
         prof_dm[idx][sl] = profs.profile_NFW(r_range[idx][sl].reshape(1,-1),
                                              m200c[idx].reshape(1,1),
                                              c_x[idx], r_x[idx],
-                                             p.prms.rho_m).reshape(-1)
+                                             prms.rho_m).reshape(-1)
 
     # --------------------------------------------------------------------------
     dm_extra = {'profile': prof_dm,
@@ -489,7 +583,7 @@ def load_dm_5r500c(prms=p.prms):
 # End of load_dm_5r500c()
 # ------------------------------------------------------------------------------
 
-def load_gas_dmo_5r500c(prms=p.prms, save=True):
+def load_gas_dmo_5r500c(prms=p.prms):
     '''
     Return beta profiles with fgas_500c = fgas_200m = f_b = fgas_5r500c
     '''
@@ -499,9 +593,9 @@ def load_gas_dmo_5r500c(prms=p.prms, save=True):
     r500c = prms.r500c
     r200m = prms.r200m
 
-    r_min = p.prms.r_range_lin[:,0]
+    r_min = prms.r_range_lin[:,0]
     r_max = (5 * r500c)
-    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), p.prms.r_bins)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
@@ -560,7 +654,10 @@ def load_gas_smooth_r200m_5r500c(prms, fgas_200):
     r500c = prms.r500c
     r200m = prms.r200m
 
-    r_range = prms.r_range_lin * (5 * r500c / r200m).reshape(-1,1)
+    r_min = prms.r_range_lin[:,0]
+    r_max = (5 * r500c)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
+                        for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
     # profile now runs between 0 and 5r500c
@@ -702,7 +799,7 @@ def load_gas_smooth_r200m_5r500c(prms, fgas_200):
 #     rx = prms.r_range_lin / r500c.reshape(-1,1)
 
 #     # gas fractions
-#     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+#     fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
 
 #     # only fit median values
 #     f_prms = fm_prms
@@ -782,7 +879,7 @@ def load_gas_smooth_r200m_5r500c(prms, fgas_200):
 #     rx = prms.r_range_lin / r500c.reshape(-1,1)
 
 #     # gas fractions
-#     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+#     fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
 
 #     # only fit median values
 #     f_prms = fm_prms
@@ -859,7 +956,7 @@ def load_gas_smooth_r200m_5r500c(prms, fgas_200):
 #     rx = prms.r_range_lin / r500c.reshape(-1,1)
 
 #     # gas fractions
-#     fm_prms, f1_prms, f2_prms = d.f_gas_prms()
+#     fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
 #     f_prms = fm_prms
 
 #     f_gas500 = d.f_gas(m500c, **f_prms)
@@ -1074,7 +1171,7 @@ def plot_beta_profile_dmo_presentation(comp_gas_dmo, prms=p.prms):
     ax = fig.add_subplot(111)
 
     idx = 50
-    r200m = p.prms.r200m
+    r200m = prms.r200m
 
     pl.set_style('line')
     ax.plot(comp_gas_dmo.r_range[idx] / r200m[idx],
@@ -1088,7 +1185,7 @@ def plot_beta_profile_dmo_presentation(comp_gas_dmo, prms=p.prms):
 
     ax.set_xlabel(r'$r/r_\mathrm{200m}$')
     ax.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
-    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(p.prms.m200m[idx]), y=1.015, fontsize=42)
+    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(prms.m200m[idx]), y=1.015, fontsize=42)
     ax.legend(loc='best')
     plt.savefig('hm_beta_dmo.pdf', transparent=True)
     plt.show()
@@ -1106,7 +1203,7 @@ def plot_beta_profile_presentation(comp_gas, prms=p.prms):
     ax = fig.add_subplot(111)
 
     idx = 50
-    r200m = p.prms.r200m
+    r200m = prms.r200m
 
     pl.set_style('line')
     ax.plot(comp_gas.r_range[idx] / r200m[idx],
@@ -1120,7 +1217,7 @@ def plot_beta_profile_presentation(comp_gas, prms=p.prms):
 
     ax.set_xlabel(r'$r/r_\mathrm{200m}$')
     ax.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
-    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(p.prms.m200m[idx]), y=1.015, fontsize=42)
+    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(prms.m200m[idx]), y=1.015, fontsize=42)
     ax.legend(loc='best')
     plt.savefig('hm_beta.pdf', transparent=True)
     plt.show()
@@ -1139,7 +1236,7 @@ def plot_beta_profile_r500_presentation(comp_gas_r500, comp_gas_smooth_r500,
     ax = fig.add_subplot(111)
 
     idx = 50
-    r200m = p.prms.r200m
+    r200m = prms.r200m
 
     pl.set_style('line')
     ax.plot(comp_gas_r500.r_range[idx] / r200m[idx],
@@ -1156,7 +1253,7 @@ def plot_beta_profile_r500_presentation(comp_gas_r500, comp_gas_smooth_r500,
 
     ax.set_xlabel(r'$r/r_\mathrm{200m}$')
     ax.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
-    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(p.prms.m200m[idx]), y=1.015, fontsize=42)
+    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(prms.m200m[idx]), y=1.015, fontsize=42)
     ax.legend(loc='best')
     plt.savefig('hm_beta_r500.pdf', transparent=True)
     plt.show()
@@ -1175,7 +1272,7 @@ def plot_beta_profile_r200_presentation(comp_gas_r200, comp_gas_smooth_r200,
     ax = fig.add_subplot(111)
 
     idx = 50
-    r200m = p.prms.r200m
+    r200m = prms.r200m
 
     pl.set_style('line')
     ax.plot(comp_gas_r200.r_range[idx] / r200m[idx],
@@ -1192,11 +1289,165 @@ def plot_beta_profile_r200_presentation(comp_gas_r200, comp_gas_smooth_r200,
 
     ax.set_xlabel(r'$r/r_\mathrm{200m}$')
     ax.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
-    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(p.prms.m200m[idx]), y=1.015, fontsize=42)
+    ax.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \mathrm{M_\odot}$'%np.log10(prms.m200m[idx]), y=1.015, fontsize=42)
     ax.legend(loc='best')
     plt.savefig('hm_beta_r200.pdf', transparent=True)
     plt.show()
 
 # ------------------------------------------------------------------------------
 # End of plot_beta_profile_presentation()
+# ------------------------------------------------------------------------------
+
+def plot_profiles_gas_paper(comp_gas_dmo, comp_gas, comp_gas_r500c_r200m,
+                            comp_gas_r500c_5r500c, comp_gas_r200m_5r500c,
+                            prms=p.prms):
+    '''
+    Plot the density for our different gas profiles in one plot
+    '''
+    fig = plt.figure(figsize=(18,8))
+    ax1 = fig.add_axes([0.1,0.1,0.266,0.8])
+    ax2 = fig.add_axes([0.366,0.1,0.266,0.8])
+    ax3 = fig.add_axes([0.632,0.1,0.266,0.8])
+
+    idx_1 = 0
+    idx_2 = 50
+    idx_3 = -1
+    r200m = prms.r200m
+    norm = prms.rho_crit
+
+    pl.set_style('line')
+
+    # Plot idx_1
+    ax1.plot(comp_gas_dmo.r_range[idx_1] / r200m[idx_1],
+             comp_gas_dmo.rho_r[idx_1] * comp_gas_dmo.f_comp[idx_1] / norm,
+             label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+    ax1.plot(comp_gas.r_range[idx_1] / r200m[idx_1],
+             comp_gas.rho_r[idx_1] * comp_gas.f_comp[idx_1]/norm,
+             lw=3, label=r'observations')
+    ax1.plot(comp_gas_r500c_r200m.r_range[idx_1] / r200m[idx_1],
+             (comp_gas_r500c_r200m.rho_r[idx_1] *
+              comp_gas_r500c_r200m.f_comp[idx_1] / norm),
+             lw=2, label=r'smooth $r_\mathrm{500c}-r_\mathrm{200m}$')
+    ax1.plot(comp_gas_r500c_5r500c.r_range[idx_1] / r200m[idx_1],
+             (comp_gas_r500c_5r500c.rho_r[idx_1] *
+              comp_gas_r500c_5r500c.f_comp[idx_1] / norm), lw=1,
+             label=r'smooth $r_\mathrm{500c}-5r_\mathrm{500c}$')
+    ax1.plot(comp_gas_r200m_5r500c.r_range[idx_1] / r200m[idx_1],
+             (comp_gas_r200m_5r500c.rho_r[idx_1] *
+              comp_gas_r200m_5r500c.f_comp[idx_1] / norm),
+             lw=1, ls='--', label=r'smooth $r_\mathrm{200m}-5r_\mathrm{500c}$')
+
+    # Plot idx_2
+    ax2.plot(comp_gas_dmo.r_range[idx_2] / r200m[idx_2],
+             comp_gas_dmo.rho_r[idx_2] * comp_gas_dmo.f_comp[idx_2] / norm,
+             label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+    ax2.plot(comp_gas.r_range[idx_2] / r200m[idx_2],
+             comp_gas.rho_r[idx_2] * comp_gas.f_comp[idx_2]/norm,
+             lw=3, label=r'observations')
+    ax2.plot(comp_gas_r500c_r200m.r_range[idx_2] / r200m[idx_2],
+             (comp_gas_r500c_r200m.rho_r[idx_2] *
+              comp_gas_r500c_r200m.f_comp[idx_2] / norm),
+             lw=2, label=r'smooth $r_\mathrm{500c}-r_\mathrm{200m}$')
+    ax2.plot(comp_gas_r500c_5r500c.r_range[idx_2] / r200m[idx_2],
+             (comp_gas_r500c_5r500c.rho_r[idx_2] *
+              comp_gas_r500c_5r500c.f_comp[idx_2] / norm), lw=1,
+             label=r'smooth $r_\mathrm{500c}-5r_\mathrm{500c}$')
+    ax2.plot(comp_gas_r200m_5r500c.r_range[idx_2] / r200m[idx_2],
+             (comp_gas_r200m_5r500c.rho_r[idx_2] *
+              comp_gas_r200m_5r500c.f_comp[idx_2] / norm),
+             lw=1, ls='--', label=r'smooth $r_\mathrm{200m}-5r_\mathrm{500c}$')
+
+    # Plot idx_3
+    ax3.plot(comp_gas_dmo.r_range[idx_3] / r200m[idx_3],
+             comp_gas_dmo.rho_r[idx_3] * comp_gas_dmo.f_comp[idx_3] / norm,
+             label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+    ax3.plot(comp_gas.r_range[idx_3] / r200m[idx_3],
+             comp_gas.rho_r[idx_3] * comp_gas.f_comp[idx_3]/norm,
+             lw=3, label=r'observations')
+    ax3.plot(comp_gas_r500c_r200m.r_range[idx_3] / r200m[idx_3],
+             (comp_gas_r500c_r200m.rho_r[idx_3] *
+              comp_gas_r500c_r200m.f_comp[idx_3] / norm),
+             lw=2, label=r'smooth $r_\mathrm{500c}-r_\mathrm{200m}$')
+    ax3.plot(comp_gas_r500c_5r500c.r_range[idx_3] / r200m[idx_3],
+             (comp_gas_r500c_5r500c.rho_r[idx_3] *
+              comp_gas_r500c_5r500c.f_comp[idx_3] / norm), lw=1,
+             label=r'smooth $r_\mathrm{500c}-5r_\mathrm{500c}$')
+    ax3.plot(comp_gas_r200m_5r500c.r_range[idx_3] / r200m[idx_3],
+             (comp_gas_r200m_5r500c.rho_r[idx_3] *
+              comp_gas_r200m_5r500c.f_comp[idx_3] / norm),
+             lw=1, ls='--', label=r'smooth $r_\mathrm{200m}-5r_\mathrm{500c}$')
+
+    ax1.set_xlim(1e-3, 3)
+    ax1.set_ylim(1e-1, 1e3)
+    ax2.set_xlim(1e-3, 3)
+    ax2.set_ylim(1e-1, 1e3)
+    ax3.set_xlim(1e-3, 3)
+    ax3.set_ylim(1e-1, 1e3)
+
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+    ax2.set_xscale('log')
+    ax2.set_yscale('log')
+    ax3.set_xscale('log')
+    ax3.set_yscale('log')
+
+    ax1.tick_params(axis='x', which='major', pad=6)
+    ax2.tick_params(axis='x', which='major', pad=6)
+    ax3.tick_params(axis='x', which='major', pad=6)
+
+    ax2.set_xlabel(r'$r/r_\mathrm{200m}$', labelpad=-2)
+    ax1.set_ylabel(r'$\rho(r)/\rho_\mathrm{c}$')
+    ax2.set_yticklabels([])
+    ax3.set_yticklabels([])
+    ticks2 = ax2.get_xticklabels()
+    ticks2[-6].set_visible(False)
+    ticks3 = ax3.get_xticklabels()
+    ticks3[-6].set_visible(False)
+
+    ax1.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_1]), y=1.015, fontsize=36)
+    ax2.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_2]), y=1.015, fontsize=36)
+    ax3.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_3]), y=1.015, fontsize=36)
+
+    ax3.legend(loc='best')
+    plt.savefig('obs_rho_extrapolated.pdf', transparent=True)
+
+# ------------------------------------------------------------------------------
+# End of plot_profiles_gas_paper()
+# ------------------------------------------------------------------------------
+
+def plot_fgas200m_paper(comp_gas, comp_gas_r500c_5r500c, prms=p.prms):
+    '''
+    Plot gas mass fractions at r200m for our different models
+    '''
+    fig = plt.figure(figsize=(10,9))
+    ax = fig.add_subplot(111)
+
+    f_b = 1 - prms.f_dm
+
+    pl.set_style('line')
+    ax.plot(comp_gas.m_range, comp_gas.f_comp, label='observations')
+    ax.plot(comp_gas_r500c_5r500c.m_range, comp_gas_r500c_5r500c.f_comp,
+            label='smooth $r_\mathrm{500c}-5r_\mathrm{500c}$')
+    ax.axhline(y=f_b, c='k', ls='--')
+
+    ax.tick_params(axis='x', which='major', pad=6)
+    text_props = ax.get_xticklabels()[0].get_font_properties()
+
+    # add annotation to f_bar
+    ax.annotate(r'$f_{\mathrm{b}}$',
+                 # xy=(1e14, 0.16), xycoords='data',
+                 # xytext=(1e14, 0.15), textcoords='data',
+                 xy=(10**(11), f_b), xycoords='data',
+                 xytext=(1.2 * 10**(11),
+                         f_b * 0.95), textcoords='data',
+                 fontproperties=text_props)
+
+    ax.set_xscale('log')
+    ax.set_xlabel('$m_\mathrm{200m} \, [\mathrm{M_\odot}/h]$')
+    ax.set_ylabel('$f_\mathrm{gas,200m}$')
+    ax.legend(loc=4)
+    plt.savefig('obs_fgas_extrapolated.pdf', transparent=True)
+
+# ------------------------------------------------------------------------------
+# End of plot_fgas200m_paper()
 # ------------------------------------------------------------------------------

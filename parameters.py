@@ -264,10 +264,10 @@ class Parameters(Cache):
     def r200c(self):
         return tools.mass_to_radius(self.m200c, 200 * self.rho_crit)
 
-    @cached_property('m200m', 'rho_crit', 'rho_m')
+    @cached_property('m200m', 'rho_crit', 'rho_m', 'm200c')
     def m500c(self):
-        return np.array([tools.m200m_to_m500c(m, self.rho_crit, self.rho_m)
-                         for m in self.m200m])
+        return np.array([tools.m200m_to_m500c(mm, self.rho_crit, self.rho_m, mc)
+                         for mm, mc in zip(self.m200m, self.m200c)])
 
     @cached_property('m500c', 'rho_crit')
     def r500c(self):
@@ -374,7 +374,7 @@ class Parameters(Cache):
     def rho_dm(self):
         return self.f_dm * self.rho_m
 
-    @cached_property('r_min', 'r_h', 'r_bins')
+    @cached_property('r_min', 'r200m', 'r_bins')
     def r_range_lin(self):
         return np.array([np.logspace(self.r_min, np.log10(r_max), self.r_bins)
                          for r_max in self.r200m])

@@ -385,11 +385,8 @@ def m500c_to_m200m(m500c, rhoc, rhom):
     m200m : float
       corresponding halo model halo virial mass
     '''
-    # 1e19 Msun is ~maximum for c_correa
-    # We take a more conservative lower limit, since we will need to determine
-    # m200c for this m200m which will always be lower than m200m and it starts
-    # at m200c=1e5
-    m200m = opt.brentq(massdiff_2m5c, 1e7, 1e19, args=(m500c, rhoc, rhom))
+    m200m = opt.brentq(massdiff_2m5c, m500c, 10. * m500c,
+                       args=(m500c, rhoc, rhom))
 
     return m200m
 
@@ -397,7 +394,7 @@ def m500c_to_m200m(m500c, rhoc, rhom):
 # End of m500c_to_m200m()
 # ------------------------------------------------------------------------------
 
-def massdiff_5c2m(m500c, m200m, rhoc, rhom):
+def massdiff_5c2m(m500c, m200m, m200c, rhoc, rhom):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
@@ -406,7 +403,6 @@ def massdiff_5c2m(m500c, m200m, rhoc, rhom):
     r_range = np.logspace(-4, np.log10(r500c), 1000)
 
     r200m = mass_to_radius(m200m, 200 * rhom)
-    m200c = m200m_to_m200c(m200m, rhoc, rhom)
     dens = profile_NFW(r_range, np.array([m200m]),
                        c_correa(m200c, 0).reshape(-1),
                        np.array([r200m]),
@@ -416,7 +412,7 @@ def massdiff_5c2m(m500c, m200m, rhoc, rhom):
 
     return mass_int - m500c
 
-def m200m_to_m500c(m200m, rhoc, rhom):
+def m200m_to_m500c(m200m, rhoc, rhom, m200c=None):
     '''
     Give m500c for the an m200m virial mass halo
 
@@ -431,7 +427,11 @@ def m200m_to_m500c(m200m, rhoc, rhom):
       halo mass at 500 times the universe critical density
     '''
     # 1e19 Msun is ~maximum for c_correa
-    m500c = opt.brentq(massdiff_5c2m, 1e5, 1e19, args=(m200m, rhoc, rhom))
+    if m200c == None:
+        m200c = m200m_to_m200c(m200m, rhoc, rhom)
+
+    m500c = opt.brentq(massdiff_5c2m, m200m/10., m200m,
+                       args=(m200m, m200c, rhoc, rhom))
 
     return m500c
 
@@ -472,7 +472,8 @@ def m200c_to_m200m(m200c, rhoc, rhom):
       corresponding halo model halo virial mass
     '''
     # 1e19 Msun is ~maximum for c_correa
-    m200m = opt.brentq(massdiff_2m2c, 1e5, 1e19, args=(m200c, rhoc, rhom))
+    m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
+                       args=(m200c, rhoc, rhom))
 
     return m200m
 
@@ -513,7 +514,8 @@ def m200m_to_m200c(m200m, rhoc, rhom):
       halo mass at 200 times the universe critical density
     '''
     # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c2m, 1e5, 1e19, args=(m200m, rhoc, rhom))
+    m200c = opt.brentq(massdiff_2c2m, m200m / 10., m200m,
+                       args=(m200m, rhoc, rhom))
 
     return m200c
 
@@ -555,7 +557,8 @@ def m500c_to_m200c(m500c, rhoc, rhom):
       halo mass at 200 times the universe critical density
     '''
     # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c5c, 1e5, 1e19, args=(m500c, rhoc, rhom))
+    m200c = opt.brentq(massdiff_2c5c, m500c, 10. * m500c,
+                       args=(m500c, rhoc, rhom))
 
     return m200c
 
