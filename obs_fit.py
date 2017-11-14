@@ -180,27 +180,23 @@ def prof_gas_hot(x, sl, a, b, m_sl, r500):
 
     return profile
 
-def load_gas(prms=p.prms):
+def load_gas(prms=p.prms, bar2dmo=True):
     '''
     Return beta profiles with fgas_500c = f_obs, extrapolated to r200m
     '''
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-
-    rc, beta = d.fit_prms()
-
     # halo model parameters
+    # ! WATCH OUT ! These are the SPH equivalent masses and do thus not
+    # correspond to the DMO case, unless f_gas,200m = f_b
     m_range = prms.m200m
     m500c = prms.m500c
     r500c = prms.r500c
+    r200m = prms.r200m
 
     # radius in terms of r500c
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
 
+    rc, beta = d.fit_prms()
     # gas fractions
     fm_prms, f1_prms, f2_prms = d.f_gas_prms(prms)
     f_gas500 = d.f_gas(m500c, prms=prms, **fm_prms)
@@ -215,6 +211,26 @@ def load_gas(prms=p.prms):
     mgas200 = tools.m_h(prof_gas, prms.r_range_lin)
     f_gas = mgas200 / m_range
 
+    # Now we can determine the equivalent DMO masses from the f_gas - m relation
+    m_dmo = d.m200b_to_m200dmo(m_range, f_gas, prms)
+    r_dmo = tools.mass_to_radius(m_dmo, 200 * prms.rho_m)
+
+    # renormalize radial range
+    r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
+
+    # need to update profile parameters
+    if bar2dmo == False:
+        profile_kwargs = {'r_range': r_range,
+                          'm_range': prms.m200m,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
+    else:
+        profile_kwargs = {'r_range': r_range_dmo,
+                          'm_range': m_dmo,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
     gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
@@ -317,7 +333,6 @@ def load_gas_smooth_r500c_r200m(prms=p.prms):
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
 
-    # profile now runs between 0 and 5r500c
     profile_kwargs = {'r_range': r_range,
                       'm_range': prms.m200m,
                       'k_range': prms.k_range_lin,
@@ -362,7 +377,7 @@ def load_gas_smooth_r500c_r200m(prms=p.prms):
 # End of load_gas_smooth_r500c_r200m()
 # ------------------------------------------------------------------------------
 
-def load_gas_5r500c(prms=p.prms):
+def load_gas_5r500c(prms=p.prms, bar2dmo=True):
     '''
     Return beta profiles with fgas_200m = f_obs_extrapolated = fgas_5r500c
     '''
@@ -379,7 +394,6 @@ def load_gas_5r500c(prms=p.prms):
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
-
 
     rc, beta = d.fit_prms()
     # gas fractions
@@ -409,12 +423,18 @@ def load_gas_5r500c(prms=p.prms):
     r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
 
     # profile now runs between 0 and 5r500c
-    profile_kwargs = {'r_range': r_range,#r_range_dmo,
-                      'm_range': prms.m200m,#m_dmo,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-
+    if bar2dmo == False:
+        profile_kwargs = {'r_range': r_range,
+                          'm_range': prms.m200m,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
+    else:
+        profile_kwargs = {'r_range': r_range_dmo,
+                          'm_range': m_dmo,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
     gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
@@ -439,11 +459,13 @@ def load_gas_5r500c(prms=p.prms):
 # End of load_gas_5r500c()
 # ------------------------------------------------------------------------------
 
-def load_gas_r500c_r200m_5r500c(prms=p.prms):
+def load_gas_r500c_r200m_5r500c(prms=p.prms, bar2dmo=True):
     '''
     Return beta profiles with fgas_200m = f_obs = fgas_5r500c
     '''
     # halo model parameters
+    # ! WATCH OUT ! These are the SPH equivalent masses and do thus not
+    # correspond to the DMO case, unless f_gas,200m = f_b
     m_range = prms.m200m
     m500c = prms.m500c
     r500c = prms.r500c
@@ -454,13 +476,6 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms):
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
-
-    # profile now runs between 0 and 5r500c
-    profile_kwargs = {'r_range': r_range,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
 
     rc, beta = d.fit_prms()
     # gas fractions
@@ -477,16 +492,16 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms):
         sl_500_200 = ((rx[idx] >= 1.) & (rx[idx] <= x200m[idx]))
         sl_gt200 = (rx[idx] >= x200m[idx])
         sl_gt500 = (rx[idx] >= 1.)
-        # radial range upto r500c
+        # radial range up to r500c
         sl_500 = (rx[idx] <= 1.)
 
-        # use beta profile upto r500c
+        # use beta profile up to r500c
         prof_gas[idx][sl_500] = prof_gas_hot(rx[idx], sl_500, rc, beta,
                                              f_gas500[idx] * m500c[idx],
                                              r500c[idx])[sl_500]
 
         m_gas500 = tools.m_h(prof_gas[idx], r_range[idx])
-        # put remaining mass in smooth component outside r500c upto r200m
+        # put remaining mass in smooth component outside r500c up to r200m
         prof_gas[idx][sl_gt500] = 1.
         mass_gt500 = tools.m_h(prof_gas[idx][sl_gt500], r_range[idx][sl_gt500])
         prof_gas[idx][sl_gt500] *= ((f_b - m_gas500 / m_range[idx]) *
@@ -496,6 +511,27 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms):
     # can integrate entire profile, since it's zero for r>r200m
     mgas = tools.m_h(prof_gas, r_range)
     f_gas = mgas / (m_range)
+
+    # Now we can determine the equivalent DMO masses from the f_gas - m relation
+    m_dmo = d.m200b_to_m200dmo(m_range, f_gas, prms)
+    r_dmo = tools.mass_to_radius(m_dmo, 200 * prms.rho_m)
+
+    # renormalize radial range
+    r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
+
+    # profile now runs between 0 and 5r500c
+    if bar2dmo == False:
+        profile_kwargs = {'r_range': r_range,
+                          'm_range': prms.m200m,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
+    else:
+        profile_kwargs = {'r_range': r_range_dmo,
+                          'm_range': m_dmo,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
     gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
@@ -520,7 +556,7 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms):
 # End of load_gas_r500c_r200m_5r500c()
 # ------------------------------------------------------------------------------
 
-def load_dm_5r500c(prms=p.prms):
+def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
     '''
     Return NFW profiles with up to r200m and 0 up to 5r500c
     '''
@@ -538,12 +574,6 @@ def load_dm_5r500c(prms=p.prms):
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
-    # profile now runs between 0 and 5r500c
-    profile_kwargs = {'r_range': r_range,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
 
     f_dm = np.ones_like(m_range) * prms.f_dm
     c_x = tools.c_correa(m200c, 0).reshape(-1) * prms.r_range_lin[:,-1]/r200c
@@ -560,6 +590,25 @@ def load_dm_5r500c(prms=p.prms):
                                              c_x[idx], r_x[idx],
                                              prms.rho_m).reshape(-1)
 
+    # Now we can determine the equivalent DMO masses from the f_gas - m relation
+    r_dmo = tools.mass_to_radius(m_dmo, 200 * prms.rho_m)
+
+    # renormalize radial range
+    r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
+
+    # profile now runs between 0 and 5r500c
+    if bar2dmo == False:
+        profile_kwargs = {'r_range': r_range,
+                          'm_range': prms.m200m,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
+    else:
+        profile_kwargs = {'r_range': r_range_dmo,
+                          'm_range': m_dmo,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     dm_extra = {'profile': prof_dm,
                  'f_comp': f_dm}
@@ -644,11 +693,13 @@ def load_gas_dmo_5r500c(prms=p.prms):
 # End of load_gas_dmo_5r500c()
 # ------------------------------------------------------------------------------
 
-def load_gas_smooth_r200m_5r500c(prms, fgas_200):
+def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
     '''
     Return uniform profiles with fgas_200m = 0 and fgas_5r500c = f_b - fgas_200
     '''
     # halo model parameters
+    # ! WATCH OUT ! These are the SPH equivalent masses and do thus not
+    # correspond to the DMO case, unless f_gas,200m = f_b
     m_range = prms.m200m
     m500c = prms.m500c
     r500c = prms.r500c
@@ -660,12 +711,6 @@ def load_gas_smooth_r200m_5r500c(prms, fgas_200):
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
-    # profile now runs between 0 and 5r500c
-    profile_kwargs = {'r_range': r_range,
-                      'm_range': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
 
     # gas fractions
     f_b = 1 - prms.f_dm
@@ -681,6 +726,27 @@ def load_gas_smooth_r200m_5r500c(prms, fgas_200):
 
     mgas = tools.m_h(prof_gas, r_range)
     f_gas = mgas / (m_range)
+
+    # Now we can determine the equivalent DMO masses from the f_gas - m relation
+    # m_dmo needs to be given from the profile up to r200m
+    r_dmo = tools.mass_to_radius(m_dmo, 200 * prms.rho_m)
+
+    # renormalize radial range
+    r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
+
+    # profile now runs between 0 and 5r500c
+    if bar2dmo == False:
+        profile_kwargs = {'r_range': r_range,
+                          'm_range': prms.m200m,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
+    else:
+        profile_kwargs = {'r_range': r_range_dmo,
+                          'm_range': m_dmo,
+                          'k_range': prms.k_range_lin,
+                          'n': 80,
+                          'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
     gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),

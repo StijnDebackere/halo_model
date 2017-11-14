@@ -27,8 +27,18 @@ class Power(Cache):
         super(Power, self).__init__()
         self.name = name
         self.comps = {}
+        self.r_range = components[0].r_range
+        self.m_range = components[0].m_range
+        self.k_range = components[0].k_range
         for comp in components:
             self.comps[comp.name] = comp
+            r_range = comp.r_range
+            m_range = comp.m_range
+            k_range = comp.k_range
+            if not (np.allclose(r_range, self.r_range) or
+                    np.allclose(m_range, self.m_range) or
+                    np.allclose(k_range, self.k_range)):
+                raise AttributeError('m_range/r_range/k_range need to be equal')
 
         self.p_lin = p_lin
 
@@ -46,6 +56,8 @@ class Power(Cache):
     @parameter
     def p_lin(self, val):
         return val
+
+    @parameter
 
     #===========================================================================
     # Methods
