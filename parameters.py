@@ -327,16 +327,22 @@ class Parameters(Cache):
         plin = p_int(self.k_range_lin)
         return plin
 
-    @cached_property('nu_file', 'm_fn')
+    @cached_property('nu_file', 'm_fn', 'hmcode')
     def nu(self):
-        nu, fnu = np.loadtxt(self.nu_file, unpack=True)
-        # nu = np.sqrt(self.m_fn.nu)
+        if hmcode:
+            nu, fnu = np.loadtxt(self.nu_file, unpack=True)
+        else:
+            nu = np.sqrt(self.m_fn.nu)
+
         return nu
 
-    @cached_property('fnu_file', 'nu', 'm_fn')
+    @cached_property('fnu_file', 'nu', 'm_fn', 'hmcode')
     def fnu(self):
-        nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
-        # fnu = self.m_fn.fsigma / self.nu
+        if hmcode:
+            nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
+        else:
+            fnu = self.m_fn.fsigma / self.nu
+
         return fnu
 
     @cached_property('omegab', 'omegac', 'rho_crit', 'h')
