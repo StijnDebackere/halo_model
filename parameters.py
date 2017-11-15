@@ -21,12 +21,8 @@ class Parameters(Cache):
 
     Parameters
     ----------
-    m_min : float
-      Minimum mass at which to perform analysis [units log10 Msun h^-1]
-    m_max : float
-      Maximum mass at which to perform analysis [units log10 Msun h^-1]
-    m_bins : int
-      Number of mass bins to compute mass function for
+    m_range : float
+      Halo mass range [units Msun h^-1]
     r_min : float
       Minimum log radius [units h^-1 Mpc]
     r_bins : int
@@ -82,8 +78,7 @@ class Parameters(Cache):
       mean matter density of the universe
 
     '''
-    def __init__(self, m200m, #m_range_mfn,
-                 m_min=10, m_max=15, m_bins=101,
+    def __init__(self, m200m,
                  r_min=-4.0, r_bins=1000,
                  k_min=-1.8, k_max=2., k_bins=1000,
                  sigma_8=0.821, H0=70.0, omegab=0.0463, omegac=0.233,
@@ -103,10 +98,6 @@ class Parameters(Cache):
                  hmcode=False):
         super(Parameters, self).__init__()
         self.m200m = m200m
-        # self.m_range_mfn = m200m
-        self.m_min = m_min
-        self.m_max = m_max
-        self.m_bins = m_bins
         self.r_min = r_min
         self.r_bins = r_bins
         self.k_min = k_min
@@ -137,22 +128,6 @@ class Parameters(Cache):
     #===========================================================================
     @parameter
     def m200m(self, val):
-        return val
-
-    # @parameter
-    # def m_range_mfn(self, val):
-    #     return val
-
-    @parameter
-    def m_min(self, val):
-        return val
-
-    @parameter
-    def m_max(self, val):
-        return val
-
-    @parameter
-    def m_bins(self, val):
         return val
 
     @parameter
@@ -295,10 +270,6 @@ class Parameters(Cache):
     def omegam(self):
         return self.omegab + self.omegac
 
-    @cached_property('m_min', 'm_max', 'm_bins')
-    def dlog10m(self):
-        return (self.m_max - self.m_min)/np.float(self.m_bins)
-
     @cached_property('k_min', 'k_max', 'k_bins')
     def dlnk(self):
         return np.log(10) * (self.k_max - self.k_min)/np.float(self.k_bins)
@@ -331,14 +302,11 @@ class Parameters(Cache):
 
         return trans
 
-    @cached_property('m_min', 'm_max', 'dlog10m', 'mf_fit', 'delta_h', 'cut_fit',
+    @cached_property('m200m', 'mf_fit', 'delta_h', 'cut_fit',
                      'delta_wrt', 'delta_c', 'trans_prms')
     def m_fn_prms(self):
         massf = {
-            # "m_range": self.m200m,
-            "Mmin": self.m_min,
-            "Mmax": self.m_max,
-            "dlog10m": self.dlog10m,
+            "m_range": self.m200m,
             "mf_fit": self.mf_fit,
             "cut_fit": self.cut_fit,
             "delta_h": self.delta_h,
@@ -400,38 +368,31 @@ class Parameters(Cache):
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
 prms1 = Parameters(m200m=np.logspace(10,11,101),
-                   m_min=10., m_max=11.,
                    nu_file='HMcode/nu_fnu_dmo_10_11.dat',
                    fnu_file='HMcode/nu_fnu_dmo_10_11.dat',
                    p_lin_file='HMcode/plin.dat')
 prms2 = Parameters(m200m=np.logspace(11,12,101),
-                   m_min=11., m_max=12.,
                    nu_file='HMcode/nu_fnu_dmo_11_12.dat',
                    fnu_file='HMcode/nu_fnu_dmo_11_12.dat',
                    p_lin_file='HMcode/plin.dat')
 prms3 = Parameters(m200m=np.logspace(12,13,101),
-                   m_min=12., m_max=13.,
                    nu_file='HMcode/nu_fnu_dmo_12_13.dat',
                    fnu_file='HMcode/nu_fnu_dmo_12_13.dat',
                    p_lin_file='HMcode/plin.dat')
 prms4 = Parameters(m200m=np.logspace(13,14,101),
-                   m_min=13., m_max=14.,
                    nu_file='HMcode/nu_fnu_dmo_13_14.dat',
                    fnu_file='HMcode/nu_fnu_dmo_13_14.dat',
                    p_lin_file='HMcode/plin.dat')
 prms5 = Parameters(m200m=np.logspace(14,15,101),
-                   m_min=14., m_max=15.,
                    nu_file='HMcode/nu_fnu_dmo_14_15.dat',
                    fnu_file='HMcode/nu_fnu_dmo_14_15.dat',
                    p_lin_file='HMcode/plin.dat')
 prmst = Parameters(m200m=np.logspace(10,15,101),
-                   m_min=10., m_max=15.,
                    nu_file='HMcode/nu_fnu_dmo_10_15.dat',
                    fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
                    p_lin_file='HMcode/plin.dat')
 
 prms = Parameters(m200m=np.logspace(11,15,101),
-                  m_min=11, m_max=15,
                   k_min=-1.8, k_max=2, k_bins=1000,
                   nu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
                   fnu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
