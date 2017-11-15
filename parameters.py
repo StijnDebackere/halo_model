@@ -320,11 +320,15 @@ class Parameters(Cache):
     def m_fn(self):
         return hmf.MassFunction(**self.m_fn_prms)
 
-    @cached_property('p_lin_file', 'k_range_lin')
+    @cached_property('p_lin_file', 'k_range_lin', 'm_fn', 'hmcode')
     def p_lin(self):
-        k, P = np.loadtxt(self.p_lin_file, unpack=True)
-        p_int = interp.interp1d(k, P)
-        plin = p_int(self.k_range_lin)
+        if hmcode:
+            k, P = np.loadtxt(self.p_lin_file, unpack=True)
+            p_int = interp.interp1d(k, P)
+            plin = p_int(self.k_range_lin)
+        else:
+            plin = np.exp(m_fn.power)
+
         return plin
 
     @cached_property('nu_file', 'm_fn', 'hmcode')
@@ -411,4 +415,3 @@ prms = Parameters(m200m=np.logspace(11,15,101),
 #                        nu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
 #                        fnu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
 #                        p_lin_file='HMcode/plin_k-3_2.dat')
-
