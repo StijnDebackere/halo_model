@@ -248,8 +248,6 @@ def load_gas(prms=p.prms, bar2dmo=True):
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     if bar2dmo == False:
-        print 'no bar2dmo:'
-        print prms.fnu
         comp_gas_kwargs = {'name': 'gas',
                            'r200m': r200m,
                            'm200m': m200m,
@@ -260,9 +258,6 @@ def load_gas(prms=p.prms, bar2dmo=True):
     else:
         prms_dmo = deepcopy(prms)
         prms_dmo.m200m = m_dmo
-        print 'bar2dmo:'
-        print prms.fnu
-        print prms_dmo.fnu
         comp_gas_kwargs = {'name': 'gas',
                            'r200m': r_dmo,
                            'm200m': m_dmo,
@@ -341,7 +336,7 @@ def load_gas_obs(prms=p.prms):
 # End of load_gas_obs()
 # ------------------------------------------------------------------------------
 
-def load_gas_smooth_r500c_r200m(prms=p.prms):
+def load_gas_smooth_r500c_r200m(prms, fgas_200):
 
     '''
     Return uniform profiles with fgas_500c = 0 and fgas_200m = f_b - f_obs
@@ -368,7 +363,7 @@ def load_gas_smooth_r500c_r200m(prms=p.prms):
         sl = (rx[idx] >= 1.)
         prof_gas[idx][sl] = 1.
         mass = tools.m_h(prof_gas[idx], r_range[idx])
-        prof_gas[idx] *= (f_b - fgas_500[idx]) * m200m[idx] / mass
+        prof_gas[idx] *= (f_b - fgas_200[idx]) * m200m[idx] / mass
 
     mgas = tools.m_h(prof_gas, r_range)
     f_gas = mgas / (m200m)
@@ -594,6 +589,67 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms, bar2dmo=True):
 
 # ------------------------------------------------------------------------------
 # End of load_gas_r500c_r200m_5r500c()
+# ------------------------------------------------------------------------------
+
+def load_dm_dmo_5r500c(prms=p.prms):
+    '''
+    Pure dark matter only component with NFW profile and f_dm = 1
+    '''
+    m200m = prms.m200m
+    m500c = prms.m500c
+    r500c = prms.r500c
+    r200m = prms.r200m
+
+    r_min = prms.r_range_lin[:,0]
+    r_max = (5 * r500c)
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
+                        for i,rm in enumerate(r_max)])
+    rx = r_range / r500c.reshape(-1,1)
+
+
+    f_dm = np.ones_like(m200m)
+    c200m = prms.c_correa
+
+    # relative position of virial radius
+    x200m = r200m / r500c
+
+    prof_dm = np.zeros_like(rx)
+    for idx, prof in enumerate(prof_dm):
+        sl = (rx[idx] <= x200m[idx])
+        prof_dm[idx][sl] = profs.profile_NFW(r_range[idx][sl].reshape(1,-1),
+                                             m200m[idx].reshape(1,1),
+                                             c200m[idx], r200m[idx],
+                                             prms.rho_m).reshape(-1)
+
+
+    # Can give the profile all of the halo model parameters, since it is
+    # a fit to observations, only the power spectrum calculation needs
+    # to convert these values to the DMO equivalent cases
+    profile_kwargs = {'r_range': r_range,
+                      'm_bar': m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+    # --------------------------------------------------------------------------
+    dm_extra = {'profile': prof_dm}
+    prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
+    # --------------------------------------------------------------------------
+    # additional kwargs for comp.Component
+    comp_dm_kwargs = {'name': 'dm',
+                      'r200m': r200m,
+                      'm200m': m200m,
+                      'p_lin': prms.p_lin,
+                      'nu': prms.nu,
+                      'fnu': prms.fnu,
+                      'f_comp': f_dm,}
+
+    dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
+
+    comp_dm = comp.Component(**dm_kwargs)
+    return comp_dm
+
+# ------------------------------------------------------------------------------
+# End of load_dm_dmo_5r500c()
 # ------------------------------------------------------------------------------
 
 def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
@@ -1250,6 +1306,14 @@ def load_models(prms=p.prms, bar2dmo=True):
     gas_dmo = load_gas_dmo(prms)
     pow_gas_dmo = power.Power([dm, gas_dmo], name='gas_dmo')
 
+    dm_dmo_5r500c = load_dm_dmo_5r500c(prms)
+    pow_dm_dmo_5r500c = power.Power([dm_dmo_5r500c], name='dmo_5r500c')
+
+    dm_5r500c = load_dm_5r500c(m_dmo=prms.m200m, prms=prms, bar2dmo=False)
+    gas_dmo_5r500c = load_gas_dmo_5r500c(prms)
+    pow_gas_dmo_5r500c = power.Power([dm_5r500c, gas_dmo_5r500c],
+                                     name='gas_dmo_5r500c')
+
     # load gas_extrap
     gas = load_gas(prms, bar2dmo=bar2dmo)
     dm_gas = load_dm(m_dmo=gas.m200m, prms=prms, bar2dmo=bar2dmo)
@@ -1257,9 +1321,8 @@ def load_models(prms=p.prms, bar2dmo=True):
 
     # load gas_smooth_r500c_r200m
     gas_beta = load_gas_obs(prms)
-    gas_smooth = load_gas_smooth_r500c_r200m(prms)
-    gas = gas_beta + gas_smooth
-    pow_gas_smooth_r500c_r200m = power.Power([dm, gas],
+    gas_smooth = load_gas_smooth_r500c_r200m(prms, gas_beta.f_comp)
+    pow_gas_smooth_r500c_r200m = power.Power([dm, gas_beta, gas_smooth],
                                              name='gas_smooth_r500c_r200m')
 
     # load gas_smooth_r200m_5r500c
@@ -1286,6 +1349,8 @@ def load_models(prms=p.prms, bar2dmo=True):
 
     results = {'dm_dmo': pow_dm_dmo,
                'gas_dmo': pow_gas_dmo,
+               'dm_dmo_5r500c': pow_dm_dmo_5r500c,
+               'gas_dmo_5r500c': pow_gas_dmo_5r500c,
                'gas': pow_gas,
                'smooth_r500c_r200m': pow_gas_smooth_r500c_r200m,
                'smooth_r200m_5r500c': pow_gas_smooth_r200m_5r500c,
