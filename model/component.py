@@ -76,9 +76,10 @@ class Component(dens.Profile):
             raise AttributeError('nu/fnu/p_lin need to be the same')
         if not (np.allclose(self.r_range, other.r_range) or
                 np.allclose(self.m_bar, other.m_bar) or
+                np.allclose(self.r200m, other.r200m) or
                 np.allclose(self.m200m, other.m200m) or
                 np.allclose(self.k_range, other.k_range)):
-            raise AttributeError('nu/fnu/p_lin need to be the same')
+            raise AttributeError('r_range/m_bar/r200m/m200m/k_range need to be the same')
 
         prof1 = self.rho_r
         prof2 = other.rho_r
@@ -101,7 +102,8 @@ class Component(dens.Profile):
                           "profile": prof_new,
                           "f_comp": f_new,
                           "profile_f": prof_f_new}
-        return Component(self.name, self.m200m, self.p_lin, self.nu, self.fnu,
+        return Component(self.name, self.r200m, self.m200m, self.p_lin,
+                         self.nu, self.fnu,
                          #self.bias_fn,
                          # self.bias_fn_args,
                          **profile_kwargs)

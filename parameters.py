@@ -83,14 +83,12 @@ class Parameters(Cache):
                  k_min=-1.8, k_max=2., k_bins=1000,
                  sigma_8=0.821, H0=70.0, omegab=0.0463, omegac=0.233,
                  omegav=0.7207, n=0.972,
-                 # transfer_fit='EH',
-                 # transfer_options=None,
                  transfer_fit='FromFile',
                  transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
                  z=0.,
-                 p_lin_file='HMcode/plin.dat',
-                 nu_file='HMcode/nu_fnu.dat',
-                 fnu_file='HMcode/nu_fnu.dat',
+                 p_lin_file=None,
+                 nu_file=None,
+                 fnu_file=None,
                  delta_h=200.,
                  mf_fit='Tinker10', cut_fit=False,
                  delta_wrt='mean', delta_c=1.686,
@@ -322,18 +320,18 @@ class Parameters(Cache):
 
     @cached_property('p_lin_file', 'k_range_lin', 'm_fn', 'hmcode')
     def p_lin(self):
-        if hmcode:
+        if self.hmcode:
             k, P = np.loadtxt(self.p_lin_file, unpack=True)
             p_int = interp.interp1d(k, P)
             plin = p_int(self.k_range_lin)
         else:
-            plin = np.exp(m_fn.power)
+            plin = np.exp(self.m_fn.power)
 
         return plin
 
     @cached_property('nu_file', 'm_fn', 'hmcode')
     def nu(self):
-        if hmcode:
+        if self.hmcode:
             nu, fnu = np.loadtxt(self.nu_file, unpack=True)
         else:
             nu = np.sqrt(self.m_fn.nu)
@@ -342,7 +340,7 @@ class Parameters(Cache):
 
     @cached_property('fnu_file', 'nu', 'm_fn', 'hmcode')
     def fnu(self):
-        if hmcode:
+        if self.hmcode:
             nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
         else:
             fnu = self.m_fn.fsigma / self.nu
