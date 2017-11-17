@@ -32,6 +32,7 @@ class Power(Cache):
         self.r200m = components[0].r200m
         self.m200m = components[0].m200m
         self.k_range = components[0].k_range
+        self.dndm = components[0].dndm
         self.p_lin = components[0].p_lin
         for comp in components:
             self.comps[comp.name] = comp
@@ -39,13 +40,15 @@ class Power(Cache):
             r200m = comp.r200m
             m200m = comp.m200m
             k_range = comp.k_range
+            dndm = comp.dndm
             p_lin = comp.p_lin
             if not (np.allclose(r_range, self.r_range) or
                     np.allclose(r200m, self.r200m) or
                     np.allclose(m200m, self.m200m) or
                     np.allclose(k_range, self.k_range) or
+                    np.allclose(dndm, self.dndm) or
                     np.allclose(p_lin, self.p_lin)):
-                raise AttributeError('m200m/r200m/r_range/k_range/p_lin need to be equal')
+                raise AttributeError('m200m/r200m/r_range/k_range/p_lin/dndm need to be equal')
 
 
     #===========================================================================
@@ -76,6 +79,10 @@ class Power(Cache):
         return val
 
     @parameter
+    def dndm(self, val):
+        return val
+
+    @parameter
     def p_lin(self, val):
         return val
 
@@ -91,44 +98,18 @@ class Power(Cache):
         m = comp_1.m200m.shape[0]
         k = comp_1.k_range.shape[0]
 
-        # dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
-        nu = comp_1.nu.reshape(m,1)
-        fnu = comp_1.fnu.reshape(m,1)
         r200m = comp_1.r200m.reshape(m,1)
-
         m200m = comp_1.m200m.reshape(m,1)
+        dndm = comp_1.dndm.reshape(m,1)
+
         f_comp_1 = comp_1.f_comp.reshape(m,1)
         f_comp_2 = comp_2.f_comp.reshape(m,1)
 
-        prefactor = 4./3 * np.pi * 200.
-        # prefactor = 1./(p.prms.rho)
-        result = Integrate(y=fnu * f_comp_1 * comp_1.rho_k *
-                           f_comp_2 * comp_2.rho_k * r200m**3,
-                           x=nu,
+        prefactor = (4./3 * np.pi * 200)**2
+        result = Integrate(y=dndm * f_comp_1 * comp_1.rho_k *
+                           f_comp_2 * comp_2.rho_k * r200m**6,
+                           x=m200m,
                            axis=0)
-        # # print (f_comp_1.reshape(-1) * comp_1.rho_k[:,0] *
-        # #        f_comp_2.reshape(-1) *
-        # #        comp_2.rho_k[:,0] *
-        # #        (r200m**3).reshape(-1))
-        # try:
-        #     print Integrate(fnu.reshape(-1) * (f_comp_1.reshape(-1) *
-        #                                        comp_1.rho_k[:,0] *
-        #                                        f_comp_2.reshape(-1) *
-        #                                        comp_2.rho_k[:,0] *
-        #                                        (r200m**3).reshape(-1)),
-        #                     nu,
-        #                     axis=0)
-
-        #     plt.plot(nu.reshape(-1), fnu.reshape(-1) * (f_comp_1.reshape(-1) *
-        #                               comp_1.rho_k[:,0] *
-        #                               f_comp_2.reshape(-1) *
-        #                               comp_2.rho_k[:,0] *
-        #                               (r200m**3).reshape(-1)))
-        #     plt.xscale('log')
-        #     plt.yscale('log')
-        #     plt.show()
-        # except:
-        #     pass
 
         result *= prefactor
 

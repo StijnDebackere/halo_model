@@ -49,8 +49,6 @@ class Parameters(Cache):
       Transfer function fit
     transfer_options : string (accepted by hmf.Transfer)
       Extra Transfer options
-    p_lin_file : string
-      Location of linear matter power spectrum file
     z : float
       Redshift to compute for
     mf_fit : string (accepted by hmf.MassFunction)
@@ -66,8 +64,6 @@ class Parameters(Cache):
       Linear critical overdensity for collapse
     rho_crit : float [units Msun h^2 / Mpc^3]
       Critical density of the universe
-    hmcode : bool
-      Use HMcode linear power spectrum and halo mass function or hmf version
 
     Methods
     -------
@@ -86,14 +82,10 @@ class Parameters(Cache):
                  transfer_fit='FromFile',
                  transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
                  z=0.,
-                 p_lin_file=None,
-                 nu_file=None,
-                 fnu_file=None,
                  delta_h=200.,
                  mf_fit='Tinker10', cut_fit=False,
                  delta_wrt='mean', delta_c=1.686,
-                 rho_crit=2.7763458 * (10.0**11.0),
-                 hmcode=False):
+                 rho_crit=2.7763458 * (10.0**11.0)):
         super(Parameters, self).__init__()
         self.m200m = m200m
         self.r_min = r_min
@@ -109,9 +101,6 @@ class Parameters(Cache):
         self.n = n
         self.transfer_fit = transfer_fit
         self.transfer_options = transfer_options
-        self.p_lin_file = p_lin_file
-        self.nu_file = nu_file
-        self.fnu_file = fnu_file
         self.z = z
         self.mf_fit = mf_fit
         self.cut_fit = cut_fit
@@ -119,7 +108,6 @@ class Parameters(Cache):
         self.delta_wrt = delta_wrt
         self.delta_c = delta_c
         self.rho_crit = rho_crit
-        self.hmcode = hmcode
 
     #===========================================================================
     # Parameters
@@ -181,18 +169,6 @@ class Parameters(Cache):
         return val
 
     @parameter
-    def p_lin_file(self, val):
-        return val
-
-    @parameter
-    def nu_file(self, val):
-        return val
-
-    @parameter
-    def fnu_file(self, val):
-        return val
-
-    @parameter
     def z(self, val):
         if val >= 0:
             return val
@@ -225,10 +201,6 @@ class Parameters(Cache):
             return val
         else:
             raise ValueError('rho_crit needs to be > 0')
-
-    @parameter
-    def hmcode(self, val):
-        return val
 
     #===========================================================================
     # Methods
@@ -318,38 +290,23 @@ class Parameters(Cache):
     def m_fn(self):
         return hmf.MassFunction(**self.m_fn_prms)
 
-    @cached_property('p_lin_file', 'k_range_lin', 'm_fn', 'hmcode')
+    @cached_property('k_range_lin', 'm_fn')
     def p_lin(self):
-        if self.hmcode:
-            k, P = np.loadtxt(self.p_lin_file, unpack=True)
-            p_int = interp.interp1d(k, P)
-            plin = p_int(self.k_range_lin)
-        else:
-            plin = np.exp(self.m_fn.power)
+        plin = np.exp(self.m_fn.power)
 
         return plin
 
-    @cached_property('nu_file', 'm_fn', 'hmcode')
-    def nu(self):
-        if self.hmcode:
-            nu, fnu = np.loadtxt(self.nu_file, unpack=True)
-        else:
-            nu = np.sqrt(self.m_fn.nu)
-
-        return nu
-
-    @cached_property('fnu_file', 'nu', 'm_fn', 'hmcode')
-    def fnu(self):
-        if self.hmcode:
-            nu, fnu = np.loadtxt(self.fnu_file, unpack=True)
-        else:
-            fnu = self.m_fn.fsigma / self.nu
-
-        return fnu
+    @cached_property('m_fn', 'm200m')
+    def dndm(self):
+        return self.m_fn.dndm
 
     @cached_property('omegab', 'omegac', 'rho_crit', 'h')
     def rho_m(self):
         return (self.omegab + self.omegac) * self.rho_crit
+
+    @cached_property('m200m', 'dndm')
+    def rho_hm(self):
+        return tools.Integrate(y=self.m200m * self.dndm, x=self.m200m)
 
     @cached_property('omegab', 'omegam')
     def f_dm(self):
@@ -375,41 +332,12 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m200m=np.logspace(10,11,101),
-                   nu_file='HMcode/nu_fnu_dmo_10_11.dat',
-                   fnu_file='HMcode/nu_fnu_dmo_10_11.dat',
-                   p_lin_file='HMcode/plin.dat')
-prms2 = Parameters(m200m=np.logspace(11,12,101),
-                   nu_file='HMcode/nu_fnu_dmo_11_12.dat',
-                   fnu_file='HMcode/nu_fnu_dmo_11_12.dat',
-                   p_lin_file='HMcode/plin.dat')
-prms3 = Parameters(m200m=np.logspace(12,13,101),
-                   nu_file='HMcode/nu_fnu_dmo_12_13.dat',
-                   fnu_file='HMcode/nu_fnu_dmo_12_13.dat',
-                   p_lin_file='HMcode/plin.dat')
-prms4 = Parameters(m200m=np.logspace(13,14,101),
-                   nu_file='HMcode/nu_fnu_dmo_13_14.dat',
-                   fnu_file='HMcode/nu_fnu_dmo_13_14.dat',
-                   p_lin_file='HMcode/plin.dat')
-prms5 = Parameters(m200m=np.logspace(14,15,101),
-                   nu_file='HMcode/nu_fnu_dmo_14_15.dat',
-                   fnu_file='HMcode/nu_fnu_dmo_14_15.dat',
-                   p_lin_file='HMcode/plin.dat')
-prmst = Parameters(m200m=np.logspace(10,15,101),
-                   nu_file='HMcode/nu_fnu_dmo_10_15.dat',
-                   fnu_file='HMcode/nu_fnu_dmo_10_15.dat',
-                   p_lin_file='HMcode/plin.dat')
+prms1 = Parameters(m200m=np.logspace(10,11,101))
+prms2 = Parameters(m200m=np.logspace(11,12,101))
+prms3 = Parameters(m200m=np.logspace(12,13,101))
+prms4 = Parameters(m200m=np.logspace(13,14,101))
+prms5 = Parameters(m200m=np.logspace(14,15,101))
+prmst = Parameters(m200m=np.logspace(10,15,101))
 
 prms = Parameters(m200m=np.logspace(11,15,101),
-                  k_min=-1.8, k_max=2, k_bins=1000,
-                  nu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
-                  fnu_file='HMcode/nu_fnu_dmo_11_15_k-1p8_2.dat',
-                  p_lin_file='HMcode/plin_k-1p8_2.dat')
-
-# prms_comp = Parameters(m200m=np.logspace(10,15,101),
-#                        m_min=10, m_max=15,
-#                        # ~ 0.001 < kR < 100
-#                        k_min=-3, k_max=2, k_bins=1000,
-#                        nu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
-#                        fnu_file='HMcode/nu_fnu_dmo_10_15_k-3_2.dat',
-#                        p_lin_file='HMcode/plin_k-3_2.dat')
+                  k_min=-1.8, k_max=2, k_bins=1000)

@@ -25,10 +25,8 @@ class Component(dens.Profile):
       dark matter only equivalent halo masses
     p_lin : (k,) array
       linear power spectrum
-    nu : (m,) array
-      halo overdensity delta_c / sigma(m)
-    fnu : (m,) array
-      halo mass multiplicity function
+    dndm : (m,) array
+      halo mass function
     f_comp : (m,) array
       fractional contribution of component to halo mass m200m for an object of
       equivalent mass m at redshift z
@@ -55,7 +53,7 @@ class Component(dens.Profile):
     delta_tot: (k,) array
       dimensionless power spectrum
     '''
-    def __init__(self, name, r200m, m200m, p_lin, nu, fnu, f_comp,
+    def __init__(self, name, r200m, m200m, p_lin, dndm, f_comp,
                  # bias_fn, bias_fn_args,
                  **profile_kwargs):
         super(Component, self).__init__(**profile_kwargs)
@@ -64,16 +62,14 @@ class Component(dens.Profile):
         self.m200m = m200m
         self.p_lin = p_lin
         self.f_comp = f_comp
-        self.nu = nu
-        self.fnu = fnu
+        self.dndm = dndm
         # self.bias_fn = bias_fn
         # self.bias_fn_args = bias_fn_args
 
     def __add__(self, other):
-        if not (np.allclose(self.nu, other.nu) or
-                np.allclose(self.fnu, other.fnu) or
+        if not (np.allclose(self.dndm, other.dndm) or
                 np.allclose(self.p_lin, other.p_lin)):
-            raise AttributeError('nu/fnu/p_lin need to be the same')
+            raise AttributeError('dndm/p_lin need to be the same')
         if not (np.allclose(self.r_range, other.r_range) or
                 np.allclose(self.m_bar, other.m_bar) or
                 np.allclose(self.r200m, other.r200m) or
@@ -103,7 +99,7 @@ class Component(dens.Profile):
                           "f_comp": f_new,
                           "profile_f": prof_f_new}
         return Component(self.name, self.r200m, self.m200m, self.p_lin,
-                         self.nu, self.fnu,
+                         self.dndm,
                          #self.bias_fn,
                          # self.bias_fn_args,
                          **profile_kwargs)
@@ -128,11 +124,7 @@ class Component(dens.Profile):
         return val
 
     @parameter
-    def nu(self, val):
-        return val
-
-    @parameter
-    def fnu(self, val):
+    def dndm(self, val):
         return val
 
     # @parameter
@@ -150,7 +142,7 @@ class Component(dens.Profile):
     def delta_lin(self):
         return 0.5/np.pi**2 * self.k_range**3 * self.p_lin
 
-    @cached_property('f_comp', 'nu', 'fnu') #, 'm_fn')
+    @cached_property('f_comp', 'm200m', 'dndm')
     def rho_comp(self):
         '''
         Compute the average density of the component as a fraction of rho_m
@@ -158,9 +150,9 @@ class Component(dens.Profile):
             rho_comp(z) = int_m m n(m,z) f_comp(m,z)
             rho_comp(z) / rho_m = int_nu f(nu, z) f_comp(nu, z)
         '''
-        norm = Integrate(y=self.fnu, x=self.nu, axis=0)
-        result = Integrate(y=self.fnu * self.f_comp,
-                           x=self.nu,
+        norm = Integrate(y=self.m200m * self.dndm, x=self.m200m, axis=0)
+        result = Integrate(y=self.m200m * self.dndm * self.f_comp,
+                           x=self.dndm,
                            axis=0) / norm
 
         return result
@@ -231,10 +223,12 @@ class Component(dens.Profile):
                                    self.r_range,
                                    axis=1)
 
-    @cached_property('r200m', 'm200m', 'k_range', 'rho_k', 'f_comp', 'nu', 'fnu')
+    @cached_property('r200m', 'm200m', 'k_range', 'rho_k', 'f_comp', 'dndm')
     def p_1h(self):
         '''
         Compute the 1-halo term of the power spectrum.
+
+        P_1h = int_m (200 * 4 pi/3 r200m(m)^3)^2 n(m_dmo(m)) |u(k|m)|^2 dm
         '''
         # define shapes for readability
         m = self.m200m.shape[0]
@@ -243,12 +237,11 @@ class Component(dens.Profile):
         m200m = self.m200m.reshape(m,1)
         f_comp = self.f_comp.reshape(m,1)
 
-        nu = self.nu.reshape(m,1)
-        fnu = self.fnu.reshape(m,1)
+        dndm = self.dndm.reshape(m,1)
 
-        prefactor = 4./3 * np.pi * 200.
-        result = Integrate(y=fnu * f_comp**2 * np.abs(self.rho_k)**2 * r200m**3,
-                           x=nu,
+        prefactor = (4./3 * np.pi * 200)**2
+        result = Integrate(y=r200m**6 * dndm * f_comp**2 * np.abs(self.rho_k)**2,
+                           x=m200m,
                            axis=0)
         result *= prefactor
 

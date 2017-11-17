@@ -62,8 +62,7 @@ def load_dm_dmo(prms=p.prms):
                       'r200m': r200m,
                       'm200m': m200m,
                       'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,
+                      'dndm': prms.dndm,
                       'f_comp': f_dm,}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
@@ -116,8 +115,7 @@ def load_dm(m_dmo, prms=p.prms, bar2dmo=True):
                            'r200m': r200m,
                            'm200m': m200m,
                            'p_lin': prms.p_lin,
-                           'nu': prms.nu,
-                           'fnu': prms.fnu,
+                           'dndm': prms.dndm,
                            'f_comp': f_dm}
     else:
         prms_dmo = deepcopy(prms)
@@ -127,8 +125,7 @@ def load_dm(m_dmo, prms=p.prms, bar2dmo=True):
                            'r200m': r_dmo,
                            'm200m': m_dmo,
                            'p_lin': prms.p_lin,
-                           'nu': prms_dmo.nu,
-                           'fnu': prms_dmo.fnu,
+                           'dndm': prms_dmo.dndm,
                            'f_comp': f_dm}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
@@ -171,8 +168,7 @@ def load_gas_dmo(prms=p.prms):
                        'r200m': prms.r200m,
                        'm200m': prms.m200m,
                        'p_lin': prms.p_lin,
-                       'nu': prms.nu,
-                       'fnu': prms.fnu,
+                       'dndm': prms.dndm,
                        'f_comp': f_gas,}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -252,8 +248,7 @@ def load_gas(prms=p.prms, bar2dmo=True):
                            'r200m': r200m,
                            'm200m': m200m,
                            'p_lin': prms.p_lin,
-                           'nu': prms.nu,
-                           'fnu': prms.fnu,
+                           'dndm': prms.dndm,
                            'f_comp': f_gas}
     else:
         prms_dmo = deepcopy(prms)
@@ -262,8 +257,7 @@ def load_gas(prms=p.prms, bar2dmo=True):
                            'r200m': r_dmo,
                            'm200m': m_dmo,
                            'p_lin': prms.p_lin,
-                           'nu': prms_dmo.nu,
-                           'fnu': prms_dmo.fnu,
+                           'dndm': prms_dmo.dndm,
                            'f_comp': f_gas}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -323,8 +317,7 @@ def load_gas_obs(prms=p.prms):
                        'r200m': r200m,
                        'm200m': m200m,
                        'p_lin': prms.p_lin,
-                       'nu': prms.nu,
-                       'fnu': prms.fnu,
+                       'dndm': prms.dndm,
                        'f_comp': f_gas}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -383,8 +376,7 @@ def load_gas_smooth_r500c_r200m(prms, fgas_200):
                        'r200m': r200m,
                        'm200m': m200m,
                        'p_lin': prms.p_lin,
-                       'nu': prms.nu,
-                       'fnu': prms.fnu,
+                       'dndm': prms.dndm,
                        'f_comp': f_gas}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -463,8 +455,7 @@ def load_gas_5r500c(prms=p.prms, bar2dmo=True):
                            'r200m': r200m,
                            'm200m': m200m,
                            'p_lin': prms.p_lin,
-                           'nu': prms.nu,
-                           'fnu': prms.fnu,
+                           'dndm': prms.dndm,
                            'f_comp': f_gas}
     else:
         prms_dmo = deepcopy(prms)
@@ -473,8 +464,7 @@ def load_gas_5r500c(prms=p.prms, bar2dmo=True):
                            'r200m': r_dmo,
                            'm200m': m_dmo,
                            'p_lin': prms.p_lin,
-                           'nu': prms_dmo.nu,
-                           'fnu': prms_dmo.fnu,
+                           'dndm': prms_dmo.dndm,
                            'f_comp': f_gas}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -568,8 +558,7 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms, bar2dmo=True):
                            'r200m': r200m,
                            'm200m': m200m,
                            'p_lin': prms.p_lin,
-                           'nu': prms.nu,
-                           'fnu': prms.fnu,
+                           'dndm': prms.dndm,
                            'f_comp': f_gas}
     else:
         prms_dmo = deepcopy(prms)
@@ -578,8 +567,7 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms, bar2dmo=True):
                            'r200m': r_dmo,
                            'm200m': m_dmo,
                            'p_lin': prms.p_lin,
-                           'nu': prms_dmo.nu,
-                           'fnu': prms_dmo.fnu,
+                           'dndm': prms_dmo.dndm,
                            'f_comp': f_gas}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -639,8 +627,7 @@ def load_dm_dmo_5r500c(prms=p.prms):
                       'r200m': r200m,
                       'm200m': m200m,
                       'p_lin': prms.p_lin,
-                      'nu': prms.nu,
-                      'fnu': prms.fnu,
+                      'dndm': prms.dndm,
                       'f_comp': f_dm,}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
@@ -704,8 +691,7 @@ def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
                            'r200m': r200m,
                            'm200m': m200m,
                            'p_lin': prms.p_lin,
-                           'nu': prms.nu,
-                           'fnu': prms.fnu,
+                           'dndm': prms.dndm,
                            'f_comp': f_dm}
     else:
         prms_dmo = deepcopy(prms)
@@ -715,8 +701,7 @@ def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
                            'r200m': r_dmo,
                            'm200m': m_dmo,
                            'p_lin': prms.p_lin,
-                           'nu': prms_dmo.nu,
-                           'fnu': prms_dmo.fnu,
+                           'dndm': prms_dmo.dndm,
                            'f_comp': f_dm}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
@@ -773,8 +758,7 @@ def load_gas_dmo_5r500c(prms=p.prms):
                        'r200m': r200m,
                        'm200m': m200m,
                        'p_lin': prms.p_lin,
-                       'nu': prms.nu,
-                       'fnu': prms.fnu,
+                       'dndm': prms.dndm,
                        'f_comp': f_gas,}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -850,8 +834,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
                            'r200m': r200m,
                            'm200m': m200m,
                            'p_lin': prms.p_lin,
-                           'nu': prms.nu,
-                           'fnu': prms.fnu,
+                           'dndm': prms.dndm,
                            'f_comp': f_gas}
     else:
         prms_dmo = deepcopy(prms)
@@ -860,8 +843,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
                            'r200m': r_dmo,
                            'm200m': m_dmo,
                            'p_lin': prms.p_lin,
-                           'nu': prms_dmo.nu,
-                           'fnu': prms_dmo.fnu,
+                           'dndm': prms_dmo.dndm,
                            'f_comp': f_gas}
 
     gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
@@ -932,7 +914,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     comp_gas_kwargs = {'name': 'gas',
 #                       'p_lin': prms.p_lin,
 #                       'nu': prms.nu,
-#                       'fnu': prms.fnu,}
+#                       'dndm': prms.dndm,}
 #                       # 'm_fn': p.prms.m_fn,
 #                       # 'bias_fn': bias.bias_Tinker10,
 #                       # 'bias_fn_args': {'nu': prms.nu}}
@@ -1012,7 +994,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     comp_gas_kwargs = {'name': 'gas',
 #                       'p_lin': prms.p_lin,
 #                       'nu': prms.nu,
-#                       'fnu': prms.fnu,}
+#                       'dndm': prms.dndm,}
 #                       # 'm_fn': p.prms.m_fn,
 #                       # 'bias_fn': bias.bias_Tinker10,
 #                       # 'bias_fn_args': {'nu': prms.nu}}
@@ -1092,7 +1074,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     comp_gas_kwargs = {'name': 'gas',
 #                       'p_lin': prms.p_lin,
 #                       'nu': prms.nu,
-#                       'fnu': prms.fnu,}
+#                       'dndm': prms.dndm,}
 #                       # 'm_fn': p.prms.m_fn,
 #                       # 'bias_fn': bias.bias_Tinker10,
 #                       # 'bias_fn_args': {'nu': prms.nu}}
@@ -1154,7 +1136,7 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
 #     comp_gas_kwargs = {'name': 'gas',
 #                       'p_lin': prms.p_lin,
 #                       'nu': prms.nu,
-#                       'fnu': prms.fnu,}
+#                       'dndm': prms.dndm,}
 #                       # 'm_fn': p.prms.m_fn,
 #                       # 'bias_fn': bias.bias_Tinker10,
 #                       # 'bias_fn_args': {'nu': prms.nu}}
