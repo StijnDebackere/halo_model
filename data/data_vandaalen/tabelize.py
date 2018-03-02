@@ -1,3 +1,4 @@
+#! /usr/local/bin/python
 import click
 import numpy as np
 import re
@@ -10,7 +11,8 @@ import os
               help='box size in Mpc, or taken from filename')
 @click.option('--n',
               default=None,
-              help='number of particles, or taken from filename')
+              help='number of particles, or taken from file')
+
 def tabelize(filename, l, n):
     if l == None:
         l = re.search('_L([0-9]*)N([0-9]*)_', filename.split('/')[-1]).group(1)
@@ -18,20 +20,23 @@ def tabelize(filename, l, n):
         V = l**3
     else:
         V = float(l)**3
-    if n == None:
-        n = re.search('_L([0-9]*)N([0-9]*)_', filename.split('/')[-1]).group(2)
+    # if n == None:
+    #     n = re.search('_L([0-9]*)N([0-9]*)_', filename.split('/')[-1]).group(2)
 
-    n = float(n)
+    # number of particles is first line of the data file
+    with open(filename, 'r') as f:
+        n = np.int(f.readline())
+
     k, P_rough, W = np.loadtxt(filename, skiprows=1, usecols=(0,3,4), unpack=True)
     k *= 2*np.pi / l
     if 'DMONLY' in filename:
         P_true = V * (P_rough - W/n**3)
-        print 'N : %i^3'%n
+        print 'N : %i'%n
 
     else:
         # double the number of particles
         P_true = V * (P_rough - W/(2*n**3))
-        print 'N : 2x%i^3'%n
+        print 'N : %i'%n
 
     print 'V : %.1f^3'%l
     file_split = filename.split('/')

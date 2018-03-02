@@ -171,11 +171,15 @@ class Profile(Cache):
             dens_profile_f = self.profile_f(self.k_range,
                                             self.m_bar,
                                             **self.profile_f_args)
-        elif self.profile_f != None:
+
+        elif isinstance(self.profile_f, np.ndarray):
             dens_profile_f = self.profile_f
 
-        else:
+        elif self.profile_f == None:
             dens_profile_f = self.rho_k_T
+
+        else:
+            raise ValueError('profile_f type invalid.')
 
         if len(dens_profile_f.shape) != 2:
             raise ValueError('profile_f should be an (m,k) array. ')

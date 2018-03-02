@@ -516,7 +516,6 @@ def fit_eckert():
 
         # Determine different profile masses
         mass = tools.m_h(prof[sl], r[sl] * r500[idx])
-        mass_actual = tools.m_h(prof[sl], r[sl] * r500[idx])
         # print 'm_gas500/m_gas500_actual - 1', (mass - mass_actual) / mass_actual
         # print 'f_gas,500c_actual :', mass_actual / m500[idx]
         # print 'f_gas,500c_fitted :', mass / m500[idx]
@@ -551,9 +550,9 @@ def fit_eckert():
         b = np.append(b, popt[1])
         m_sl = np.append(m_sl, m500gas)
         # c = np.append(c, popt[2])
-        aerr = np.append(aerr, np.sqrt(np.diag(pcov)))[0]
-        berr = np.append(berr, np.sqrt(np.diag(pcov)))[1]
-        # cerr = np.append(cerr, np.sqrt(np.diag(pcov)))[2]
+        aerr = np.append(aerr, np.sqrt(np.diag(pcov))[0])
+        berr = np.append(berr, np.sqrt(np.diag(pcov))[1])
+        # cerr = np.append(cerr, np.sqrt(np.diag(pcov))[2])
 
 
     return a, aerr, b, berr, m_sl, m500g, r500 # c, cerr, m500g
@@ -838,8 +837,9 @@ def plot_parameters(mean=False):
 # End of plot_parameters()
 # ------------------------------------------------------------------------------
 
-def f_gas(m, mc, a, f0, prms):
-    return (prms.omegab/prms.omegam - f0) * (m/mc)**a/ (1 + (m/mc)**a) + f0
+def f_gas(m, log10mc, a, prms):
+    x = np.log10(m) - log10mc
+    return (prms.omegab/prms.omegam) * (0.5 * (1 + np.tanh(x / a)))
 
 def f_gas_prms(prms):
     m500_obs, f_obs = np.loadtxt(ddir +
@@ -860,28 +860,25 @@ def f_gas_prms(prms):
     f_q85 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 85)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fmopt, fmcov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0., prms),
+    fmopt, fmcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
                                  m[m>1e14], f_med[m>1e14],
-                                 bounds=([1e10, 0],
-                                         [1e15, 10]))
-    f1opt, f1cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0., prms),
+                                 bounds=([10, 0],
+                                         [15, 10]))
+    f1opt, f1cov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
                                  m[m>1e14], f_q15[m>1e14],
-                                 bounds=([1e10, 0],
-                                         [1e15, 10]))
-    f2opt, f2cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0., prms),
+                                 bounds=([10, 0],
+                                         [15, 10]))
+    f2opt, f2cov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
                                  m[m>1e14], f_q85[m>1e14],
-                                 bounds=([1e10, 0],
-                                         [1e15, 10]))
+                                 bounds=([10, 0],
+                                         [15, 10]))
 
-    fm_prms = {"mc": fmopt[0],
-               "a": fmopt[1],
-               "f0": 0.}
-    f1_prms = {"mc": f1opt[0],
-               "a": f1opt[1],
-               "f0": 0.}
-    f2_prms = {"mc": f2opt[0],
-               "a": f2opt[1],
-               "f0": 0.}
+    fm_prms = {"log10mc": fmopt[0],
+               "a": fmopt[1]}
+    f1_prms = {"log10mc": f1opt[0],
+               "a": f1opt[1]}
+    f2_prms = {"log10mc": f2opt[0],
+               "a": f2opt[1]}
 
     return fm_prms, f1_prms, f2_prms
 
@@ -1072,14 +1069,33 @@ def beta_mass(f500c, f200m, prms=p.prms):
 # # End of beta_slope()
 # # ------------------------------------------------------------------------------
 
-def fit_prms():
+def fit_prms(x=500):
     '''
     Return observational beta profile fit parameters
     '''
-    with open('data/croston_500.p', 'rb') as f:
-        data_c = cPickle.load(f)
-    with open('data/eckert_500.p', 'rb') as f:
-        data_e = cPickle.load(f)
+    if x == 500:
+        with open('data/croston_500.p', 'rb') as f:
+            data_c = cPickle.load(f)
+        with open('data/eckert_500.p', 'rb') as f:
+            data_e = cPickle.load(f)
+
+        m500c_e = data_e['m500c']
+        m500c_c = data_c['m500c']
+        m500c = np.append(m500c_e, m500c_c)
+
+    elif x == 200:
+        with open('data/croston_200.p', 'rb') as f:
+            data_c = cPickle.load(f)
+        with open('data/eckert_200.p', 'rb') as f:
+            data_e = cPickle.load(f)
+
+        m200m_e = data_e['m200m']
+        m200m_c = data_c['m200m']
+        m200m = np.append(m200m_e, m200m_c)
+
+
+    else:
+        raise ValueError('x must be 500 or 200')
 
     rc_e = data_e['rc']
     rc_c = data_c['rc']
@@ -1088,10 +1104,6 @@ def fit_prms():
     b_e = data_e['b'] # equal to literature standard
     b_c = data_c['b']
     beta = np.append(b_e, b_c)
-
-    m500c_e = data_e['m500c']
-    m500c_c = data_c['m500c']
-    m500c = np.append(m500c_e, m500c_c)
 
     return np.median(rc), np.median(beta)
 
@@ -1155,20 +1167,20 @@ def m200b_to_m200dmo(m_b, f_gas, prms):
 # End of m200b_to_m200dmo()
 # ------------------------------------------------------------------------------
 
-def plot_profiles_paper():
+def plot_profiles_paper(prms=prms):
     with open('data/croston.p', 'rb') as f:
         data_c = cPickle.load(f)
     with open('data/eckert.p', 'rb') as f:
         data_e = cPickle.load(f)
 
     pl.set_style()
-    # fig = plt.figure(figsize=(16,8))
-    # ax1 = fig.add_axes([0.1,0.1,0.4,0.8])
-    # ax2 = fig.add_axes([0.5,0.1,0.4,0.8])
-    fig = plt.figure(figsize=(18,8))
-    ax1 = fig.add_axes([0.1,0.1,0.266,0.8])
-    ax2 = fig.add_axes([0.366,0.1,0.266,0.8])
-    ax3 = fig.add_axes([0.632,0.1,0.266,0.8])
+    fig = plt.figure(figsize=(16,8))
+    ax1 = fig.add_axes([0.1,0.1,0.4,0.8])
+    ax2 = fig.add_axes([0.5,0.1,0.4,0.8])
+    # fig = plt.figure(figsize=(18,8))
+    # ax1 = fig.add_axes([0.1,0.1,0.266,0.8])
+    # ax2 = fig.add_axes([0.366,0.1,0.266,0.8])
+    # ax3 = fig.add_axes([0.632,0.1,0.266,0.8])
 
     rx_c = data_c['rx']
     rx_e = data_e['rx']
@@ -1176,20 +1188,22 @@ def plot_profiles_paper():
     rho_c = data_c['rho']
     rho_e = data_e['rho']
 
+    rho_crit = prms.rho_crit * prms.h**2
+
     ax1.set_prop_cycle(cycler(c='k', lw=[0.5]))
     for r, prof in zip(rx_c, rho_c):
-        ax1.plot(r, prof, ls='-', lw=0.5, c='k')
+        ax1.plot(r, prof / rho_crit, ls='-', lw=0.5, c='k')
 
-    ax1.set_xlim([3e-3, 2])
-    ax1.set_ylim([1e11, 1e16])
+    ax1.set_xlim([1e-3, 1e1])
+    ax1.set_ylim([1e1, 1e5])
     ticks = ax1.get_xticklabels()
-    ticks[-5].set_visible(False)
+    ticks[-1].set_visible(False)
 
     ax1.xaxis.set_tick_params(pad=8)
     ax1.set_xscale('log')
     ax1.set_yscale('log')
-    ax1.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-10)
-    ax1.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
+    ax1.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-5)
+    ax1.set_ylabel(r'$\rho(r) / \rho_\mathrm{c}$')
     ax1.set_title(r'Croston+08')
 
     # get median binned profiles
@@ -1197,10 +1211,10 @@ def plot_profiles_paper():
 
     ax2.set_prop_cycle(cycler(c='k', lw=[0.5]))
     for r, prof in zip(rx_e, rho_e):
-        ax2.plot(r, prof, ls='-', lw=0.5, c='k')
+        ax2.plot(r, prof / rho_crit, ls='-', lw=0.5, c='k')
 
-    ax2.set_xlim([3e-3, 2])
-    ax2.set_ylim([1e11, 1e16])
+    ax2.set_xlim([1e-3, 1e1])
+    ax2.set_ylim([1e1, 1e5])
     # ticks = ax2.get_xticklabels()
     # ticks[-3].set_visible(False)
 
@@ -1208,28 +1222,28 @@ def plot_profiles_paper():
     ax2.set_xscale('log')
     ax2.set_yscale('log')
     ax2.set_yticklabels([])
-    ax2.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-10)
+    ax2.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-5)
     # ax2.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
     text = ax2.set_title(r'Eckert+16')
     title_props = text.get_fontproperties()
 
-    for r, prof, std in zip(r_med, rho_med, rho_std):
-        ax3.plot(r, prof, ls='-', lw=2, c='k')
-        ax3.fill_between(r, std[0], std[1], color='k', alpha=0.2)
+    # for r, prof, std in zip(r_med, rho_med, rho_std):
+    #     ax3.plot(r, prof, ls='-', lw=2, c='k')
+    #     ax3.fill_between(r, std[0], std[1], color='k', alpha=0.2)
 
-    ax3.set_xlim([3e-3, 2])
-    ax3.set_ylim([1e11, 1e16])
-    # ticks = ax3.get_xticklabels()
-    # ticks[-3].set_visible(False)
+    # ax3.set_xlim([3e-3, 2])
+    # ax3.set_ylim([1e11, 1e16])
+    # # ticks = ax3.get_xticklabels()
+    # # ticks[-3].set_visible(False)
 
-    ax3.xaxis.set_tick_params(pad=8)
-    ax3.set_xscale('log')
-    ax3.set_yscale('log')
-    ax3.set_yticklabels([])
-    ax3.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-10)
-    # ax3.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
-    text = ax3.set_title(r'Eckert+16 binned')
-    title_props = text.get_fontproperties()
+    # ax3.xaxis.set_tick_params(pad=8)
+    # ax3.set_xscale('log')
+    # ax3.set_yscale('log')
+    # ax3.set_yticklabels([])
+    # ax3.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-10)
+    # # ax3.set_ylabel(r'$\rho(r) \, [\mathrm{M_\odot/Mpc^3}]$')
+    # text = ax3.set_title(r'Eckert+16 binned')
+    # title_props = text.get_fontproperties()
 
     plt.show()
 
@@ -1237,10 +1251,10 @@ def plot_profiles_paper():
 # End of plot_profiles()
 # ------------------------------------------------------------------------------
 
-def plot_gas_fractions():
+def plot_gas_fractions(prms):
     pl.set_style()
     fig = plt.figure(figsize=(10,9))
-    ax3 = fig.add_subplot(111)
+    ax = fig.add_subplot(111)
 
     # Gas fractions
     m500_obs, f_obs = np.loadtxt(ddir +
@@ -1248,9 +1262,11 @@ def plot_gas_fractions():
                                  unpack=True)
 
     n_m = 15
-    m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m)
+
+    # data assumed h=0.7
+    m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m) * 0.7
     m = tools.bins2center(m_bins)
-    m_bin_idx = np.digitize(10**(m500_obs), m_bins)
+    m_bin_idx = np.digitize(10**(m500_obs) * 0.7, m_bins)
 
     f_med = np.array([np.median(f_obs[m_bin_idx == m_bin])
                       for m_bin in np.arange(1, len(m_bins))])
@@ -1265,57 +1281,62 @@ def plot_gas_fractions():
     # Get shadow twiny instance for ratio plot, to also have m200m
     # need it in this order to get correct yticks with log scale, since
     # twin instance seems to mess things up...
-    axs = ax3.twiny()
-    m200 = np.array([tools.m500c_to_m200m(mass) for mass in m])
+    axs = ax.twiny()
+    m200 = np.array([tools.m500c_to_m200m(mass, prms.rho_crit, prms.rho_m)
+                     for mass in m])
     axs.plot(m200, m200)
     axs.cla()
 
     axs.tick_params(axis='x', pad=5)
 
 
-    ax3.set_prop_cycle(pl.cycle_mark())
-    ax3.plot(10**(m500_obs[23:33]), f_obs[23:33], marker='o',
+    ax.set_prop_cycle(pl.cycle_mark())
+    ax.plot(10**(m500_obs[23:33]), f_obs[23:33], marker='o',
              label=r'Vikhlinin+2006')
-    ax3.plot(10**(m500_obs[128:165]), f_obs[128:165],
+    ax.plot(10**(m500_obs[128:165]), f_obs[128:165],
              marker='^', label=r'Maughan+2008')
-    ax3.plot(10**(m500_obs[:23]), f_obs[:23], marker='v',
+    ax.plot(10**(m500_obs[:23]), f_obs[:23], marker='v',
              label=r'Sun+2009')
-    ax3.plot(10**(m500_obs[33:64]), f_obs[33:64], marker='<',
+    ax.plot(10**(m500_obs[33:64]), f_obs[33:64], marker='<',
              label=r'Pratt+2009')
-    ax3.plot(10**(m500_obs[64:128]), f_obs[64:128], marker='>',
+    ax.plot(10**(m500_obs[64:128]), f_obs[64:128], marker='>',
              label=r'Lin+2012')
-    ax3.plot(10**(m500_obs[165:]), f_obs[165:], marker='D',
+    ax.plot(10**(m500_obs[165:]), f_obs[165:], marker='D',
              label=r'Lovisari+2015')
-    ax3.set_prop_cycle(pl.cycle_line())
-    ax3.set_prop_cycle(c='k')
-    ax3.plot(m, f_med, ls='-', c='k', lw=2, label='median')
-    # ax3.plot(m, f_q16, ls='--', c='k', lw=2)
-    # ax3.plot(m, f_q84, ls='--', c='k', lw=2)
-    ax3.set_prop_cycle(c='r')
-    ax3.plot(m, f_gas(m, **fm_prms), ls='-', c='r', lw=2, label='fit')
-    # ax3.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1)
-    # ax3.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1)
+    ax.set_prop_cycle(pl.cycle_line())
+    ax.set_prop_cycle(c='k')
+    ax.plot(m, f_med, ls='-', c='k', lw=2, label='median')
+    # ax.plot(m, f_q16, ls='--', c='k', lw=2)
+    # ax.plot(m, f_q84, ls='--', c='k', lw=2)
+    ax.set_prop_cycle(c='r')
+    ax.plot(m, f_gas(m, prms=prms, **fm_prms), ls='-', c='r', lw=2,
+            label='fit')
+    # ax.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1)
+    # ax.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1)
 
-    ax3.xaxis.set_tick_params(pad=8)
-    ax3.set_xlim([1e13, 10**(15.5)])
-    ax3.set_ylim([0.01, 0.17])
-    ax3.set_xscale('log')
-    text = ax3.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M_\odot}]$')
-    ax3.set_ylabel(r'$f_{\mathrm{gas}}$')
+    ax.xaxis.set_tick_params(pad=8)
+    ax.set_xlim([1e13, 10**(15.5)])
+    ax.set_ylim([0.01, 0.17])
+
+    axs.set_xlim(tools.m500c_to_m200m(ax.get_xlim()[0], prms.rho_crit, prms.rho_m),
+                 tools.m500c_to_m200m(ax.get_xlim()[-1], prms.rho_crit, prms.rho_m))
+
+    ax.set_xscale('log')
+    axs.set_xscale('log')
+
+    text = ax.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M_\odot}]$')
+    ax.set_ylabel(r'$f_{\mathrm{gas,500c}}$')
     title_props = text.get_fontproperties()
-    leg = ax3.legend(loc='best', numpoints=1, frameon=True, framealpha=0.8)
+    leg = ax.legend(loc='best', numpoints=1, frameon=True, framealpha=0.8)
     leg.get_frame().set_linewidth(0.0)
 
-    axs.set_xlim(tools.m500c_to_m200m(ax3.get_xlim()[0]),
-                 tools.m500c_to_m200m(ax3.get_xlim()[-1]))
-    axs.set_xscale('log')
 
     axs.set_xlabel(r'$m_{\mathrm{200m}} \, [\mathrm{M_\odot}]$', labelpad=10)
 
-    f_bar = p.prms.omegab/p.prms.omegam
-    ax3.axhline(y=f_bar, c='k', ls='--')
+    f_bar = prms.omegab/prms.omegam
+    ax.axhline(y=f_bar, c='k', ls='--')
     # add annotation to f_bar
-    ax3.annotate(r'$f_{\mathrm{b}}$',
+    ax.annotate(r'$f_{\mathrm{b}}$',
                  # xy=(1e14, 0.16), xycoords='data',
                  # xytext=(1e14, 0.15), textcoords='data',
                  xy=(10**(13), f_bar), xycoords='data',
@@ -1647,11 +1668,11 @@ def plot_profiles_fgas_presentation():
 
 
     ax3.plot(m, f_med, ls='-', c='k', lw=2, marker='None')
-    ax3.plot(m, f_q16, ls='--', c='k', lw=2, marker='None')
-    ax3.plot(m, f_q84, ls='--', c='k', lw=2, marker='None')
+    # ax3.plot(m, f_q16, ls='--', c='k', lw=2, marker='None')
+    # ax3.plot(m, f_q84, ls='--', c='k', lw=2, marker='None')
     ax3.plot(m, f_gas(m, **fm_prms), ls='-', c='r', lw=1, marker='None')
-    ax3.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1, marker='None')
-    ax3.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1, marker='None')
+    # ax3.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1, marker='None')
+    # ax3.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1, marker='None')
     text = ax3.set_title(r'Gas fractions')
     title_props = text.get_fontproperties()
 
@@ -1671,10 +1692,10 @@ def plot_profiles_fgas_presentation():
 # End of plot_profiles_presentation()
 # ------------------------------------------------------------------------------
 
-def plot_fit_prms_paper():
-    with open('data/croston_200.p', 'rb') as f:
+def plot_fit_prms_paper(prms=prms):
+    with open('data/croston_500.p', 'rb') as f:
         data_c = cPickle.load(f)
-    with open('data/eckert_200.p', 'rb') as f:
+    with open('data/eckert_500.p', 'rb') as f:
         data_e = cPickle.load(f)
 
     rc_e = data_e['rc']
@@ -1685,22 +1706,43 @@ def plot_fit_prms_paper():
     b_c = data_c['b'] / 3.
     beta = np.append(b_e, b_c)
 
-    m200m_e = data_e['m200m']
-    m200m_c = data_c['m200m']
-    m200m = np.append(m200m_e, m200m_c)
+    m500c_e = data_e['m500c']
+    m500c_c = data_c['m500c']
+    m500c = np.append(m500c_e, m500c_c)
+    m200m = np.array([tools.m500c_to_m200m(m500c.min(), prms.rho_crit, prms.rho_m),
+                      tools.m500c_to_m200m(m500c.max(), prms.rho_crit, prms.rho_m)])
 
     pl.set_style('mark')
 
     fig = plt.figure(figsize=(10,9))
     ax = fig.add_subplot(111)
 
-    ax.plot(m200m_e, rc_e, label='Eckert+16')
-    ax.plot(m200m_c, rc_c, label='Croston+08')
+    ##########################################################################
+    # Get shadow twiny instance for ratio plot, to also have m200m
+    # need it in this order to get correct yticks with log scale, since
+    # twin instance seems to mess things up...
+    axs = ax.twiny()
+    axs.plot(m200m, [0,0])
+    axs.cla()
+
+    axs.tick_params(axis='x', pad=5)
+
+    ax.plot(m500c_e, rc_e, label='Eckert+16')
+    ax.plot(m500c_c, rc_c, label='Croston+08')
     ax.axhline(y=np.median(rc), ls='-', c='k')
-    ax.annotate('median', xy=(1.05 * m200m.min(), 1.05 * np.median(rc)))
+    ax.annotate('median', xy=(1.05 * m500c.min(), 1.05 * np.median(rc)))
+
+    ax.set_xlim(0.95 * m500c.min(), 1.05 * m500c.max())
+    axs.set_xlim(tools.m500c_to_m200m(ax.get_xlim()[0], prms.rho_crit, prms.rho_m),
+                 tools.m500c_to_m200m(ax.get_xlim()[-1], prms.rho_crit, prms.rho_m))
+
+    ax.set_ylim(0,0.5)
     ax.set_xscale('log')
-    ax.set_xlabel('$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$')
-    ax.set_ylabel('$r_\mathrm{c}/r_{\mathrm{200m}}$')
+    axs.set_xscale('log')
+
+    ax.set_xlabel(r'$m_{\mathrm{500c}}\, [\mathrm{M_\odot}/h]$')
+    axs.set_xlabel(r'$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$', labelpad=10)
+    ax.set_ylabel('$r_\mathrm{c}/r_{\mathrm{500c}}$')
     ax.legend(loc='best')
     plt.savefig('obs_rc_fit.pdf', transparent=True)
 
@@ -1708,12 +1750,31 @@ def plot_fit_prms_paper():
     fig = plt.figure(figsize=(10,9))
     ax = fig.add_subplot(111)
 
-    ax.plot(m200m_e, b_e, label='Eckert+16')
-    ax.plot(m200m_c, b_c, label='Croston+08')
+    ##########################################################################
+    # Get shadow twiny instance for ratio plot, to also have m200m
+    # need it in this order to get correct yticks with log scale, since
+    # twin instance seems to mess things up...
+    axs = ax.twiny()
+    axs.plot(m200m, [0,0])
+    axs.cla()
+
+    axs.tick_params(axis='x', pad=5)
+
+    ax.plot(m500c_e, b_e, label='Eckert+16')
+    ax.plot(m500c_c, b_c, label='Croston+08')
     ax.axhline(y=np.median(beta), ls='-', c='k')
-    ax.annotate('median', xy=(1.05 * m200m.min(), 1.05 * np.median(beta)))
+    ax.annotate('median', xy=(1.05 * m500c.min(), 1.05 * np.median(beta)))
+
+    ax.set_xlim(0.95 * m500c.min(), 1.05 * m500c.max())
+    axs.set_xlim(tools.m500c_to_m200m(ax.get_xlim()[0], prms.rho_crit, prms.rho_m),
+                 tools.m500c_to_m200m(ax.get_xlim()[-1], prms.rho_crit, prms.rho_m))
+
+    ax.set_ylim(0.04, 1.7)
     ax.set_xscale('log')
-    ax.set_xlabel('$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$')
+    axs.set_xscale('log')
+
+    ax.set_xlabel('$m_{\mathrm{500c}}\, [\mathrm{M_\odot}/h]$')
+    axs.set_xlabel(r'$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$', labelpad=10)
     ax.set_ylabel(r'$\beta$')
     ax.legend(loc='best')
     plt.savefig('obs_beta_fit.pdf', transparent=True)

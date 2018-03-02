@@ -8,7 +8,7 @@ add methods to Parameters docstring
 
 import numpy as np
 import scipy.interpolate as interp
-import hmf
+import halo.hmf as hmf
 
 import halo.tools as tools
 from halo.model._cache import Cache, cached_property, parameter

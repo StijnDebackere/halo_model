@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as opt
+import scipy.interpolate as interp
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 import sys
@@ -87,16 +88,6 @@ def prof_nfw(r, sl, c, m_sl):
 
     return profile
 
-# def prof_nfw(r, rs, m):
-#     x = r/rs.reshape(-1,1)
-#     # dc = dc.reshape(-1,1)
-#     m = m.reshape(-1,1)
-#     profile = x**(-1) * (1 + x)**(-2) #* p.prms.h**2
-#     mass = tools.m_h(profile, r).reshape(-1,1)
-#     profile *= m/mass
-
-#     return profile
-
 def prof_gas_warm(x, a, b, m, r200):
     '''einasto profile'''
     profile = np.exp(-(x/a)**b)
@@ -122,6 +113,9 @@ def prof_gas_hot_s(x, a, b, m, r200):
     return profile
 
 def S(m, mc, t):
+    '''
+    Sigmoid function
+    '''
     return (m/mc)**t/(1 + (m/mc)**t)
 
 def prof_stars_s(x, a, b, m, r200):
@@ -599,4 +593,67 @@ def load_masses():
 
 # ------------------------------------------------------------------------------
 # End of load_masses()
+# ------------------------------------------------------------------------------
+
+def plot_power_ratio_paper(comp, name='gas_smooth_r200m_5r500c'):
+    '''
+    Compare the power in component to the simulation power spectrum
+    '''
+    k1, P1, delta1 = np.loadtxt('halo/data/data_vandaalen/BAHAMAS/tables/AGN_TUNED_nu0_L400N1024_WMAP9_032_gas_T_gt_1e6K_table.dat', unpack=True)
+
+    f_D = interp.interp1d(k1, delta1)
+
+    pl.set_style('line')
+    plt.clf()
+    fig = plt.figure(figsize=(11, 8))
+    # ax_P = fig.add_axes([0.1, 0.35, 0.8, 0.55])
+    # ax_r = fig.add_axes([0.1, 0.1, 0.8, 0.25])
+    ax_P = fig.add_subplot(111)
+
+    ax_P.plot(k1, delta1, label=r'gas_T_gt_1e6K')
+    ax_P.plot(comp.k_range, comp.delta_1h, label=name)
+
+    axd = ax_P.twiny()
+    l = 2 * np.pi / k1
+    axd.plot(l, delta1)
+    axd.set_xlim(axd.get_xlim()[::-1])
+    axd.cla()
+    axd.set_xscale('log')
+    axd.set_xlabel(r'$\lambda \, [\mathrm{Mpc}/h]$', labelpad=10)
+    axd.tick_params(axis='x', pad=5)
+
+    # yticklabs = ax_P.get_yticklabels()
+    # yticklabs[0] = ""
+    # ax_P.set_yticklabels(yticklabs)
+    ax_P.set_ylim(ymin=2e-3)
+    ax_P.set_xlim([1e-2,1e2])
+    ax_P.axes.set_xscale('log')
+    ax_P.axes.set_yscale('log')
+    ax_P.set_ylabel(r'$\Delta^2(k)$')
+    # ax_P.set_title(r'Power spectra for BAHAMAS')
+    ax_P.set_xticklabels([])
+    ax_P.legend(loc='best')
+
+    # ax_r.plot(comp.k_range, comp.delta_1h / f_D(comp.k_range))
+    # ax_r.axhline(y=1, c='k', ls='--')
+    # ax_r.grid()
+    # ax_r.set_xlim([1e-2,1e2])
+    # # ax_r.set_ylim([1e-3,1])
+    # ax_r.set_ylim([0.82,1.2])
+    # ax_r.axes.set_xscale('log')
+    # # ax_r.axes.set_yscale('log')
+    # ax_r.minorticks_on()
+    # ax_r.tick_params(axis='x',which='minor',bottom='off')
+
+    # ax_r.legend(loc='best')
+    # ax_r.set_xlabel(r'$k \, [h/\mathrm{Mpc}]$')
+    # # ax_r.set_ylabel(r'$\frac{P_{\mathrm{AGN}} - P_{\mathrm{DM}}}{P_{\mathrm{DM}}}$',
+    # #                 labelpad=-2)
+    # ax_r.set_ylabel(r'$P_\mathrm{obs}/P_\mathrm{sim}$')
+
+    plt.savefig('ratio_sim_obs.pdf', dpi=900, transparent=True)
+    # plt.close(fig)
+
+# ------------------------------------------------------------------------------
+# End of plot_power_ratio_paper()
 # ------------------------------------------------------------------------------

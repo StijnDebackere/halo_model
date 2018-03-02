@@ -2,8 +2,10 @@ import numpy as np
 import scipy.optimize as opt
 import h5py
 import sys
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+from matplotlib.collections import LineCollection
 import palettable
 from cycler import cycler
 
@@ -176,17 +178,18 @@ def plot_dm_bahamas():
 
     lines = []
     lines_dmo = []
-    for idx, prof in enumerate(rho_norm[::4]):
-        line1, = ax.plot(r[r>=0.05], dmo_rho_norm[::4][idx][r>=0.05] * m[::4][idx])
+    skip = 10
+    for idx, prof in enumerate(rho_norm[::skip]):
+        line1, = ax.plot(r[r>=0.05], dmo_rho_norm[::skip][idx][r>=0.05] * m[::skip][idx])
         fill1 = ax.fill_between(r[r>=0.05],
-                               dmo_q16_norm[::4][idx][r>=0.05] * m[::4][idx],
-                               dmo_q84_norm[::4][idx][r>=0.05] * m[::4][idx],
+                               dmo_q16_norm[::skip][idx][r>=0.05] * m[::skip][idx],
+                               dmo_q84_norm[::skip][idx][r>=0.05] * m[::skip][idx],
                                facecolor=line1.get_color(), alpha=0.3,
                                edgecolor='none')
-        line, = ax.plot(r[r>=0.05], prof[r>=0.05] * m[::4][idx])
+        line, = ax.plot(r[r>=0.05], prof[r>=0.05] * m[::skip][idx])
         fill = ax.fill_between(r[r>=0.05],
-                               q16_norm[::4][idx][r>=0.05] * m[::4][idx],
-                               q84_norm[::4][idx][r>=0.05] * m[::4][idx],
+                               q16_norm[::skip][idx][r>=0.05] * m[::skip][idx],
+                               q84_norm[::skip][idx][r>=0.05] * m[::skip][idx],
                                facecolor=line1.get_color(), alpha=0.3,
                                edgecolor='none')
         lines.append((line, fill))
@@ -207,7 +210,7 @@ def plot_dm_bahamas():
     handles = map(tuple, handles)
     labels = np.array([[r'$M_{\mathrm{DMO}}=10^{%.1f}$'%np.log10(c),
                         r'$M_{\mathrm{AGN}}=10^{%.1f}$'%np.log10(c)]
-                       for c in m[::4]]).reshape(-1)
+                       for c in m[::skip]]).reshape(-1)
     ax.legend([handle for handle in handles],
               [lab for lab in labels],
               loc='center left', bbox_to_anchor=(1, 0.5))
@@ -1315,6 +1318,14 @@ def prof_gas_hot_beta(x, a, b, m, r200):
 
     return profile
 
+def prof_gas_hot(x, sl, a, b, m_sl, r500):
+    '''beta profile'''
+    profile = (1 + (x/a)**2)**(-b/2.)
+    mass = tools.m_h(profile[sl], x[sl] * r500)
+    profile *= m_sl/mass
+
+    return profile
+
 def prof_gas_hot_c(x, a, b, c, m, r200):
     '''beta profile'''
     profile = (1 + (x/a)**2)**(-b/2) * np.exp(-(x/c)**2)
@@ -2330,9 +2341,9 @@ def fit_dm_bahamas_all():
     '''
     # profiles = h5py.File('halo/data/BAHAMAS/DMONLY/eagle_subfind_particles_032_profiles_200_mean.hdf5', 'r')
     profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles.hdf5', 'r')
-    rho = profiles['PartType1/Densities'][:]
-    m200 = profiles['PartType1/M200'][:]
-    r200 = profiles['PartType1/R200'][:]
+    rho = profiles['PartType1/Densities'][:] / 0.7**2
+    m200 = profiles['PartType1/M200'][:] * 0.7
+    r200 = profiles['PartType1/R200'][:] * 0.7
     r_range = tools.bins2center(profiles['RBins_R_Mean200'][:])
     numpart = profiles['PartType1/NumPartGroup'][:]
     grnr = profiles['PartType1/GroupNumber'][:].astype(int)
@@ -2340,6 +2351,8 @@ def fit_dm_bahamas_all():
     profiles.close()
 
     sl = ((numpart[grnr] > 1e4) & relaxed)
+    # sl = ((numpart[grnr] > 1e2) & relaxed)
+    # sl = ((numpart[grnr] > 1e4))
 
     rho = rho[sl]
     m200 = m200[sl]
@@ -2359,29 +2372,37 @@ def fit_dm_bahamas_all():
         sl = ((prof > 0) & (r_range > 0.05))
         mass = tools.m_h(prof[sl], r200[idx] * r_range[sl])
 
-        popt, pcov = opt.curve_fit(lambda r_range, rs: \
-                                   np.log10(prof_nfw_nosl(r_range, rs, mass)),
-                                   r_range[sl]*r200[idx],
-                                   np.log10(prof[sl]), bounds=([0],[100]))
-        masses[idx] = mass
-        rs[idx] = popt[0]
-        # dc[idx] = popt[1]
-        rs_err[idx] = np.sqrt(np.diag(pcov))[0]
-        # dc_err[idx] = np.sqrt(np.diag(pcov))[1]
+        try:
+            popt, pcov = opt.curve_fit(lambda r_range, rs: \
+                                       np.log10(prof_nfw_nosl(r_range, rs, mass)),
+                                       r_range[sl]*r200[idx],
+                                       np.log10(prof[sl]), bounds=([0],[100]))
+            masses[idx] = mass
+            rs[idx] = popt[0]
+            # dc[idx] = popt[1]
+            rs_err[idx] = np.sqrt(np.diag(pcov))[0]
+            # dc_err[idx] = np.sqrt(np.diag(pcov))[1]
 
-        c[idx] = r200[idx] / rs[idx]
-        # if idx%1000 == 0:
-        #     profile = prof_nfw(r_range[sl]*r200[idx], rs[idx], dc[idx])
-        #     print mass
-        #     print tools.m_h(profile, r_range[sl] * r200[idx])
-        #     print m200[idx]
-        #     print '---'
+            c[idx] = r200[idx] / rs[idx]
 
-        #     plt.plot(r_range[sl], prof[sl])
-        #     plt.plot(r_range[sl], profile)
-        #     plt.xscale('log')
-        #     plt.yscale('log')
-        #     plt.show()
+            # if idx%100 == 0:
+            #     profile = prof_nfw_nosl(r_range[sl]*r200[idx], rs[idx], mass)
+            #     profile_cor = prof_nfw_nosl(r_range[sl]*r200[idx], rs_cor, mass)
+            #     print mass
+            #     print tools.m_h(profile, r_range[sl] * r200[idx])
+            #     print m200[idx]
+            #     print '---'
+
+            #     plt.clf()
+            #     plt.plot(r_range[sl], prof[sl], marker='o', lw=0, label='prof')
+            #     plt.plot(r_range[sl], profile, label='fit')
+            #     plt.title('m=%.5e'%m200[idx])
+            #     plt.xscale('log')
+            #     plt.yscale('log')
+            #     plt.legend()
+            #     plt.savefig('prof_nfw_%i_norel_ngt1e3.pdf'%idx)
+        except:
+            continue
 
     # copt, ccov = opt.curve_fit(dm_c_fit, m200, c)
     # c_prms = {"a": copt[0],
@@ -2578,19 +2599,18 @@ def fit_dm_bahamas_bar():
 # End of fit_dm_bahamas_bar()
 # ------------------------------------------------------------------------------
 
-def fit_dm_bahamas():
+def fit_dm_bahamas_dmo():
     '''
     Fit the concentration for the BAHAMAS simulations
     '''
-    # profiles = h5py.File('halo/data/BAHAMAS/DMONLY/eagle_subfind_particles_032_profiles_binned_200_mean_M13_15.hdf5', 'r')
-    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned.hdf5', 'r')
+    profiles = h5py.File('halo/data/BAHAMAS/DMONLY/eagle_subfind_particles_032_profiles_binned.hdf5', 'r')
 
-    rho = profiles['PartType1/MedianDensity'][:]
-    m200 = profiles['PartType1/MedianM200'][:]
-    r200 = profiles['PartType1/MedianR200'][:]
+    # need to convert to hubble units
+    rho = profiles['PartType1/MedianDensity'][:] / 0.7**2
+    m200 = profiles['PartType1/MedianM200'][:] * 0.7
+    r200 = profiles['PartType1/MedianR200'][:] * 0.7
     r_range = tools.bins2center(profiles['RBins_R_Mean200'][:])
     profiles.close()
-
 
     rs = -1 * np.ones_like(m200)
     c = -1 * np.ones_like(m200)
@@ -2615,13 +2635,96 @@ def fit_dm_bahamas():
         c[idx] = r200[idx] / rs[idx]
 
         # plt.plot(r_range, r_range**2 * prof)
-        # plt.plot(r_range[sl2], r_range[sl2]**2 * prof_nfw(r_range[sl2]*r200[idx],
-        #                                                 rs[idx], mass2))
-        # plt.plot(r_range[sl1], r_range[sl1]**2 * prof_nfw(r_range[sl1]*r200[idx],
-        #                                                   ri[idx], mass1))
+        # plt.plot(r_range[sl], r_range[sl]**2 * prof_nfw_nosl(r_range[sl]*r200[idx],
+        #                                                      rs[idx], mass))
+        # plt.plot(r_range, r_range * prof)
+        # plt.plot(r_range[sl], r_range[sl] * prof_nfw_nosl(r_range[sl]*r200[idx],
+        #                                                   rs[idx], mass))
         # plt.xscale('log')
         # plt.yscale('log')
         # plt.show()
+
+
+    copt, ccov = opt.curve_fit(dm_plaw_fit, m200, c)
+    c_prms = {"a": copt[0],
+              "b": copt[1],}
+
+    rsopt, rscov = opt.curve_fit(dm_plaw_fit, m200, rs)
+    rs_prms = {"a": rsopt[0],
+               "b": rsopt[1]}
+
+    # dopt, dcov = opt.curve_fit(dm_dc_fit, m200, dc)
+    # d_prms = {"a": dopt[0],
+    #           "b": dopt[1]}
+
+
+    mopt, mcov = opt.curve_fit(dm_plaw_fit, m200, m/m200)
+    m_prms = {"a": mopt[0],
+              "b": mopt[1]}
+
+    # fopt, fcov = opt.curve_fit(dm_f_fit, m200, (m1 + m2)/m200)
+    # f_prms = {"a": fopt[0],
+    #           "b": fopt[1]}
+    # print c_prms
+    # plt.plot(m200, c)
+    # plt.plot(m200, dm_c_fit(m200, **c_prms))
+    # plt.xscale('log')
+    # plt.yscale('log')
+    # plt.show()
+
+    # return c, c_err, masses, m200, c_prms, m_prms
+    return rs, rs_err, m, m200, rs_prms, c_prms, m_prms
+
+# ------------------------------------------------------------------------------
+# End of fit_dm_bahamas_dmo()
+# ------------------------------------------------------------------------------
+
+def fit_dm_bahamas():
+    '''
+    Fit the concentration for the BAHAMAS simulations
+    '''
+    # profiles = h5py.File('halo/data/BAHAMAS/DMONLY/eagle_subfind_particles_032_profiles_binned_200_mean_M13_15.hdf5', 'r')
+    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned.hdf5', 'r')
+
+    # need to convert to hubble units
+    rho = profiles['PartType1/MedianDensity'][:] / 0.7**2
+    m200 = profiles['PartType1/MedianM200'][:] * 0.7
+    r200 = profiles['PartType1/MedianR200'][:] * 0.7
+    r_range = tools.bins2center(profiles['RBins_R_Mean200'][:])
+    profiles.close()
+
+    rs = -1 * np.ones_like(m200)
+    c = -1 * np.ones_like(m200)
+    rs_err = -1 * np.ones_like(m200)
+    m = -1 * np.ones_like(m200)
+
+    pl.set_style('line')
+
+    for idx, prof in enumerate(rho):
+        # sl = (prof > 0)
+        sl = ((prof > 0) & (r_range > 0.05))
+        mass = tools.m_h(prof[sl], r200[idx] * r_range[sl])
+
+        popt, pcov = opt.curve_fit(lambda r_range, rs: \
+                                   np.log10(prof_nfw_nosl(r_range, rs, mass)),
+                                   r_range[sl]*r200[idx],
+                                   np.log10(prof[sl]), bounds=([0],[100]))
+        m[idx] = mass
+
+        rs[idx] = popt[0]
+        rs_err[idx] = np.sqrt(np.diag(pcov))[0]
+        c[idx] = r200[idx] / rs[idx]
+
+        # plt.plot(r_range, r_range**2 * prof)
+        # plt.plot(r_range[sl], r_range[sl]**2 * prof_nfw_nosl(r_range[sl]*r200[idx],
+        #                                                      rs[idx], mass))
+        # plt.plot(r_range, r_range * prof)
+        # plt.plot(r_range[sl], r_range[sl] * prof_nfw_nosl(r_range[sl]*r200[idx],
+        #                                                   rs[idx], mass))
+        # plt.xscale('log')
+        # plt.yscale('log')
+        # plt.show()
+
 
     copt, ccov = opt.curve_fit(dm_plaw_fit, m200, c)
     c_prms = {"a": copt[0],
@@ -2929,3 +3032,445 @@ def mass_fraction():
 # ------------------------------------------------------------------------------
 # End of mass_fraction()
 # ------------------------------------------------------------------------------
+
+def fit_hot_gas_profiles_all():
+    '''
+    Fit the hot gas profiles in BAHAMAS with beta profiles and return the fit
+    parameters in such a way that bahamas_obs_fit can easily read them
+    '''
+    profiles = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_500_crit_Tgt1e6_5rf500c.hdf5', 'r')
+
+    # we need rho in terms of density * h**2
+    rho = profiles['PartType0/Densities'][:] / 0.7**2
+    # r500 is in Mpc but was normalized with r/h_70
+    # we need r in terms of Mpc/h for halo model -> need to ``unnormalise''
+    # same for m500, in terms of mass / h
+    m500 = profiles['PartType0/M500'][:] * 0.7
+    r500 = profiles['PartType0/R500'][:] * 0.7
+
+    r_range = tools.bins2center(profiles['RBins_R_Crit500'][:])
+    numpart = profiles['PartType0/NumPartGroup'][:]
+    grnr = profiles['PartType0/GroupNumber'][:].astype(int)
+
+    sl = (numpart[grnr] > 1e4)
+
+    rho = rho[sl]
+    m500 = m500[sl]
+    r500 = r500[sl] * cm2mpc
+
+    # # Need to express bins in easy way to extract median m500 in each bin
+    # nbin = profiles['PartType0/NumBin'][:]
+    # bins_idx = np.cumsum(np.concatenate([[0],nbin], axis=0))
+    # bins = np.concatenate([bins_idx[:-1].reshape(-1,1),
+    #                        bins_idx[1:].reshape(-1,1)], axis=1)
+
+    # # take median value as the true one
+    # m500 = np.array([np.median(m500[b[0]:b[1]]) for b in bins])
+    # r500 = np.array([np.median(r500[b[0]:b[1]]) for b in bins])
+
+    r_bins = profiles['RBins_R_Crit500'][:]
+
+    profiles.close()
+
+    rx = 0.5 * (r_bins[:-1] + r_bins[1:])
+
+    a = np.empty((0,), dtype=float)
+    b = np.empty((0,), dtype=float)
+    m_sl = np.empty((0,), dtype=float)
+    aerr = np.empty((0,), dtype=float)
+    berr = np.empty((0,), dtype=float)
+    for idx, prof in enumerate(rho):
+        sl = ((prof > 0) & (rx >= 0.15) & (rx <= 1.))
+        sl_500 = ((prof > 0) & (rx <= 1.))
+
+        # need at least more than 4 points to make a fit
+        if sl.sum() <= 3:
+            # Final fit will need to reproduce the m500gas mass
+            a = np.append(a, np.nan)
+            b = np.append(b, np.nan)
+            m_sl = np.append(m_sl, 0.)
+            aerr = np.append(aerr, np.nan)
+            berr = np.append(berr, np.nan)
+
+        else:
+            r = rx
+
+            # Determine different profile masses
+            mass = tools.m_h(prof[sl], r[sl] * r500[idx])
+            m500gas = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
+
+            # Need to perform the fit for [0.15,1] r500c -> mass within this
+            # region need to match
+            sl_fit = np.ones(sl.sum(), dtype=bool)
+            popt, pcov = opt.curve_fit(lambda r, a, b: \
+                                       # , c:\
+                                       prof_gas_hot(r, sl_fit, a, b, # , c,
+                                                      mass, r500[idx]),
+                                       r[sl], prof[sl], bounds=([0, 0],
+                                                                [1, 5]))
+
+            # plt.plot(r, prof, label='obs')
+            # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1],
+            #                          m500gas, r500[idx]),
+            #          label='fit')
+            # plt.title('%i'%idx)
+            # plt.xscale('log')
+            # plt.yscale('log')
+            # plt.legend()
+            # plt.show()
+
+            # Final fit will need to reproduce the m500gas mass
+            a = np.append(a, popt[0])
+            b = np.append(b, popt[1])
+            m_sl = np.append(m_sl, m500gas)
+            aerr = np.append(aerr, np.sqrt(np.diag(pcov))[0])
+            berr = np.append(berr, np.sqrt(np.diag(pcov))[1])
+
+    sl = ~np.isnan(a)
+
+    return a[sl], aerr[sl], b[sl], berr[sl], m_sl[sl], r500[sl], m500[sl]
+
+# ------------------------------------------------------------------------------
+# End of fit_hot_gas_profiles_all()
+# ------------------------------------------------------------------------------
+
+def fit_hot_gas_profiles_like_obs():
+    '''
+    Fit the hot gas profiles in BAHAMAS with beta profiles and return the fit
+    parameters in such a way that bahamas_obs_fit can easily read them
+    '''
+    f = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_Tgt1e6_5r500c.hdf5', 'r')
+
+    # this is m200c
+    m200_med = f['PartType0/MedianM200'][:] * 0.7
+
+    # Need to express bins in easy way to extract median m500 in each bin
+    nbin = f['PartType0/NumBin'][:]
+    bins_idx = np.cumsum(np.concatenate([[0],nbin], axis=0))
+    bins = np.concatenate([bins_idx[:-1].reshape(-1,1),
+                           bins_idx[1:].reshape(-1,1)], axis=1)
+
+    # r500 is in Mpc but was normalized with r/h_70
+    # we need r in terms of Mpc/h for halo model -> need to ``unnormalise''
+    # same for m500, in terms of mass / h
+    m500 = f['PartType0/M500'][:] * 0.7
+    r500 = f['PartType0/R500'][:] * 0.7
+    # take median value as the true one
+    m500 = np.array([np.median(m500[b[0]:b[1]]) for b in bins])
+    r500 = np.array([np.median(r500[b[0]:b[1]]) for b in bins])
+
+    r_bins = f['RBins_R_Crit500'][:]
+    m_bins = f['MBins_M_Crit500'][:]
+
+    # same for rho, we need it in terms of density * h**2
+    rho = f['PartType0/MedianDensity'][:] / 0.7**2
+
+    f.close()
+
+    rx = 0.5 * (r_bins[:-1] + r_bins[1:])
+    m = np.sum(m_bins, axis=1).reshape(-1)
+
+    a = np.empty((0,), dtype=float)
+    b = np.empty((0,), dtype=float)
+    m_sl = np.empty((0,), dtype=float)
+    aerr = np.empty((0,), dtype=float)
+    berr = np.empty((0,), dtype=float)
+    for idx, prof in enumerate(rho):
+        sl = ((prof > 0) & (rx >= 0.15) & (rx <= 1.))
+        sl_500 = ((prof > 0) & (rx <= 1.))
+
+        # need at least more than 4 points to make a fit
+        if sl.sum() <= 3:
+            # Final fit will need to reproduce the m500gas mass
+            a = np.append(a, np.nan)
+            b = np.append(b, np.nan)
+            m_sl = np.append(m_sl, 0.)
+            aerr = np.append(aerr, np.nan)
+            berr = np.append(berr, np.nan)
+
+        else:
+            r = rx
+
+            # Determine different profile masses
+            mass = tools.m_h(prof[sl], r[sl] * r500[idx])
+            m500gas = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
+
+            # Need to perform the fit for [0.15,1] r500c -> mass within this
+            # region need to match
+            sl_fit = np.ones(sl.sum(), dtype=bool)
+            popt, pcov = opt.curve_fit(lambda r, a, b: \
+                                       # , c:\
+                                       prof_gas_hot(r, sl_fit, a, b, # , c,
+                                                      mass, r500[idx]),
+                                       r[sl], prof[sl], bounds=([0, 0],
+                                                                [1, 5]))
+
+            # plt.plot(r, prof, label='obs')
+            # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1],
+            #                          m500gas, r500[idx]),
+            #          label='fit')
+            # plt.title('%i'%idx)
+            # plt.xscale('log')
+            # plt.yscale('log')
+            # plt.legend()
+            # plt.show()
+
+            # Final fit will need to reproduce the m500gas mass
+            a = np.append(a, popt[0])
+            b = np.append(b, popt[1])
+            m_sl = np.append(m_sl, m500gas)
+            aerr = np.append(aerr, np.sqrt(np.diag(pcov))[0])
+            berr = np.append(berr, np.sqrt(np.diag(pcov))[1])
+
+    sl = ~np.isnan(a)
+
+    return a[sl], aerr[sl], b[sl], berr[sl], m_sl[sl], r500[sl], m500[sl]
+
+# ------------------------------------------------------------------------------
+# End of fit_hot_gas_profiles_like_obs()
+# ------------------------------------------------------------------------------
+
+def fit_prms_sim():
+    '''
+    Return beta profile fit parameters
+    '''
+    a, aerr, b, berr, m_sl, r500, m500 = fit_hot_gas_profiles_all()
+
+    sl = ((m500 > 1e13) & (m500 < 1e15))
+
+    m500 = m500[sl]
+    a = a[sl]
+    b = b[sl]
+    m_sl = m_sl[sl]
+    r500 = r500[sl]
+
+    # bin relation
+    m_bins = np.logspace(np.log10(m500).min(), np.log10(m500).max(), 30)
+    m = tools.bins2center(m_bins)
+    m_bin_idx = np.digitize(m500, m_bins)
+
+    # median rc
+    a_med = np.array([np.median(a[m_bin_idx == m_bin])
+                      for m_bin in np.arange(1, len(m_bins))])
+
+    b_med = np.array([np.median(b[m_bin_idx == m_bin])
+                      for m_bin in np.arange(1, len(m_bins))])
+
+    aopt, acov = opt.curve_fit(dm_plaw_fit, m, a_med)
+
+    bopt, bcov = opt.curve_fit(dm_plaw_fit, m, b_med)
+
+
+    rc_prms = {'a': aopt[0],
+               'b': aopt[1]}
+
+    b_prms = {'a': bopt[0],
+              'b': bopt[1]}
+
+    return rc_prms, b_prms
+
+# ------------------------------------------------------------------------------
+# End of fit_prms_sim()
+# ------------------------------------------------------------------------------
+
+
+def fit_prms(x=500, m_cut=1e13, prms=p.prms):
+    '''
+    Return beta profile fit parameters
+
+    Parameters
+    ----------
+    x : int
+      Overdensity threshold to compare rc to
+    m_cut : float
+      Mass cut for which to compute the median fit parameter
+    prms : halo.Parameters object
+      Contains all cosmological and halo model information
+
+    Returns
+    -------
+    rc : float
+      Median rc fit parameter
+    beta : float
+      Median beta fit parameter
+    '''
+    a, aerr, b, berr, m_sl, r500, m500 = fit_hot_gas_profiles_like_obs()
+
+    if x == 500:
+        # ! WATCH OUT ! This rc is rc / r500c, whereas in the paper we plot
+        # rc / r200m
+        rc = np.median(a[m500 > m_cut])
+        beta = np.median(b[m500 > m_cut])
+
+    elif x == 200:
+        m200 = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m)
+                         for m in m500[m500 > m_cut]])
+        r200 = tools.mass_to_radius(m200, 200 * prms.rho_m)
+
+        rc = np.median(a[m500 > m_cut] * r500[m500 > m_cut] / r200)
+        beta = np.median(b[m500 > m_cut])
+
+    return rc, beta
+
+# ------------------------------------------------------------------------------
+# End of fit_prms()
+# ------------------------------------------------------------------------------
+
+def f_gas(m, log10mc, a, prms):
+    x = np.log10(m) - log10mc
+    return (prms.omegab/prms.omegam) * (0.5 * (1 + np.tanh(x / a)))
+
+def f_gas_prms(prms):
+    '''
+    Get the gas fractions from the beta profile fits to the hot gas in the
+    simulations
+    '''
+    a, aerr, b, berr, m_sl, r500, m500 = fit_hot_gas_profiles_like_obs()
+
+    f_med = m_sl / m500
+
+    fmopt, fmcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
+                                 m500, f_med,
+                                 bounds=([10, 0],
+                                         [15, 10]))
+
+    fm_prms = {"log10mc": fmopt[0],
+               "a": fmopt[1]}
+
+    return fm_prms
+
+# ------------------------------------------------------------------------------
+# End of f_gas_prms()
+# ------------------------------------------------------------------------------
+
+def gas_plaw(r, rx, a, rhox):
+    '''
+    Return a power law with index a and density rhox at radius rx
+    '''
+    return rhox * (r/rx)**a
+
+def mass_diff_plaw(a, m, rx, ry, rhox):
+    '''
+    Return the mass of a power law with index a between rx and ry
+    with density rhox at rx
+    '''
+    if a == -3:
+        return np.abs(m - (4 * np.pi * (rhox / rx**a) * np.log(ry / rx)))
+
+    else:
+        return np.abs(m - 4 * np.pi * (rhox / rx**a) * 1. / (a + 3) *
+                      (ry**(a+3) - rx**(a+3)))
+
+def fit_plaw_index_mass(m, rx, ry, rhox):
+    '''
+    Returns the power law index for a power law density with rhox at rx
+    containing a mass m between rx and ry
+    '''
+    x0 = [-4]
+    res = opt.minimize(mass_diff_plaw, x0, args=(m, rx, ry, rhox),
+                       bounds=[(-20,20)])
+
+    return res.x[0]
+
+def massdiff_dmo2bar(m_bar, m_dmo, f_b, prms, fm):
+    '''
+    Return the mass difference between the measured halo mass and the
+    dark matter only equivalent mass according to the relation
+
+        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+
+    '''
+    f_g = f_gas(m_bar, prms=prms, **fm)
+
+    return (1 - (f_b - f_g)) * m_dmo - m_bar
+
+def m200dmo_to_m200b(m_dmo, prms):
+    '''
+    Invert the relation between the measured halo mass and the dark matter only
+    equivalent mass according to the relation
+
+        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+    '''
+    f_b = 1 - prms.f_dm
+    fm, f1, f2 = f_gas_prms(prms)
+    m200_b = opt.brentq(massdiff_dmo2bar, m_dmo / 10., m_dmo,
+                        args=(m_dmo, f_b, prms, fm))
+
+    return m200_b
+
+# ------------------------------------------------------------------------------
+# End of m200dmo_to_m200b()
+# ------------------------------------------------------------------------------
+
+def m200b_to_m200dmo(m_b, f_gas, prms):
+    '''
+    Get the relation between the measured halo mass and the dark matter only
+    equivalent mass according to the relation
+
+        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+    '''
+    f_b = 1 - prms.f_dm
+    m200dmo = m_b / (1 - (f_b - f_gas))
+
+    return m200dmo
+
+# ------------------------------------------------------------------------------
+# End of m200b_to_m200dmo()
+# ------------------------------------------------------------------------------
+
+def plot_hot_gas_profiles_paper(prms):
+    '''
+    Plot the hot gas profiles extracted from the BAHAMAS simulations
+    '''
+    f = h5py.File('halo/data/BAHAMAS/eagle_subfind_particles_032_profiles_binned_500_crit_Tgt1e6_5r500c.hdf5', 'r')
+
+    m200_med = f['PartType0/MedianM200'][:]
+
+    # Need to express bins in easy way to extract median m500 in each bin
+    nbin = f['PartType0/NumBin'][:]
+    bins_idx = np.cumsum(np.concatenate([[0],nbin], axis=0))
+    bins = np.concatenate([bins_idx[:-1].reshape(-1,1),
+                           bins_idx[1:].reshape(-1,1)], axis=1)
+
+    m500 = f['PartType0/M500'][:]
+    m500_med = np.array([np.median(m500[b[0]:b[1]]) for b in bins])
+
+    r_bins = f['RBins_R_Crit500'][:]
+    m_bins = f['MBins_M_Crit500'][:]
+
+    dens = f['PartType0/MedianDensity'][:] / prms.rho_crit
+    dens[dens == 0] = np.nan
+
+    f.close()
+
+    r = 0.5 * (r_bins[:-1] + r_bins[1:])
+    m = np.sum(m_bins, axis=1).reshape(-1)
+
+    cmap = mpl.cm.get_cmap('magma', m.shape[0])
+    lines = LineCollection([list(zip(r, d)) for d in dens],
+                           cmap=cmap)
+
+    pl.set_style('line')
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlim(r.min(), r.max())
+    ax.set_ylim(np.nanmin(dens[np.nonzero(dens)]),
+                np.nanmax(dens))
+
+    lines.set_array(np.log10(m))
+    ax.add_collection(lines)
+    axcb = fig.colorbar(lines)
+
+    axcb.set_label(r'$\log_{10}(m_\mathrm{500c}) \, [\mathrm{M_\odot}/h]$',
+                   rotation=270, labelpad=30)
+    ax.set_xlabel(r'$r/r_\mathrm{500c}$')
+    ax.set_ylabel(r'$\rho(r)/\rho_\mathrm{crit}$')
+
+    plt.savefig('bahamas_hot_gas_profiles.pdf')
+
+# ------------------------------------------------------------------------------
+# End of plot_hot_gas_profiles_paper()
+# ------------------------------------------------------------------------------
+

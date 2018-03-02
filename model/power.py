@@ -145,14 +145,33 @@ class Power(Cache):
 
     #     return result
 
+    # @staticmethod
+    # def _cross_power_2h(comp_1, comp_2):
+    #     '''
+    #     Compute the 2h cross-correlation between comp_1 and comp_2.
+    #     '''
+    #     # p_2h = Power._cross_2halo(comp_1, comp_2)
+
+    #     return p_2h
+
+    @staticmethod
+    def _cross_power_1h(comp_1, comp_2):
+        '''
+        Compute the 1h cross-correlation between comp_1 and comp_2.
+        '''
+        p_1h = Power._cross_1halo(comp_1, comp_2)
+
+        return p_1h
+
     @staticmethod
     def _cross_power(comp_1, comp_2):
         '''
-        Compute the cross-correlation between comp_1 and comp_2.
+        Compute the 1h cross-correlation between comp_1 and comp_2.
         '''
         # p_2h = Power._cross_2halo(comp_1, comp_2)
         p_1h = Power._cross_1halo(comp_1, comp_2)
-        p_tot = p_1h #+ p_2h
+
+        p_tot = p_1h # + p_2h
 
         return p_tot
 
@@ -194,6 +213,29 @@ class Power(Cache):
         k_range = self.comps.values()[0].k_range
 
         return 0.5 / np.pi**2 * k_range**3 * self.p_lin
+
+    @cached_property('cross_p', 'comps', 'p_lin')
+    def p_tot(self):
+        '''
+        Return total power including correlations
+        '''
+        rho = p.prms.rho_m
+        p_tot = self.p_lin
+        for key, comp in self.comps.iteritems():
+            k_range = comp.k_range
+
+            p_tot += comp.p_1h
+
+        for key, cross_comp in self.cross_p.iteritems():
+            c1, c2 = key.split('-')
+
+            k_range = self.comps[c1].k_range
+
+            p_cross = 2 * cross_comp
+            p_tot += p_cross
+
+        return p_tot
+
 
     @cached_property('cross_p', 'comps', 'p_lin')
     def p_tot(self):

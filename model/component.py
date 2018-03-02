@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import numpy as np
-import hmf
+import halo.hmf as hmf
 import scipy.special as spec
 import halo.density_profiles as profs
 import halo.parameters as p
@@ -84,7 +84,9 @@ class Component(dens.Profile):
         prof2_f = other.rho_k
 
         f_comp1 = self.f_comp
+        comp1_mask = (self.f_comp == 0.)
         f_comp2 = other.f_comp
+        comp2_mask = (other.f_comp == 0.)
         f_new = f_comp1 + f_comp2
 
         prof_new = 1. / f_new.reshape(-1,1) * (f_comp1.reshape(-1,1) * prof1 +
@@ -247,38 +249,30 @@ class Component(dens.Profile):
 
         return result
 
-    # @cached_property('m200m', 'k_range', 'p_lin', 'nu', 'fnu', 'rho_k', 'bias')
-    # def p_2h(self):
-    #     '''
-    #     Compute the 2-halo term of the power spectrum.
-    #     '''
-    #     # define shapes for readability
-    #     m = self.m200m.shape[0]
-    #     k = self.k_range.shape[0]
+    @cached_property('m200m', 'k_range', 'p_lin')
+    def p_2h(self):
+        '''
+        Compute the 2-halo term of the power spectrum.
+        '''
+        # define shapes for readability
+        m = self.m200m.shape[0]
+        k = self.k_range.shape[0]
 
-    #     nu = self.nu.reshape(m,1)
-    #     fnu = self.fnu.reshape(m,1)
+        m200m = self.m200m.reshape(m,1)
+        f_comp = self.f_comp.reshape(m,1)
 
-    #     # nu = self.nu.reshape(m,1)
-    #     # nu = np.sqrt(self.m_fn.nu).reshape(m,1)
-    #     # fnu = Component._MF_Tinker10(nu)
+        prefactor = self.p_lin
+        # result = (Integrate(y=fnu * f_comp * self.rho_k * bias,
+        #                     x=nu,
+        #                     axis=0))**2
+        # result *= prefactor
+        result = prefactor
 
-    #     m200m = self.m200m.reshape(m,1)
-    #     f_comp = self.f_comp.reshape(m,1)
-    #     bias = self.bias.reshape(m,1)
+        return result
 
-    #     prefactor = self.p_lin
-    #     # result = (Integrate(y=fnu * f_comp * self.rho_k * bias,
-    #     #                     x=nu,
-    #     #                     axis=0))**2
-    #     # result *= prefactor
-    #     result = prefactor
-
-    #     return result
-
-    # @cached_property('p_1h', 'p_2h')
-    # def p_tot(self):
-    #     return self.p_1h + self.p_2h
+    @cached_property('p_1h', 'p_2h')
+    def p_tot(self):
+        return self.p_1h + self.p_2h
 
     @cached_property('k_range', 'p_1h')
     def delta_1h(self):
@@ -289,18 +283,18 @@ class Component(dens.Profile):
         '''
         return 1./(2*np.pi**2) * self.k_range**3 * self.p_1h
 
-    # @cached_property('k_range', 'p_1h')
-    # def delta_2h(self):
-    #     '''
-    #     Return the dimensionless power spectrum for 2-halo term of component
+    @cached_property('k_range', 'p_1h')
+    def delta_2h(self):
+        '''
+        Return the dimensionless power spectrum for 2-halo term of component
 
-    #            Delta[k] = 1/(2*pi^2) * k^3 P(k)
-    #     '''
-    #     return 1./(2*np.pi**2) * self.k_range**3 * self.p_2h
+               Delta[k] = 1/(2*pi^2) * k^3 P(k)
+        '''
+        return 1./(2*np.pi**2) * self.k_range**3 * self.p_2h
 
-    # @cached_property('delta_1h', 'delta_2h')
-    # def delta_tot(self):
-    #     return self.delta_1h + self.delta_2h
+    @cached_property('delta_1h', 'delta_2h')
+    def delta_tot(self):
+        return self.delta_1h + self.delta_2h
 
 # ------------------------------------------------------------------------------
 # End of Component()
