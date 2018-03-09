@@ -332,11 +332,10 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m200m=np.logspace(10,11,101))
-prms2 = Parameters(m200m=np.logspace(11,12,101))
-prms3 = Parameters(m200m=np.logspace(12,13,101))
-prms4 = Parameters(m200m=np.logspace(13,14,101))
-prms5 = Parameters(m200m=np.logspace(14,15,101))
+prms1 = Parameters(m200m=np.logspace(11,12,101))
+prms2 = Parameters(m200m=np.logspace(12,13,101))
+prms3 = Parameters(m200m=np.logspace(13,14,101))
+prms4 = Parameters(m200m=np.logspace(14,15,101))
 prmst = Parameters(m200m=np.logspace(10,15,101))
 
 prms = Parameters(m200m=np.logspace(11,15,101),

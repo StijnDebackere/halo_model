@@ -3392,7 +3392,7 @@ def m200dmo_to_m200b(m_dmo, prms):
         m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
     '''
     f_b = 1 - prms.f_dm
-    fm, f1, f2 = f_gas_prms(prms)
+    fm = f_gas_prms(prms)
     m200_b = opt.brentq(massdiff_dmo2bar, m_dmo / 10., m_dmo,
                         args=(m_dmo, f_b, prms, fm))
 

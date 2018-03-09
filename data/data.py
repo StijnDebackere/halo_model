@@ -841,7 +841,7 @@ def f_gas(m, log10mc, a, prms):
     x = np.log10(m) - log10mc
     return (prms.omegab/prms.omegam) * (0.5 * (1 + np.tanh(x / a)))
 
-def f_gas_prms(prms):
+def f_gas_prms(prms, q=50):
     m500_obs, f_obs = np.loadtxt(ddir +
                                  'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                                  unpack=True)
@@ -853,34 +853,18 @@ def f_gas_prms(prms):
     m = tools.bins2center(m_bins)
     m_bin_idx = np.digitize(10**(m500_obs) * 0.7, m_bins)
 
-    f_med = np.array([np.median(f_obs[m_bin_idx == m_bin])
-                      for m_bin in np.arange(1, len(m_bins))])
-    f_q15 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 15)
-                      for m_bin in np.arange(1, len(m_bins))])
-    f_q85 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 85)
+    f_q = np.array([np.percentile(f_obs[m_bin_idx == m_bin], q)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fmopt, fmcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
-                                 m[m>1e14], f_med[m>1e14],
-                                 bounds=([10, 0],
-                                         [15, 10]))
-    f1opt, f1cov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
-                                 m[m>1e14], f_q15[m>1e14],
-                                 bounds=([10, 0],
-                                         [15, 10]))
-    f2opt, f2cov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
-                                 m[m>1e14], f_q85[m>1e14],
+    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
+                                 m[m>1e14], f_q[m>1e14],
                                  bounds=([10, 0],
                                          [15, 10]))
 
-    fm_prms = {"log10mc": fmopt[0],
-               "a": fmopt[1]}
-    f1_prms = {"log10mc": f1opt[0],
-               "a": f1opt[1]}
-    f2_prms = {"log10mc": f2opt[0],
-               "a": f2opt[1]}
+    fq_prms = {"log10mc": fqopt[0],
+               "a": fqopt[1]}
 
-    return fm_prms, f1_prms, f2_prms
+    return fq_prms
 
 # ------------------------------------------------------------------------------
 # End of f_gas_prms()
@@ -966,7 +950,7 @@ def beta_mass(f500c, f200m, prms=p.prms):
     r500c = prms.r500c
 
     # # Gas fractions
-    # gas_prms = f_gas_prms(prms)
+    # gas_prms = f_gas_prms(prms, q=50)
     # f200m = 1 - prms.f_dm
     # f500c = f_gas(m500c, **gas_prms[0])
 
@@ -1024,7 +1008,7 @@ def beta_mass(f500c, f200m, prms=p.prms):
 #     r500c = tools.mass_to_radius(m500c, 500 * prms.rho_crit * prms.h**2)
 
 #     # # Gas fractions
-#     # gas_prms = f_gas_prms(prms)
+#     # gas_prms = f_gas_prms(prms, q=50)
 #     # f200m = 1 - prms.f_dm
 #     # f500c = f_gas(m500c, **gas_prms[0])
 
@@ -1069,7 +1053,7 @@ def beta_mass(f500c, f200m, prms=p.prms):
 # # End of beta_slope()
 # # ------------------------------------------------------------------------------
 
-def fit_prms(x=500):
+def fit_prms(x=500, q_rc=50, q_beta=50):
     '''
     Return observational beta profile fit parameters
     '''
@@ -1105,7 +1089,7 @@ def fit_prms(x=500):
     b_c = data_c['b']
     beta = np.append(b_e, b_c)
 
-    return np.median(rc), np.median(beta)
+    return np.percentile(rc, q_rc), np.percentile(beta, q_beta)
 
 # ------------------------------------------------------------------------------
 # End of fit_prms()
@@ -1141,7 +1125,7 @@ def m200dmo_to_m200b(m_dmo, prms):
         m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
     '''
     f_b = 1 - prms.f_dm
-    fm, f1, f2 = f_gas_prms(prms)
+    fm = f_gas_prms(prms, q=50)
     m200_b = opt.brentq(massdiff_dmo2bar, m_dmo / 10., m_dmo,
                         args=(m_dmo, f_b, prms, fm))
 
@@ -1270,12 +1254,14 @@ def plot_gas_fractions(prms):
 
     f_med = np.array([np.median(f_obs[m_bin_idx == m_bin])
                       for m_bin in np.arange(1, len(m_bins))])
-    f_q16 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 16)
+    f_q15 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 15)
                       for m_bin in np.arange(1, len(m_bins))])
-    f_q84 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 84)
+    f_q85 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 85)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fm_prms, f1_prms, f2_prms = f_gas_prms(prms)
+    fm_prms = f_gas_prms(prms, q=50)
+    fq15_prms = f_gas_prms(prms, q=15)
+    fq85_prms = f_gas_prms(prms, q=85)
 
     ##########################################################################
     # Get shadow twiny instance for ratio plot, to also have m200m
@@ -1311,6 +1297,10 @@ def plot_gas_fractions(prms):
     ax.set_prop_cycle(c='r')
     ax.plot(m, f_gas(m, prms=prms, **fm_prms), ls='-', c='r', lw=2,
             label='fit')
+    ax.fill_between(m,
+                    f_gas(m, prms=prms, **fq15_prms),
+                    f_gas(m, prms=prms, **fq85_prms),
+                    facecolor='r', alpha=0.3,)
     # ax.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1)
     # ax.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1)
 
@@ -1650,7 +1640,7 @@ def plot_profiles_fgas_presentation():
     f_q84 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 84)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fm_prms, f1_prms, f2_prms = f_gas_prms(prms)
+    fm_prms = f_gas_prms(prms, q=50)
 
     ax3.set_prop_cycle(pl.cycle_mark())
     ax3.plot(10**(m500_obs[23:33]), f_obs[23:33], marker='o',
@@ -1730,6 +1720,8 @@ def plot_fit_prms_paper(prms=prms):
     ax.plot(m500c_e, rc_e, label='Eckert+16')
     ax.plot(m500c_c, rc_c, label='Croston+08')
     ax.axhline(y=np.median(rc), ls='-', c='k')
+    ax.axhspan(np.percentile(rc, 15), np.percentile(rc, 85),
+               facecolor='k', alpha=0.3)
     ax.annotate('median', xy=(1.05 * m500c.min(), 1.05 * np.median(rc)))
 
     ax.set_xlim(0.95 * m500c.min(), 1.05 * m500c.max())
@@ -1763,6 +1755,8 @@ def plot_fit_prms_paper(prms=prms):
     ax.plot(m500c_e, b_e, label='Eckert+16')
     ax.plot(m500c_c, b_c, label='Croston+08')
     ax.axhline(y=np.median(beta), ls='-', c='k')
+    ax.axhspan(np.percentile(beta, 15), np.percentile(beta, 85),
+               facecolor='k', alpha=0.3)
     ax.annotate('median', xy=(1.05 * m500c.min(), 1.05 * np.median(beta)))
 
     ax.set_xlim(0.95 * m500c.min(), 1.05 * m500c.max())
@@ -1916,7 +1910,7 @@ def plot_missing_mass_paper(comp_gas):
     f_gas = comp_gas.m_h / m_range
 
     m500c = np.array([tools.m200m_to_m500c(mass) for mass in m_range[::5]])
-    f500c = d.f_gas(m500c, **d.f_gas_prms(prms)[0])
+    f500c = d.f_gas(m500c, **d.f_gas_prms(prms, q=50))
 
     ax.plot(m_range, f_dm, label='$f_{\mathrm{dm}}$')
     ax.plot(m_range, f_dm + f_gas, label='$f_{\mathrm{dm}} + f_{\mathrm{gas,200m}}$')

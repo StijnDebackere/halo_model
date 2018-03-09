@@ -214,27 +214,42 @@ class Power(Cache):
 
         return 0.5 / np.pi**2 * k_range**3 * self.p_lin
 
-    @cached_property('cross_p', 'comps', 'p_lin')
-    def p_tot(self):
+    @cached_property('comps')
+    def p_1h(self):
         '''
-        Return total power including correlations
+        Return 1h power including correlations
         '''
         rho = p.prms.rho_m
-        p_tot = self.p_lin
+        p_1h = 0
+
         for key, comp in self.comps.iteritems():
             k_range = comp.k_range
 
-            p_tot += comp.p_1h
+            p_1h += comp.p_1h
 
-        for key, cross_comp in self.cross_p.iteritems():
-            c1, c2 = key.split('-')
+        cross_1h = {}
+        keys = self.comps.keys()
+        for idx, key_1 in enumerate(keys):
+            comp_1 = self.comps[key_1]
 
-            k_range = self.comps[c1].k_range
+            for key_2 in keys[idx+1:]:
+                comp_2 = self.comps[key_2]
+                cross_name = '{:s}-{:s}'.format(comp_1.name, comp_2.name)
+                cross_1h[cross_name] = Power._cross_power_1h(comp_1, comp_2)
 
-            p_cross = 2 * cross_comp
-            p_tot += p_cross
+        for key, cross_comp in cross_1h.iteritems():
+            p_1h += 2 * cross_comp
 
-        return p_tot
+        return p_1h
+
+    @cached_property('p_1h', 'comps')
+    def delta_1h(self):
+        '''
+        Return 1h dimensionless power
+        '''
+        k_range = self.comps.values()[0].k_range
+
+        return 0.5 / np.pi**2 * k_range**3 * self.p_1h
 
 
     @cached_property('cross_p', 'comps', 'p_lin')
