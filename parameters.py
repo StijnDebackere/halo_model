@@ -296,6 +296,12 @@ class Parameters(Cache):
 
         return plin
 
+    @cached_property('k_range_lin', 'm_fn', 'p_lin')
+    def delta_lin(self):
+        delta_lin = 1. / (2 * np.pi**2) * self.k_range_lin**3 * self.p_lin
+
+        return delta_lin
+
     @cached_property('m_fn', 'm200m')
     def dndm(self):
         return self.m_fn.dndm

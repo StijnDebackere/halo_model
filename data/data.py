@@ -870,6 +870,25 @@ def f_gas_prms(prms, q=50):
 # End of f_gas_prms()
 # ------------------------------------------------------------------------------
 
+def f_gas_prms_debiased(prms):
+    m500_obs, f_obs = np.loadtxt(ddir +
+                                 'data_mccarthy/gas/M500_fgas_bias_corrected.dat',
+                                 unpack=True)
+
+    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
+                                 m500_obs, f_obs,
+                                 bounds=([10, 0],
+                                         [15, 10]))
+
+    fq_prms = {"log10mc": fqopt[0],
+               "a": fqopt[1]}
+
+    return fq_prms
+
+# ------------------------------------------------------------------------------
+# End of f_gas_prms_debiased()
+# ------------------------------------------------------------------------------
+
 def prof_prms(mean=False):
     if mean:
         with open('data/croston_200.p', 'rb') as f:
