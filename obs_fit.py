@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.optimize as opt
 import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
+from matplotlib.ticker import AutoMinorLocator, ScalarFormatter
 
 import sys
 import cPickle
@@ -891,7 +891,9 @@ def load_models(prms=p.prms, q_f=50, q_rc=50, q_beta=50, bar2dmo=True):
 
 def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
                             comp_gas_r500c_5r500c,
-                            comp_gas_r200m_5r500c, prms=p.prms):
+                            comp_gas_r200m_5r500c,
+                            rho_k=False,
+                            prms=p.prms):
     '''
     Plot the density for our different gas profiles in one plot
     '''
@@ -904,115 +906,240 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     idx_2 = 50
     idx_3 = -1
     r200m = prms.r200m
-    norm = prms.rho_crit
 
     pl.set_style('line')
 
-    # Plot idx_1
-    # ax1.plot(comp_gas_dmo.r_range[idx_1] / r200m[idx_1],
-    #          comp_gas_dmo.rho_r[idx_1] * comp_gas_dmo.f_comp[idx_1] / norm,
-    #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
-    ax1.plot(comp_gas.r_range[idx_1] / r200m[idx_1],
-             comp_gas.rho_r[idx_1] * comp_gas.f_comp[idx_1]/norm,
-             lw=3, label=r'model 1')
-    ax1.plot(comp_gas_r500c_r200m.r_range[idx_1] / r200m[idx_1],
-             (comp_gas_r500c_r200m.rho_r[idx_1] *
-              comp_gas_r500c_r200m.f_comp[idx_1] / norm),
-             lw=2, label=r'model 2')
-    ax1.plot(comp_gas_r500c_5r500c.r_range[idx_1] / r200m[idx_1],
-             (comp_gas_r500c_5r500c.rho_r[idx_1] *
-              comp_gas_r500c_5r500c.f_comp[idx_1] / norm), lw=1,
-             label=r'model 3')
-    ax1.plot(comp_gas_r200m_5r500c.r_range[idx_1] / r200m[idx_1],
-             (comp_gas_r200m_5r500c.rho_r[idx_1] *
-              comp_gas_r200m_5r500c.f_comp[idx_1] / norm),
-             lw=1, ls='--', label=r'model 4')
+    if not rho_k:
+        norm = prms.rho_crit
+        # Plot idx_1
+        # ax1.plot(comp_gas_dmo.r_range[idx_1] / r200m[idx_1],
+        #          comp_gas_dmo.rho_r[idx_1] * comp_gas_dmo.f_comp[idx_1] / norm,
+        #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+        ax1.plot(comp_gas.r_range[idx_1] / r200m[idx_1],
+                 comp_gas.rho_r[idx_1] * comp_gas.f_comp[idx_1]/norm,
+                 lw=3, label=r'model 1')
+        ax1.plot(comp_gas_r500c_r200m.r_range[idx_1] / r200m[idx_1],
+                 (comp_gas_r500c_r200m.rho_r[idx_1] *
+                  comp_gas_r500c_r200m.f_comp[idx_1] / norm),
+                 lw=2, label=r'model 2')
+        ax1.plot(comp_gas_r500c_5r500c.r_range[idx_1] / r200m[idx_1],
+                 (comp_gas_r500c_5r500c.rho_r[idx_1] *
+                  comp_gas_r500c_5r500c.f_comp[idx_1] / norm), lw=1,
+                 label=r'model 3')
+        ax1.plot(comp_gas_r200m_5r500c.r_range[idx_1] / r200m[idx_1],
+                 (comp_gas_r200m_5r500c.rho_r[idx_1] *
+                  comp_gas_r200m_5r500c.f_comp[idx_1] / norm),
+                 lw=1, ls='--', label=r'model 4')
 
-    ax1.axvline(x=prms.r500c[idx_1] / prms.r200m[idx_1], ls='--', c='k')
-    ax1.text(x=prms.r500c[idx_1] / prms.r200m[idx_1] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
-             ha='center', va='center')
+        ax1.axvline(x=prms.r500c[idx_1] / prms.r200m[idx_1], ls='--', c='k')
+        ax1.text(x=prms.r500c[idx_1] / prms.r200m[idx_1] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
+                 ha='center', va='center')
 
-    # Plot idx_2
-    # ax2.plot(comp_gas_dmo.r_range[idx_2] / r200m[idx_2],
-    #          comp_gas_dmo.rho_r[idx_2] * comp_gas_dmo.f_comp[idx_2] / norm,
-    #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
-    ax2.plot(comp_gas.r_range[idx_2] / r200m[idx_2],
-             comp_gas.rho_r[idx_2] * comp_gas.f_comp[idx_2]/norm,
-             lw=3, label=r'model 1')
-    ax2.plot(comp_gas_r500c_r200m.r_range[idx_2] / r200m[idx_2],
-             (comp_gas_r500c_r200m.rho_r[idx_2] *
-              comp_gas_r500c_r200m.f_comp[idx_2] / norm),
-             lw=2, label=r'model 2')
-    ax2.plot(comp_gas_r500c_5r500c.r_range[idx_2] / r200m[idx_2],
-             (comp_gas_r500c_5r500c.rho_r[idx_2] *
-              comp_gas_r500c_5r500c.f_comp[idx_2] / norm), lw=1,
-             label=r'model 3')
-    ax2.plot(comp_gas_r200m_5r500c.r_range[idx_2] / r200m[idx_2],
-             (comp_gas_r200m_5r500c.rho_r[idx_2] *
-              comp_gas_r200m_5r500c.f_comp[idx_2] / norm),
-             lw=1, ls='--', label=r'model 4')
+        # Plot idx_2
+        # ax2.plot(comp_gas_dmo.r_range[idx_2] / r200m[idx_2],
+        #          comp_gas_dmo.rho_r[idx_2] * comp_gas_dmo.f_comp[idx_2] / norm,
+        #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+        ax2.plot(comp_gas.r_range[idx_2] / r200m[idx_2],
+                 comp_gas.rho_r[idx_2] * comp_gas.f_comp[idx_2]/norm,
+                 lw=3, label=r'model 1')
+        ax2.plot(comp_gas_r500c_r200m.r_range[idx_2] / r200m[idx_2],
+                 (comp_gas_r500c_r200m.rho_r[idx_2] *
+                  comp_gas_r500c_r200m.f_comp[idx_2] / norm),
+                 lw=2, label=r'model 2')
+        ax2.plot(comp_gas_r500c_5r500c.r_range[idx_2] / r200m[idx_2],
+                 (comp_gas_r500c_5r500c.rho_r[idx_2] *
+                  comp_gas_r500c_5r500c.f_comp[idx_2] / norm), lw=1,
+                 label=r'model 3')
+        ax2.plot(comp_gas_r200m_5r500c.r_range[idx_2] / r200m[idx_2],
+                 (comp_gas_r200m_5r500c.rho_r[idx_2] *
+                  comp_gas_r200m_5r500c.f_comp[idx_2] / norm),
+                 lw=1, ls='--', label=r'model 4')
 
-    ax2.axvline(x=prms.r500c[idx_2] / prms.r200m[idx_2], ls='--', c='k')
-    ax2.text(x=prms.r500c[idx_2] / prms.r200m[idx_2] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
-             ha='center', va='center')
+        ax2.axvline(x=prms.r500c[idx_2] / prms.r200m[idx_2], ls='--', c='k')
+        ax2.text(x=prms.r500c[idx_2] / prms.r200m[idx_2] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
+                 ha='center', va='center')
 
-    # Plot idx_3
-    # ax3.plot(comp_gas_dmo.r_range[idx_3] / r200m[idx_3],
-    #          comp_gas_dmo.rho_r[idx_3] * comp_gas_dmo.f_comp[idx_3] / norm,
-    #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
-    ax3.plot(comp_gas.r_range[idx_3] / r200m[idx_3],
-             comp_gas.rho_r[idx_3] * comp_gas.f_comp[idx_3]/norm,
-             lw=3, label=r'model 1')
-    ax3.plot(comp_gas_r500c_r200m.r_range[idx_3] / r200m[idx_3],
-             (comp_gas_r500c_r200m.rho_r[idx_3] *
-              comp_gas_r500c_r200m.f_comp[idx_3] / norm),
-             lw=2, label=r'model 2')
-    ax3.plot(comp_gas_r500c_5r500c.r_range[idx_3] / r200m[idx_3],
-             (comp_gas_r500c_5r500c.rho_r[idx_3] *
-              comp_gas_r500c_5r500c.f_comp[idx_3] / norm), lw=1,
-             label=r'model 3')
-    ax3.plot(comp_gas_r200m_5r500c.r_range[idx_3] / r200m[idx_3],
-             (comp_gas_r200m_5r500c.rho_r[idx_3] *
-              comp_gas_r200m_5r500c.f_comp[idx_3] / norm),
-             lw=1, ls='--', label=r'model 4')
+        # Plot idx_3
+        # ax3.plot(comp_gas_dmo.r_range[idx_3] / r200m[idx_3],
+        #          comp_gas_dmo.rho_r[idx_3] * comp_gas_dmo.f_comp[idx_3] / norm,
+        #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+        ax3.plot(comp_gas.r_range[idx_3] / r200m[idx_3],
+                 comp_gas.rho_r[idx_3] * comp_gas.f_comp[idx_3]/norm,
+                 lw=3, label=r'model 1')
+        ax3.plot(comp_gas_r500c_r200m.r_range[idx_3] / r200m[idx_3],
+                 (comp_gas_r500c_r200m.rho_r[idx_3] *
+                  comp_gas_r500c_r200m.f_comp[idx_3] / norm),
+                 lw=2, label=r'model 2')
+        ax3.plot(comp_gas_r500c_5r500c.r_range[idx_3] / r200m[idx_3],
+                 (comp_gas_r500c_5r500c.rho_r[idx_3] *
+                  comp_gas_r500c_5r500c.f_comp[idx_3] / norm), lw=1,
+                 label=r'model 3')
+        ax3.plot(comp_gas_r200m_5r500c.r_range[idx_3] / r200m[idx_3],
+                 (comp_gas_r200m_5r500c.rho_r[idx_3] *
+                  comp_gas_r200m_5r500c.f_comp[idx_3] / norm),
+                 lw=1, ls='--', label=r'model 4')
 
-    ax3.axvline(x=prms.r500c[idx_3] / prms.r200m[idx_3], ls='--', c='k')
-    ax3.text(x=prms.r500c[idx_3] / prms.r200m[idx_3] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
-             ha='center', va='center')
+        ax3.axvline(x=prms.r500c[idx_3] / prms.r200m[idx_3], ls='--', c='k')
+        ax3.text(x=prms.r500c[idx_3] / prms.r200m[idx_3] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
+                 ha='center', va='center')
 
-    ax1.set_xlim(1e-3, 3)
-    ax1.set_ylim(1e-1, 1e3)
-    ax2.set_xlim(1e-3, 3)
-    ax2.set_ylim(1e-1, 1e3)
-    ax3.set_xlim(1e-3, 3)
-    ax3.set_ylim(1e-1, 1e3)
+        ax1.set_xlim(1e-3, 3)
+        ax1.set_ylim(1e-1, 1e3)
+        ax2.set_xlim(1e-3, 3)
+        ax2.set_ylim(1e-1, 1e3)
+        ax3.set_xlim(1e-3, 3)
+        ax3.set_ylim(1e-1, 1e3)
 
-    ax1.set_xscale('log')
-    ax1.set_yscale('log')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax3.set_xscale('log')
-    ax3.set_yscale('log')
+        ax1.set_xscale('log')
+        ax1.set_yscale('log')
+        ax2.set_xscale('log')
+        ax2.set_yscale('log')
+        ax3.set_xscale('log')
+        ax3.set_yscale('log')
 
-    ax1.tick_params(axis='x', which='major', pad=6)
-    ax2.tick_params(axis='x', which='major', pad=6)
-    ax3.tick_params(axis='x', which='major', pad=6)
+        ax1.tick_params(axis='x', which='major', pad=6)
+        ax2.tick_params(axis='x', which='major', pad=6)
+        ax3.tick_params(axis='x', which='major', pad=6)
 
-    ax2.set_xlabel(r'$r/r_\mathrm{200m}$', labelpad=-10)
-    ax1.set_ylabel(r'$\rho(r)/\rho_\mathrm{c}$')
-    ax2.set_yticklabels([])
-    ax3.set_yticklabels([])
-    # ticks2 = ax2.get_xticklabels()
-    # ticks2[-6].set_visible(False)
-    # ticks3 = ax3.get_xticklabels()
-    # ticks3[-6].set_visible(False)
+        ax2.set_xlabel(r'$r/r_\mathrm{200m}$', labelpad=-10)
+        ax1.set_ylabel(r'$\rho(r)/\rho_\mathrm{c}$')
+        ax2.set_yticklabels([])
+        ax3.set_yticklabels([])
+        # ticks2 = ax2.get_xticklabels()
+        # ticks2[-6].set_visible(False)
+        # ticks3 = ax3.get_xticklabels()
+        # ticks3[-6].set_visible(False)
 
-    ax1.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_1]), y=1.015, fontsize=28)
-    ax2.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_2]), y=1.015, fontsize=28)
-    ax3.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_3]), y=1.015, fontsize=28)
+        ax1.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_1]), y=1.015, fontsize=28)
+        ax2.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_2]), y=1.015, fontsize=28)
+        ax3.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_3]), y=1.015, fontsize=28)
 
-    ax3.legend(loc='best', fontsize=28)
-    plt.savefig('obs_rho_extrapolated.pdf', transparent=True)
+        ax3.legend(loc='best', fontsize=28)
+        plt.savefig('obs_rho_extrapolated.pdf', transparent=True)
+
+    else:
+        norm = 1.
+        # Plot idx_1
+        # ax1.plot(comp_gas_dmo.k_range,
+        #          comp_gas_dmo.rho_k[idx_1] * comp_gas_dmo.f_comp[idx_1] / norm,
+        #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+        ax1.plot(comp_gas.k_range,
+                 comp_gas.rho_k[idx_1] * comp_gas.f_comp[idx_1]/norm,
+                 lw=3, label=r'model 1')
+        ax1.plot(comp_gas_r500c_r200m.k_range,
+                 (comp_gas_r500c_r200m.rho_k[idx_1] *
+                  comp_gas_r500c_r200m.f_comp[idx_1] / norm),
+                 lw=2, label=r'model 2')
+        ax1.plot(comp_gas_r500c_5r500c.k_range,
+                 (comp_gas_r500c_5r500c.rho_k[idx_1] *
+                  comp_gas_r500c_5r500c.f_comp[idx_1] / norm), lw=1,
+                 label=r'model 3')
+        ax1.plot(comp_gas_r200m_5r500c.k_range,
+                 (comp_gas_r200m_5r500c.rho_k[idx_1] *
+                  comp_gas_r200m_5r500c.f_comp[idx_1] / norm),
+                 lw=1, ls='--', label=r'model 4')
+
+        # ax1.axvline(x=prms.r500c[idx_1] / prms.r200m[idx_1], ls='--', c='k')
+        # ax1.text(x=prms.r500c[idx_1] / prms.r200m[idx_1] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
+        #          ha='center', va='center')
+
+        # Plot idx_2
+        # ax2.plot(comp_gas_dmo.k_range,
+        #          comp_gas_dmo.rho_k[idx_2] * comp_gas_dmo.f_comp[idx_2] / norm,
+        #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+        ax2.plot(comp_gas.k_range,
+                 comp_gas.rho_k[idx_2] * comp_gas.f_comp[idx_2]/norm,
+                 lw=3, label=r'model 1')
+        ax2.plot(comp_gas_r500c_r200m.k_range,
+                 (comp_gas_r500c_r200m.rho_k[idx_2] *
+                  comp_gas_r500c_r200m.f_comp[idx_2] / norm),
+                 lw=2, label=r'model 2')
+        ax2.plot(comp_gas_r500c_5r500c.k_range,
+                 (comp_gas_r500c_5r500c.rho_k[idx_2] *
+                  comp_gas_r500c_5r500c.f_comp[idx_2] / norm), lw=1,
+                 label=r'model 3')
+        ax2.plot(comp_gas_r200m_5r500c.k_range,
+                 (comp_gas_r200m_5r500c.rho_k[idx_2] *
+                  comp_gas_r200m_5r500c.f_comp[idx_2] / norm),
+                 lw=1, ls='--', label=r'model 4')
+
+        # ax2.axvline(x=prms.r500c[idx_2] / prms.r200m[idx_2], ls='--', c='k')
+        # ax2.text(x=prms.r500c[idx_2] / prms.r200m[idx_2] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
+        #          ha='center', va='center')
+
+        # Plot idx_3
+        # ax3.plot(comp_gas_dmo.k_range,
+        #          comp_gas_dmo.rho_k[idx_3] * comp_gas_dmo.f_comp[idx_3] / norm,
+        #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
+        ax3.plot(comp_gas.k_range,
+                 comp_gas.rho_k[idx_3] * comp_gas.f_comp[idx_3]/norm,
+                 lw=3, label=r'model 1')
+        ax3.plot(comp_gas_r500c_r200m.k_range,
+                 (comp_gas_r500c_r200m.rho_k[idx_3] *
+                  comp_gas_r500c_r200m.f_comp[idx_3] / norm),
+                 lw=2, label=r'model 2')
+        ax3.plot(comp_gas_r500c_5r500c.k_range,
+                 (comp_gas_r500c_5r500c.rho_k[idx_3] *
+                  comp_gas_r500c_5r500c.f_comp[idx_3] / norm), lw=1,
+                 label=r'model 3')
+        ax3.plot(comp_gas_r200m_5r500c.k_range,
+                 (comp_gas_r200m_5r500c.rho_k[idx_3] *
+                  comp_gas_r200m_5r500c.f_comp[idx_3] / norm),
+                 lw=1, ls='--', label=r'model 4')
+
+        # ax3.axvline(x=prms.r500c[idx_3] / prms.r200m[idx_3], ls='--', c='k')
+        # ax3.text(x=prms.r500c[idx_3] / prms.r200m[idx_3] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
+        #          ha='center', va='center')
+
+        # ax1.set_xlim(prms.k_range_lin.min(), prms.k_range_lin.max())
+        # ax2.set_xlim(prms.k_range_lin.min(), prms.k_range_lin.max())
+        # ax3.set_xlim(prms.k_range_lin.min(), prms.k_range_lin.max())
+
+        ax1.set_xscale('log')
+        ax2.set_xscale('log')
+        ax3.set_xscale('log')
+        ax1.set_yscale('symlog',linthreshy=1e-5)
+        ax2.set_yscale('symlog',linthreshy=1e-5)
+        ax3.set_yscale('symlog',linthreshy=1e-5)
+
+        ax1.set_xlim(1,100)
+        ax2.set_xlim(1,100)
+        ax3.set_xlim(1,100)
+        ax1.set_ylim(-1, 1)
+        ax2.set_ylim(-1, 1)
+        ax3.set_ylim(-1, 1)
+
+        # formatter = ScalarFormatter()
+        # formatter.set_scientific(False)
+        # ax1.xaxis.set_major_formatter(formatter)
+        # ax2.xaxis.set_major_formatter(formatter)
+        # ax3.xaxis.set_major_formatter(formatter)
+        # ax1.xaxis.set_minor_formatter(formatter)
+        # ax2.xaxis.set_minor_formatter(formatter)
+        # ax3.xaxis.set_minor_formatter(formatter)
+
+        ax1.tick_params(axis='x', which='major', pad=6)
+        ax2.tick_params(axis='x', which='major', pad=6)
+        ax3.tick_params(axis='x', which='major', pad=6)
+        ax1.tick_params(axis='x', which='minor', bottom='on', top='on')
+        ax2.tick_params(axis='x', which='minor', bottom='on', top='on')
+        ax3.tick_params(axis='x', which='minor', bottom='on', top='on')
+
+        ax2.set_xlabel(r'$k \, [h/\mathrm{Mpc}]$', labelpad=-10)
+        ax1.set_ylabel(r'$f_\mathrm{gas}(m)u(k|m)$')
+        ax2.set_yticklabels([])
+        ax3.set_yticklabels([])
+        # ticks2 = ax2.get_xticklabels()
+        # ticks2[-6].set_visible(False)
+        # ticks3 = ax3.get_xticklabels()
+        # ticks3[-6].set_visible(False)
+
+        ax1.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_1]), y=1.015, fontsize=28)
+        ax2.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_2]), y=1.015, fontsize=28)
+        ax3.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_3]), y=1.015, fontsize=28)
+
+        ax3.legend(loc='best', fontsize=28)
+        plt.savefig('obs_rho_k_extrapolated.pdf', transparent=True)
 
 # ------------------------------------------------------------------------------
 # End of plot_profiles_gas_paper()

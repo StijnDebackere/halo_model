@@ -22,7 +22,7 @@ class Profile(Cache):
     r_range : (m,r) array
       array containing r_range for each m
     m_bar : (m,) array
-      array containing total halo mass (this needn't be m200m )to compute
+      array containing total halo mass (this needn't be m200m) to compute
       profile for
     k_range : (k,) array
       array containing wavevectors to compute profile for

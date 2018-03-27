@@ -146,6 +146,57 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 # End of profile_NFW_f()
 # ------------------------------------------------------------------------------
 
+def profile_uniform(r_range, m_range, r_x, r_y):
+    '''
+    Return a uniform, spherically symmetric profile between r_x and r_y
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each m
+    m_range : (m,) array
+      array containing masses inside the profile
+    r_x : (m,) array
+      array containing inner radius for each m
+    r_x : (m,) array
+      array containing outer radius for each m
+
+    Returns
+    -------
+    profile : (m,r)
+      array containing profile
+    '''
+
+# ------------------------------------------------------------------------------
+# End of profile_uniform()
+# ------------------------------------------------------------------------------
+
+def profile_uniform_f(k_range, m_range, r_x, r_y):
+    '''
+    Return the FT of a uniform, spherically symmetric profile between r_x and r_y
+
+    Parameters
+    ----------
+    k_range : (k,) array
+      array containing the k_range
+    m_range : (m,) array
+      array containing masses inside the profile
+    r_x : (m,) array
+      array containing inner radius for each m
+    r_x : (m,) array
+      array containing outer radius for each m
+
+    Returns
+    -------
+    profile_f : (k,)
+      array containing profile_f
+    '''
+    
+
+# ------------------------------------------------------------------------------
+# End of profile_uniform_f()
+# ------------------------------------------------------------------------------
+
 def profile_Schaller(r_range, r_s, d_s, r_i, d_i, rho_crit):
     '''
     Generalized matter profile defined by Schaller et al (2014). Outer profile
@@ -168,6 +219,7 @@ def profile_Schaller(r_range, r_s, d_s, r_i, d_i, rho_crit):
       value for m_i in Schaller profile
     rho_crit : float
       critical density of universe
+
     Returns
     -------
     profile : (m,r)

@@ -26,7 +26,7 @@ class Component(dens.Profile):
     p_lin : (k,) array
       linear power spectrum
     dndm : (m,) array
-      halo mass function
+      halo mass function, adjusted for lower m200m in baryon case
     f_comp : (m,) array
       fractional contribution of component to halo mass m200m for an object of
       equivalent mass m at redshift z
