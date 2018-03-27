@@ -50,6 +50,7 @@ def read_croston():
     Z = data[:,4]
 
     # Load in croston data -> n = n_e
+    r = [np.loadtxt(f)[:,0] for idx, f in enumerate(files)] * 10**(-3) #[Mpc]
     rx = [np.loadtxt(f)[:,1] for idx, f in enumerate(files)]
     n = [np.loadtxt(f)[:,2] for idx, f in enumerate(files)]
     n_err = [np.loadtxt(f)[:,3] for idx, f in enumerate(files)]
@@ -462,6 +463,7 @@ def fit_croston():
         # plt.yscale('log')
         # plt.legend()
         # plt.show()
+        print mass / m500g[idx]
 
         # Final fit will need to reproduce the m500gas mass
         a = np.append(a, popt[0])
@@ -1918,6 +1920,48 @@ def plot_beta_presentation():
     ax.set_ylabel(r'$\rho(r) \, [h^2 \, \mathrm{M_\odot/Mpc^3}]$')
 
     plt.savefig('obs_beta.pdf', transparent=True)
+    plt.show()
+
+# ------------------------------------------------------------------------------
+# End of plot_beta_presentation()
+# ------------------------------------------------------------------------------
+
+def plot_beta_rc_paper():
+    """
+    Plot the mass dependence of beta for the paper
+    """
+    with open('croston_500.p', 'rb') as f:
+        data_c = cPickle.load(f)
+    with open('eckert_500.p', 'rb') as f:
+        data_e = cPickle.load(f)
+
+    beta = np.concatenate([data_c['b'], data_e['b']], axis=0) / 3.
+    rc = np.concatenate([data_c['rc'], data_e['rc']], axis=0)
+    m500c = np.concatenate([data_c['m500c'], data_e['m500c']])
+
+    pl.set_style('mark')
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot(111)
+    ax.plot(data_e['m500c'], data_e['b'] / 3., label='Eckert+16')
+    ax.plot(data_c['m500c'], data_c['b'] / 3., label='Croston+08')
+    ax.axhline(y=np.median(beta), color='k')
+    ax.text(1.01 * m500c.min(), 1.01 * np.median(beta), s='median')
+    ax.set_xlabel(r'$m_\mathrm{500c} \,[\mathrm{M_\odot}]$')
+    ax.set_ylabel(r'$\beta$')
+    ax.set_xscale('log')
+    ax.legend()
+    plt.show()
+
+    fig = plt.figure(figsize=(10,8))
+    ax = fig.add_subplot(111)
+    ax.plot(data_e['m500c'], data_e['rc'], label='Eckert+16')
+    ax.plot(data_c['m500c'], data_c['rc'], label='Croston+08')
+    ax.axhline(y=np.median(rc), color='k')
+    ax.text(1.01 * m500c.min(), 1.01 * np.median(rc), s='median')
+    ax.set_xlabel(r'$m_\mathrm{500c} \,[\mathrm{M_\odot}]$')
+    ax.set_ylabel(r'$r_\mathrm{c}/r_\mathrm{500c}$')
+    ax.set_xscale('log')
+    ax.legend()
     plt.show()
 
 
