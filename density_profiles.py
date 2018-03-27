@@ -73,8 +73,9 @@ def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 
 def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     '''
-    Returns the analytic Fourier transform of the NFW profile for m_range along
-    axis 0 and k_range along axis 1 (and optional z_range along axis 2).
+    Returns the analytic normalized Fourier transform of the NFW
+    profile for m_range along axis 0 and k_range along axis 1 (and
+    optional z_range along axis 2).
 
     Parameters
     ----------
@@ -100,6 +101,7 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     or (if z is an array)
     profile_f : (m,k,z) array
       array containing Fourier transform of NFW profile
+
     '''
     m = m_range.shape[0]
     k = k_range.shape[0]
@@ -150,6 +152,8 @@ def profile_uniform(r_range, m_range, r_x, r_y):
     '''
     Return a uniform, spherically symmetric profile between r_x and r_y
 
+    !!! NOTE -> currently only works for float values of m !!!
+
     Parameters
     ----------
     r_range : (m,r) array
@@ -166,21 +170,35 @@ def profile_uniform(r_range, m_range, r_x, r_y):
     profile : (m,r)
       array containing profile
     '''
+    idx_x = np.where(r_range >= r_x)[0][0]
+    idx_y = np.where(r_range >= r_y)[0][0]
+
+    r_x = r_range[idx_x]
+    r_y = r_range[idx_y]
+
+    profile = np.zeros_like(r_range)
+    profile[idx_x:idx_y+1] = 1.
+
+    mass = tools.m_h(profile, r_range)
+    profile = m_range * profile / mass
+
+    return profile
 
 # ------------------------------------------------------------------------------
 # End of profile_uniform()
 # ------------------------------------------------------------------------------
 
-def profile_uniform_f(k_range, m_range, r_x, r_y):
+def profile_uniform_f(k_range, r_x, r_y):
     '''
-    Return the FT of a uniform, spherically symmetric profile between r_x and r_y
+    Return the normalized FT of a uniform, spherically symmetric
+    profile between r_x and r_y
+
+    !!! NOTE -> currently not adjusted for array values of r_x & r_y
 
     Parameters
     ----------
     k_range : (k,) array
       array containing the k_range
-    m_range : (m,) array
-      array containing masses inside the profile
     r_x : (m,) array
       array containing inner radius for each m
     r_x : (m,) array
@@ -190,8 +208,16 @@ def profile_uniform_f(k_range, m_range, r_x, r_y):
     -------
     profile_f : (k,)
       array containing profile_f
+
     '''
-    
+    kx = k_range * r_x
+    ky = k_range * r_y
+
+    prefactor = 3. / (ky**3 - kx**3)
+    profile_f = (np.sin(ky) - np.sin(kx) + kx * np.cos(kx) - ky * np.cos(ky))
+    profile_f = prefactor * profile_f
+
+    return profile_f
 
 # ------------------------------------------------------------------------------
 # End of profile_uniform_f()

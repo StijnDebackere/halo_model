@@ -52,7 +52,7 @@ class Profile(Cache):
     rho_r : (m,r) array
       density profile
     rho_k : (m,k) array
-      Fourier transform of density profile
+      normalized Fourier transform of density profile
     F_n : (m,n+1) array
       array containing Taylor coefficients of Fourier transform
     rho_k_T : (m,k) array
@@ -159,13 +159,15 @@ class Profile(Cache):
                      'taylor_err', 'profile_f', 'profile_f_args', 'rho_k_T')
     def rho_k(self):
         '''
-        Computes the Fourier profile either by calling the function with its args,
-        by just returning the given array, or by computing the transform.
+        Computes the normalized Fourier profile either by calling the
+        function with its args, by just returning the given array, or
+        by computing the transform.
 
         Returns
         -------
         dens_profile_f : (m,k) array
           Fourier transform of rho_r
+
         '''
         if hasattr(self.profile_f,'__call__'):
             dens_profile_f = self.profile_f(self.k_range,
