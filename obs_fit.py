@@ -37,7 +37,8 @@ def load_dm_dmo(prms=p.prms):
     r200c = prms.r200c
 
     f_dm = np.ones_like(m200m)
-    c200m = prms.c_correa
+    # c200m = prms.c_correa
+    c200m = b.dm_c_dmo(m200m * prms.h)
     r200m = prms.r200m
 
     # general profile kwargs to be used for all components
@@ -153,7 +154,8 @@ def load_dm_dmo_5r500c(prms=p.prms):
 
 
     f_dm = np.ones_like(m200m)
-    c200m = prms.c_correa
+    # c200m = prms.c_correa
+    c200m = b.dm_c_dmo(m200m * prms.h)
 
     # relative position of virial radius
     x200m = r200m / r500c
@@ -893,7 +895,7 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     '''
     Plot the density for our different gas profiles in one plot
     '''
-    fig = plt.figure(figsize=(18,8))
+    fig = plt.figure(figsize=(30,8))
     ax1 = fig.add_axes([0.1,0.1,0.266,0.8])
     ax2 = fig.add_axes([0.366,0.1,0.266,0.8])
     ax3 = fig.add_axes([0.632,0.1,0.266,0.8])
@@ -904,7 +906,7 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     r200m = prms.r200m
     norm = prms.rho_crit
 
-    # pl.set_style('line')
+    pl.set_style('line')
 
     # Plot idx_1
     # ax1.plot(comp_gas_dmo.r_range[idx_1] / r200m[idx_1],
@@ -912,22 +914,22 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
     ax1.plot(comp_gas.r_range[idx_1] / r200m[idx_1],
              comp_gas.rho_r[idx_1] * comp_gas.f_comp[idx_1]/norm,
-             lw=3, label=r'observations')
+             lw=3, label=r'model 1')
     ax1.plot(comp_gas_r500c_r200m.r_range[idx_1] / r200m[idx_1],
              (comp_gas_r500c_r200m.rho_r[idx_1] *
               comp_gas_r500c_r200m.f_comp[idx_1] / norm),
-             lw=2, label=r'flat $r_\mathrm{500c}-r_\mathrm{200m}$')
+             lw=2, label=r'model 2')
     ax1.plot(comp_gas_r500c_5r500c.r_range[idx_1] / r200m[idx_1],
              (comp_gas_r500c_5r500c.rho_r[idx_1] *
               comp_gas_r500c_5r500c.f_comp[idx_1] / norm), lw=1,
-             label=r'flat $r_\mathrm{500c}-5r_\mathrm{500c}$')
+             label=r'model 3')
     ax1.plot(comp_gas_r200m_5r500c.r_range[idx_1] / r200m[idx_1],
              (comp_gas_r200m_5r500c.rho_r[idx_1] *
               comp_gas_r200m_5r500c.f_comp[idx_1] / norm),
-             lw=1, ls='--', label=r'flat $r_\mathrm{200m}-5r_\mathrm{500c}$')
+             lw=1, ls='--', label=r'model 4')
 
     ax1.axvline(x=prms.r500c[idx_1] / prms.r200m[idx_1], ls='--', c='k')
-    ax1.text(x=prms.r500c[idx_1] / prms.r200m[idx_1] * 2, y=1e2, s=r'$r_\mathrm{500c}$',
+    ax1.text(x=prms.r500c[idx_1] / prms.r200m[idx_1] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
              ha='center', va='center')
 
     # Plot idx_2
@@ -936,22 +938,22 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
     ax2.plot(comp_gas.r_range[idx_2] / r200m[idx_2],
              comp_gas.rho_r[idx_2] * comp_gas.f_comp[idx_2]/norm,
-             lw=3, label=r'observations')
+             lw=3, label=r'model 1')
     ax2.plot(comp_gas_r500c_r200m.r_range[idx_2] / r200m[idx_2],
              (comp_gas_r500c_r200m.rho_r[idx_2] *
               comp_gas_r500c_r200m.f_comp[idx_2] / norm),
-             lw=2, label=r'flat $r_\mathrm{500c}-r_\mathrm{200m}$')
+             lw=2, label=r'model 2')
     ax2.plot(comp_gas_r500c_5r500c.r_range[idx_2] / r200m[idx_2],
              (comp_gas_r500c_5r500c.rho_r[idx_2] *
               comp_gas_r500c_5r500c.f_comp[idx_2] / norm), lw=1,
-             label=r'flat $r_\mathrm{500c}-5r_\mathrm{500c}$')
+             label=r'model 3')
     ax2.plot(comp_gas_r200m_5r500c.r_range[idx_2] / r200m[idx_2],
              (comp_gas_r200m_5r500c.rho_r[idx_2] *
               comp_gas_r200m_5r500c.f_comp[idx_2] / norm),
-             lw=1, ls='--', label=r'flat $r_\mathrm{200m}-5r_\mathrm{500c}$')
+             lw=1, ls='--', label=r'model 4')
 
     ax2.axvline(x=prms.r500c[idx_2] / prms.r200m[idx_2], ls='--', c='k')
-    ax2.text(x=prms.r500c[idx_2] / prms.r200m[idx_2] * 2, y=1e2, s=r'$r_\mathrm{500c}$',
+    ax2.text(x=prms.r500c[idx_2] / prms.r200m[idx_2] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
              ha='center', va='center')
 
     # Plot idx_3
@@ -960,22 +962,22 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
     ax3.plot(comp_gas.r_range[idx_3] / r200m[idx_3],
              comp_gas.rho_r[idx_3] * comp_gas.f_comp[idx_3]/norm,
-             lw=3, label=r'observations')
+             lw=3, label=r'model 1')
     ax3.plot(comp_gas_r500c_r200m.r_range[idx_3] / r200m[idx_3],
              (comp_gas_r500c_r200m.rho_r[idx_3] *
               comp_gas_r500c_r200m.f_comp[idx_3] / norm),
-             lw=2, label=r'flat $r_\mathrm{500c}-r_\mathrm{200m}$')
+             lw=2, label=r'model 2')
     ax3.plot(comp_gas_r500c_5r500c.r_range[idx_3] / r200m[idx_3],
              (comp_gas_r500c_5r500c.rho_r[idx_3] *
               comp_gas_r500c_5r500c.f_comp[idx_3] / norm), lw=1,
-             label=r'flat $r_\mathrm{500c}-5r_\mathrm{500c}$')
+             label=r'model 3')
     ax3.plot(comp_gas_r200m_5r500c.r_range[idx_3] / r200m[idx_3],
              (comp_gas_r200m_5r500c.rho_r[idx_3] *
               comp_gas_r200m_5r500c.f_comp[idx_3] / norm),
-             lw=1, ls='--', label=r'flat $r_\mathrm{200m}-5r_\mathrm{500c}$')
+             lw=1, ls='--', label=r'model 4')
 
     ax3.axvline(x=prms.r500c[idx_3] / prms.r200m[idx_3], ls='--', c='k')
-    ax3.text(x=prms.r500c[idx_3] / prms.r200m[idx_3] * 2, y=1e2, s=r'$r_\mathrm{500c}$',
+    ax3.text(x=prms.r500c[idx_3] / prms.r200m[idx_3] * 3, y=1e2, s=r'$r_\mathrm{500c}$',
              ha='center', va='center')
 
     ax1.set_xlim(1e-3, 3)
@@ -996,7 +998,7 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     ax2.tick_params(axis='x', which='major', pad=6)
     ax3.tick_params(axis='x', which='major', pad=6)
 
-    ax2.set_xlabel(r'$r/r_\mathrm{200m}$', labelpad=-2)
+    ax2.set_xlabel(r'$r/r_\mathrm{200m}$', labelpad=-10)
     ax1.set_ylabel(r'$\rho(r)/\rho_\mathrm{c}$')
     ax2.set_yticklabels([])
     ax3.set_yticklabels([])
@@ -1009,7 +1011,7 @@ def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
     ax2.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_2]), y=1.015, fontsize=28)
     ax3.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_3]), y=1.015, fontsize=28)
 
-    ax3.legend(loc='best')
+    ax3.legend(loc='best', fontsize=28)
     plt.savefig('obs_rho_extrapolated.pdf', transparent=True)
 
 # ------------------------------------------------------------------------------
@@ -1026,9 +1028,9 @@ def plot_fgas200m_paper(comp_gas, comp_gas_r500c_5r500c, prms=p.prms):
     f_b = 1 - prms.f_dm
 
     pl.set_style('line')
-    ax.plot(comp_gas.m200m, comp_gas.f_comp, label='observations')
+    ax.plot(comp_gas.m200m, comp_gas.f_comp, label='model 1')
     ax.plot(comp_gas_r500c_5r500c.m200m, comp_gas_r500c_5r500c.f_comp,
-            label='flat $r_\mathrm{500c}-5r_\mathrm{500c}$')
+            label='model 3')
     ax.axhline(y=f_b, c='k', ls='--')
 
     ax.tick_params(axis='x', which='major', pad=6)

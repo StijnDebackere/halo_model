@@ -331,7 +331,7 @@ def compare_individual_binned():
     pl.set_style('mark')
     plt.plot(m, m_med_i/m, label=r'Individual')
     plt.plot(m, m_med/m, label=r'Binned')
-    plt.plot(m, f_gas, label=r'Observations')
+    plt.plot(m, f_gas, label=r'model 1')
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel(r'$M_{500} \, [M_\odot]$')

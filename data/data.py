@@ -468,8 +468,8 @@ def fit_croston():
         b = np.append(b, popt[1])
         m_sl = np.append(m_sl, m500gas)
         # c = np.append(c, popt[2])
-        aerr = np.append(aerr, np.sqrt(np.diag(pcov)))[0]
-        berr = np.append(berr, np.sqrt(np.diag(pcov)))[1]
+        aerr = np.append(aerr, np.sqrt(np.diag(pcov))[0])
+        berr = np.append(berr, np.sqrt(np.diag(pcov))[1])
         # cerr = np.append(cerr, np.sqrt(np.diag(pcov)))[2]
 
     return a, aerr, b, berr, m_sl, m500g, r500 # c, cerr, m500g
@@ -1254,7 +1254,7 @@ def plot_profiles_paper(prms=prms):
 # End of plot_profiles()
 # ------------------------------------------------------------------------------
 
-def plot_gas_fractions(prms):
+def plot_gas_fractions_paper(prms):
     pl.set_style()
     fig = plt.figure(figsize=(10,9))
     ax = fig.add_subplot(111)
@@ -1357,7 +1357,7 @@ def plot_gas_fractions(prms):
     plt.show()
 
 # ------------------------------------------------------------------------------
-# End of plot_gas_fractions()
+# End of plot_gas_fractions_paper()
 # ------------------------------------------------------------------------------
 
 def plot_fit_profiles_paper():
@@ -1709,11 +1709,17 @@ def plot_fit_prms_paper(prms=prms):
 
     rc_e = data_e['rc']
     rc_c = data_c['rc']
+    rc_e_err = data_e['rcerr']
+    rc_c_err = data_c['rcerr']
     rc = np.append(rc_e, rc_c)
+    rc_err = np.append(rc_e_err, rc_c_err)
 
     b_e = data_e['b'] / 3. # equal to literature standard
     b_c = data_c['b'] / 3.
+    b_e_err = data_e['berr'] / 3. # equal to literature standard
+    b_c_err = data_c['berr'] / 3.
     beta = np.append(b_e, b_c)
+    beta_err = np.append(b_e_err, b_c_err)
 
     m500c_e = data_e['m500c']
     m500c_c = data_c['m500c']
@@ -1721,7 +1727,7 @@ def plot_fit_prms_paper(prms=prms):
     m200m = np.array([tools.m500c_to_m200m(m500c.min(), prms.rho_crit, prms.rho_m),
                       tools.m500c_to_m200m(m500c.max(), prms.rho_crit, prms.rho_m)])
 
-    pl.set_style('mark')
+    pl.set_style('line')
 
     fig = plt.figure(figsize=(10,9))
     ax = fig.add_subplot(111)
@@ -1736,8 +1742,10 @@ def plot_fit_prms_paper(prms=prms):
 
     axs.tick_params(axis='x', pad=5)
 
-    ax.plot(m500c_e, rc_e, label='Eckert+16')
-    ax.plot(m500c_c, rc_c, label='Croston+08')
+    ax.errorbar(m500c_c, rc_c, yerr=rc_c_err, lw=0, elinewidth=1, marker='s',
+                label='Croston+08')
+    ax.errorbar(m500c_e, rc_e, yerr=rc_e_err, lw=0, elinewidth=1, marker='o',
+                label='Eckert+16')
     ax.axhline(y=np.median(rc), ls='-', c='k')
     ax.axhspan(np.percentile(rc, 15), np.percentile(rc, 85),
                facecolor='k', alpha=0.3)
@@ -1751,7 +1759,7 @@ def plot_fit_prms_paper(prms=prms):
     ax.set_xscale('log')
     axs.set_xscale('log')
 
-    ax.set_xlabel(r'$m_{\mathrm{500c}}\, [\mathrm{M_\odot}/h]$')
+    ax.set_xlabel(r'$m_{\mathrm{500c}}\, [\mathrm{M_\odot}/h]$', labelpad=-5)
     axs.set_xlabel(r'$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$', labelpad=10)
     ax.set_ylabel('$r_\mathrm{c}/r_{\mathrm{500c}}$')
     ax.legend(loc='best')
@@ -1771,8 +1779,10 @@ def plot_fit_prms_paper(prms=prms):
 
     axs.tick_params(axis='x', pad=5)
 
-    ax.plot(m500c_e, b_e, label='Eckert+16')
-    ax.plot(m500c_c, b_c, label='Croston+08')
+    ax.errorbar(m500c_c, b_c, yerr=b_c_err, lw=0, elinewidth=1, marker='s',
+                label='Croston+08')
+    ax.errorbar(m500c_e, b_e, yerr=b_e_err, lw=0, elinewidth=1, marker='o',
+                label='Eckert+16')
     ax.axhline(y=np.median(beta), ls='-', c='k')
     ax.axhspan(np.percentile(beta, 15), np.percentile(beta, 85),
                facecolor='k', alpha=0.3)
@@ -1786,14 +1796,14 @@ def plot_fit_prms_paper(prms=prms):
     ax.set_xscale('log')
     axs.set_xscale('log')
 
-    ax.set_xlabel('$m_{\mathrm{500c}}\, [\mathrm{M_\odot}/h]$')
+    ax.set_xlabel('$m_{\mathrm{500c}}\, [\mathrm{M_\odot}/h]$', labelpad=-5)
     axs.set_xlabel(r'$m_{\mathrm{200m}}\, [\mathrm{M_\odot}/h]$', labelpad=10)
     ax.set_ylabel(r'$\beta$')
     ax.legend(loc='best')
     plt.savefig('obs_beta_fit.pdf', transparent=True)
 
 # ------------------------------------------------------------------------------
-# End of plot_fit_prms_presentation()
+# End of plot_fit_prms_paper()
 # ------------------------------------------------------------------------------
 
 def plot_correlation_presentation():
@@ -1957,8 +1967,8 @@ def plot_masses_hist_paper():
 
     m500cc = gas.mgas_to_m500c(m500g_c)
     m500ce = gas.mgas_to_m500c(m500g_e)
-    m200mc = np.array([tools.m500c_to_m200m(m) for m in m500cc])
-    m200me = np.array([tools.m500c_to_m200m(m) for m in m500ce])
+    m200mc = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m) for m in m500cc])
+    m200me = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m) for m in m500ce])
 
     mn = np.min(np.hstack([m200mc, m200me]))
     mx = np.max(np.hstack([m200mc, m200me]))
@@ -1976,4 +1986,5 @@ def plot_masses_hist_paper():
     ax.set_xscale('log')
     ax.legend(loc='best')
 
+    plt.savefig('obs_masses_hist_stacked.pdf', transparent=True)
     plt.show()
