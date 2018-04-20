@@ -211,7 +211,7 @@ class Parameters(Cache):
 
     @cached_property('m200m', 'rho_crit', 'rho_m')
     def m200c(self):
-        return np.array([tools.m200m_to_m200c(m, self.rho_crit, self.rho_m)
+        return np.array([tools.m200m_to_m200c(m, self.rho_crit, self.rho_m, prms.h)
                          for m in self.m200m])
 
     @cached_property('m200c', 'rho_crit')
@@ -220,7 +220,7 @@ class Parameters(Cache):
 
     @cached_property('m200m', 'rho_crit', 'rho_m', 'm200c')
     def m500c(self):
-        return np.array([tools.m200m_to_m500c(mm, self.rho_crit, self.rho_m, mc)
+        return np.array([tools.m200m_to_m500c(mm, self.rho_crit, self.rho_m, prms.h, mc)
                          for mm, mc in zip(self.m200m, self.m200c)])
 
     @cached_property('m500c', 'rho_crit')
@@ -232,7 +232,7 @@ class Parameters(Cache):
         '''
         The density profiles always assume cosmology dependent variables
         '''
-        return (np.array([tools.c_correa(m/self.h)
+        return (np.array([tools.c_correa(m, h=self.h)
                          for m in self.m200c]).reshape(-1)
                 * self.r200m / self.r200c)
 

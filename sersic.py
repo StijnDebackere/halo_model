@@ -77,6 +77,7 @@ import multiprocessing as multi
 import scipy.integrate, scipy.optimize
 import mpmath
 import numpy as np
+from functools import reduce
 
 # Maximum multiple of effective radius to which to carry integrals.
 # In principle should be able to set this to inf, but that causes the
@@ -115,7 +116,7 @@ def all_rationals(qmax, rmin=None, rmax=None, sort=False):
     # flatten result into a single list
     result = reduce(operator.add, result)
     # Sort if requested
-    if sort: result = sorted(result, key=lambda (pp,qq): pp/(1.0*qq))
+    if sort: result = sorted(result, key=lambda pp_qq: pp_qq[0]/(1.0*pp_qq[1]))
     return result
 
 ##############################
@@ -247,7 +248,7 @@ def bg_lum_hi(pp, qq):
 
     # a and b vectors are specified: [[num1, num2, num3],[denom1,denom2,denom3]]
     avect = [[], []]
-    nums = range(1,2*pp/qq)
+    nums = list(range(1,2*pp/qq))
     bvect = [[xx/(2.0*mm) for xx in nums] + [0.5], []]
     reff = 1.0
 

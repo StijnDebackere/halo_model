@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator, ScalarFormatter
 
 import sys
-import cPickle
+import pickle
 from copy import deepcopy
 
 # allow import of plot
@@ -37,8 +37,8 @@ def load_dm_dmo(prms=p.prms):
     r200c = prms.r200c
 
     f_dm = np.ones_like(m200m)
-    # c200m = prms.c_correa
-    c200m = b.dm_c_dmo(m200m * prms.h)
+    c200m = prms.c_correa
+    # c200m = b.dm_c_dmo(m200m * prms.h)
     r200m = prms.r200m
 
     # general profile kwargs to be used for all components
@@ -154,8 +154,8 @@ def load_dm_dmo_5r500c(prms=p.prms):
 
 
     f_dm = np.ones_like(m200m)
-    # c200m = prms.c_correa
-    c200m = b.dm_c_dmo(m200m * prms.h)
+    c200m = prms.c_correa
+    # c200m = b.dm_c_dmo(m200m * prms.h)
 
     # relative position of virial radius
     x200m = r200m / r500c
@@ -467,6 +467,9 @@ def load_gas_smooth_r500c_r200m(prms, fgas_200):
     r500c = prms.r500c
     r200m = prms.r200m
 
+    # will need to fill exact r500c values in r_range for uniform profile to match
+    r500_in_range = np.zeros_like(m200m)
+
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
 
@@ -476,11 +479,16 @@ def load_gas_smooth_r500c_r200m(prms, fgas_200):
     x200m = r200m / r500c
 
     prof_gas = np.zeros_like(rx)
+    prof_gas_f = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
         sl = (rx[idx] >= 1.)
+        r500_in_range[idx] = r_range[idx][sl.nonzero()[0][0]]
         prof_gas[idx][sl] = 1.
         mass = tools.m_h(prof_gas[idx], r_range[idx])
         prof_gas[idx] *= (f_b - fgas_200[idx]) * m200m[idx] / mass
+        prof_gas_f[idx] = profs.profile_uniform_f(prms.k_range_lin,
+                                                  r500_in_range[idx],
+                                                  r200m[idx])
 
     mgas = tools.m_h(prof_gas, r_range)
     f_gas = mgas / (m200m)
@@ -490,9 +498,11 @@ def load_gas_smooth_r500c_r200m(prms, fgas_200):
                       'k_range': prms.k_range_lin,
                       'n': 80,
                       'taylor_err': 1.e-50}
+
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
+                 'profile_f': prof_gas_f}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
@@ -645,6 +655,9 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms, q_f=50, q_rc=50, q_beta=50,
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
+    # # will need to fill exact r500c values in r_range for uniform profile to match
+    # r500_in_range = np.zeros_like(m200m)
+
     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
     # gas fractions
     f_prms = d.f_gas_prms(prms, q=q_f)
@@ -655,6 +668,7 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms, q_f=50, q_rc=50, q_beta=50,
     x200m = r200m / r500c
 
     prof_gas = np.zeros_like(rx)
+    # prof_gas_f = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
         # radial range between r500c and r200m
         sl_500_200 = ((rx[idx] >= 1.) & (rx[idx] <= x200m[idx]))
@@ -662,6 +676,9 @@ def load_gas_r500c_r200m_5r500c(prms=p.prms, q_f=50, q_rc=50, q_beta=50,
         sl_gt500 = (rx[idx] >= 1.)
         # radial range up to r500c
         sl_500 = (rx[idx] <= 1.)
+
+        # # fill exact value
+        # r500_in_range[idx] = r_range[idx][sl_gt500.nonzero()[0][0]]
 
         # use beta profile up to r500c
         prof_gas[idx][sl_500] = prof_gas_hot(rx[idx], sl_500, rc, beta,
@@ -766,11 +783,14 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
     x200m = r200m / r500c
 
     prof_gas = np.zeros_like(rx)
+    prof_gas_f = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
         sl = (rx[idx] >= x200m[idx])
         prof_gas[idx][sl] = 1.
         mass = tools.m_h(prof_gas[idx], r_range[idx])
         prof_gas[idx] *= (f_b - fgas_200[idx]) * m200m[idx] / mass
+        prof_gas_f[idx] = profs.profile_uniform_f(prms.k_range_lin,
+                                                  r200m[idx], r_max[idx])
 
     mgas = tools.m_h(prof_gas, r_range)
     f_gas = mgas / (m200m)
@@ -795,7 +815,8 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):
                       'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
     # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
+    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1),
+                 'profile_f': prof_gas_f}
     prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component

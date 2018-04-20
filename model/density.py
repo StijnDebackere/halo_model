@@ -1,7 +1,7 @@
 '''
 TO-DO -> add z_range support to profile as new axis
 '''
-from __future__ import print_function
+
 import multiprocessing
 
 import numpy as np

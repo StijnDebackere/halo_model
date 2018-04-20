@@ -31,14 +31,14 @@ def tabelize(filename, l, n):
     k *= 2*np.pi / l
     if 'DMONLY' in filename:
         P_true = V * (P_rough - W/n**3)
-        print 'N : %i'%n
+        print('N : %i'%n)
 
     else:
         # double the number of particles
         P_true = V * (P_rough - W/(2*n**3))
-        print 'N : %i'%n
+        print('N : %i'%n)
 
-    print 'V : %.1f^3'%l
+    print('V : %.1f^3'%l)
     file_split = filename.split('/')
     file_path = '/'.join(file_split[:-1]) + '/tables/'
     file_name = file_split[-1]
@@ -47,7 +47,7 @@ def tabelize(filename, l, n):
     if not os.path.exists(file_path):
         os.makedirs(file_path)
     data = np.column_stack([k, P_true, 1./(2*np.pi**2) * k**3 * P_true])
-    print 'Saving to %s'%new_filename
+    print('Saving to %s'%new_filename)
     np.savetxt(new_filename, data,
                header = 'k [h/Mpc] P [(Mpc/h)^3] Delta')
 

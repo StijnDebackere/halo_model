@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 
 import sys
-import cPickle
+import pickle
 from copy import deepcopy
 
 # allow import of plot

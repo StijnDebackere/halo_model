@@ -8,7 +8,7 @@ import sys
 import astropy.io.fits as fits
 import glob
 import re
-import cPickle
+import pickle
 
 import matplotlib.pyplot as plt
 # allow import of plot
@@ -174,14 +174,14 @@ def compare_method_eckert():
     m500_f_eckert = tools.m_delta(r500_f_eckert, 500, p.prms.rho_crit * 0.7**2)
     m500_eckert = tools.m_delta(r500_eckert, 500, p.prms.rho_crit * 0.7**2)
 
-    print 'm500 from f_gas : ', m500_f_eckert
-    print 'ratio wrt mwl   : ', m500_f_eckert / mwl
-    print 'f_gas determined: ', mgas_f / m500_f_eckert
-    print 'f_gas actual    : ', mgas_f / mwl
-    print 'm500 from T_gas : ', m500_eckert
-    print 'ratio wrt mwl   : ', m500_eckert / mwl
-    print 'f_gas determined: ', mgas / m500_eckert
-    print 'f_gas actual    : ', mgas / mwl
+    print('m500 from f_gas : ', m500_f_eckert)
+    print('ratio wrt mwl   : ', m500_f_eckert / mwl)
+    print('f_gas determined: ', mgas_f / m500_f_eckert)
+    print('f_gas actual    : ', mgas_f / mwl)
+    print('m500 from T_gas : ', m500_eckert)
+    print('ratio wrt mwl   : ', m500_eckert / mwl)
+    print('f_gas determined: ', mgas / m500_eckert)
+    print('f_gas actual    : ', mgas / mwl)
 
 # ------------------------------------------------------------------------------
 # End of compare_eckert()
@@ -212,7 +212,7 @@ def rhogas_eckert():
     T_bins = np.array([0.6, 2, 3, 4, 5])
     # halo mass bin edges! What are min and max mass?
     mwl_bins = T2Mwl(T_bins)
-    print mwl_bins
+    print(mwl_bins)
     mgas_bins = T2Mgas(T_bins)
 
     # change to ``cosmological'' coordinates
@@ -505,9 +505,9 @@ def fit_sun_profile():
     r200m = tools.mass_to_radius(m200m, 200 * p.prms.rho_m * 0.7**2)
     r500c = tools.mass_to_radius(M, 500 * p.prms.rho_crit * 0.7**2)
 
-    print 'r200m: ', r200m
-    print 'r500c: ', r500c
-    print 'ratio: ', r500c/r200m
+    print('r200m: ', r200m)
+    print('r500c: ', r500c)
+    print('ratio: ', r500c/r200m)
 
     r_range = np.logspace(-4, np.log10(r200m / r500c), 100)
     u_beta = profs.profile_b(r_range, 1, 1, **fit_beta[0])
@@ -527,8 +527,8 @@ def fit_sun_profile():
     mg500 = tools.m_h(prof_beta[:idx_500 + 1], r_range[:idx_500 + 1]) * r500c**3
     mg200 = tools.m_h(prof_beta, r_range) * r500c**3
 
-    print 'fgas_500: ', mg500 / M
-    print 'fgas_200: ', mg200 / m200m
+    print('fgas_500: ', mg500 / M)
+    print('fgas_200: ', mg200 / m200m)
 
     # pl.set_style()
     # fig = plt.figure()
@@ -582,9 +582,9 @@ def fit_croston_profile():
     m200m = tools.radius_to_mass(r200m, 200 * p.prms.rho_m * 0.7**2)
     r500c = tools.mass_to_radius(M, 500 * p.prms.rho_crit * 0.7**2)
 
-    print 'r200m: ', r200m
-    print 'r500c: ', r500c
-    print 'ratio: ', r500c/r200m
+    print('r200m: ', r200m)
+    print('r500c: ', r500c)
+    print('ratio: ', r500c/r200m)
 
     r_range = np.logspace(-4, np.log10(r200m / r500c), 100)
     u_beta = profs.profile_b(r_range, 1, 1, **fit_beta[0])
@@ -604,8 +604,8 @@ def fit_croston_profile():
     mg500 = tools.m_h(prof_beta[:idx_500 + 1], r_range[:idx_500 + 1]) * r500c**3
     mg200 = tools.m_h(prof_beta, r_range) * r500c**3
 
-    print 'fgas_500: ', mg500 / M
-    print 'fgas_200: ', mg200 / m200m
+    print('fgas_500: ', mg500 / M)
+    print('fgas_200: ', mg200 / m200m)
 
     # pl.set_style()
     # fig = plt.figure()

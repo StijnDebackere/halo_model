@@ -181,7 +181,7 @@ class Power(Cache):
         Compute all cross-correlation terms between different components.
         '''
         cross = {}
-        keys = self.comps.keys()
+        keys = list(self.comps.keys())
         for idx, key_1 in enumerate(keys):
             comp_1 = self.comps[key_1]
 
@@ -198,9 +198,9 @@ class Power(Cache):
         '''
         Compute dimensionless power spectrum
         '''
-        k_range = self.comps[self.comps.keys()[0]].k_range
+        k_range = self.comps[list(self.comps.keys())[0]].k_range
         cross_d = {}
-        for key, item in self.cross_p.iteritems():
+        for key, item in self.cross_p.items():
             cross_d[key] = 1./(2*np.pi**2) * k_range**3 * item
 
         return cross_d
@@ -210,7 +210,7 @@ class Power(Cache):
         '''
         Return linear delta
         '''
-        k_range = self.comps.values()[0].k_range
+        k_range = list(self.comps.values())[0].k_range
 
         return 0.5 / np.pi**2 * k_range**3 * self.p_lin
 
@@ -222,13 +222,13 @@ class Power(Cache):
         rho = p.prms.rho_m
         p_1h = 0
 
-        for key, comp in self.comps.iteritems():
+        for key, comp in self.comps.items():
             k_range = comp.k_range
 
             p_1h += comp.p_1h
 
         cross_1h = {}
-        keys = self.comps.keys()
+        keys = list(self.comps.keys())
         for idx, key_1 in enumerate(keys):
             comp_1 = self.comps[key_1]
 
@@ -237,7 +237,7 @@ class Power(Cache):
                 cross_name = '{:s}-{:s}'.format(comp_1.name, comp_2.name)
                 cross_1h[cross_name] = Power._cross_power_1h(comp_1, comp_2)
 
-        for key, cross_comp in cross_1h.iteritems():
+        for key, cross_comp in cross_1h.items():
             p_1h += 2 * cross_comp
 
         return p_1h
@@ -247,7 +247,7 @@ class Power(Cache):
         '''
         Return 1h dimensionless power
         '''
-        k_range = self.comps.values()[0].k_range
+        k_range = list(self.comps.values())[0].k_range
 
         return 0.5 / np.pi**2 * k_range**3 * self.p_1h
 
@@ -259,12 +259,12 @@ class Power(Cache):
         '''
         rho = p.prms.rho_m
         p_tot = self.p_lin
-        for key, comp in self.comps.iteritems():
+        for key, comp in self.comps.items():
             k_range = comp.k_range
 
             p_tot += comp.p_1h
 
-        for key, cross_comp in self.cross_p.iteritems():
+        for key, cross_comp in self.cross_p.items():
             c1, c2 = key.split('-')
 
             k_range = self.comps[c1].k_range
@@ -280,11 +280,11 @@ class Power(Cache):
         Return total dimensionless power including correlations
         '''
         d_tot = 0.
-        for key, comp in self.comps.iteritems():
+        for key, comp in self.comps.items():
             k_range = comp.k_range
             d_tot += comp.delta_1h
 
-        for key, cross_comp in self.cross_delta.iteritems():
+        for key, cross_comp in self.cross_delta.items():
             c1, c2 = key.split('-')
 
             d_cross = 2 * cross_comp

@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.integrate
 import scipy.optimize as opt
-import commah
+from . import commah
 
 import pdb
 
@@ -141,7 +141,7 @@ def median_slices(data, medians, bins):
 # # End of running_mean()
 # # ------------------------------------------------------------------------------
 
-def c_correa(m_range, z_range=0, cosmology='WMAP9'):
+def c_correa(m_range, z_range=0, h=0.7, cosmology='WMAP9'):
     '''
     Returns the mass-concentration relation from Correa et al (2015c)
     through the commah code.
@@ -157,11 +157,11 @@ def c_correa(m_range, z_range=0, cosmology='WMAP9'):
 
     Returns
     -------
-    c : (m,z) array
+    c : (z,m) array
       array containing concentration for each (m,z)
     '''
-    # (m,z) array
-    c = commah.run(cosmology=cosmology, Mi=m_range, z=z_range, mah=False)['c']
+    # (z,m) array
+    c = commah.run(cosmology=cosmology, Mi=m_range/h, z=z_range, mah=False)['c'].T
     return c
 
 # ------------------------------------------------------------------------------
@@ -298,6 +298,43 @@ def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
 # End of m_h()
 # ------------------------------------------------------------------------------
 
+def m_NFW(r, c_x, r_x, rho_mean, Delta=200):
+    '''
+    Calculate the mass of the NFW profile with c_x and r_x, relative to
+    Delta rho_meanup to r
+
+    Parameters
+    ----------
+    r : array
+      radii to compute mass for
+    c_x : float
+      concentration of halo
+    r_x : float
+      array containing r_x to evaluate r_s from r_s = r_x/c_x
+    rho_mean : float
+      mean dark matter density
+    Delta : float (default=200.)
+      critical overdensity for collapse
+
+    Returns
+    -------
+    m_h : float
+      mass
+    '''
+    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    r_s = r_x / c_x
+
+    prefactor = 4 * np.pi * rho_s * r_s**3
+    c_factor  = np.log((r_s + r) / r_s) - r / (r + r_s)
+
+    mass = prefactor * c_factor
+
+    return mass
+
+# ------------------------------------------------------------------------------
+# End of m_NFW()
+# ------------------------------------------------------------------------------
+
 def mass_to_radius(m, mean_dens):
     '''
     Calculate radius of a region of space from its mass.
@@ -357,19 +394,18 @@ def massdiff_2m5c(m200m, m500c, rhoc, rhom):
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
     '''
+    # compute radii
     r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
-    r_range = np.logspace(-4, np.log10(r500c), 1000)
-
     r200m = mass_to_radius(m200m, 200 * rhom)
-    m200c = m200m_to_m200c(m200m, rhoc, rhom)
-    dens = profile_NFW(r_range, np.array([m200m]),
-                       c_correa(m200c, 0).reshape(-1),
-                       np.array([r200m]),
-                       rhom,
-                       Delta=200)
-    mass_int = m_h(dens, r_range)
 
-    return mass_int - m500c
+    # compute concentration
+    m200c = m200m_to_m200c(m200m, rhoc, rhom)
+    c200c = c_correa(m200c, 0, h).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r500c, c200c * r200m / r200c, r200m, rhom, Delta=200.)
+
+    return mass - m500c
 
 def m500c_to_m200m(m500c, rhoc, rhom):
     '''
@@ -394,25 +430,25 @@ def m500c_to_m200m(m500c, rhoc, rhom):
 # End of m500c_to_m200m()
 # ------------------------------------------------------------------------------
 
-def massdiff_5c2m(m500c, m200m, m200c, rhoc, rhom):
+def massdiff_5c2m(m500c, m200m, m200c, rhoc, rhom, h):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
     '''
+    # compute radii
     r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
-    r_range = np.logspace(-4, np.log10(r500c), 1000)
-
     r200m = mass_to_radius(m200m, 200 * rhom)
-    dens = profile_NFW(r_range, np.array([m200m]),
-                       c_correa(m200c, 0).reshape(-1),
-                       np.array([r200m]),
-                       rhom,
-                       Delta=200)
-    mass_int = m_h(dens, r_range)
+    r200c = mass_to_radius(m200c, 200 * rhoc)
 
-    return mass_int - m500c
+    # compute concentration
+    c200c = c_correa(m200c, 0, h).reshape(-1)
 
-def m200m_to_m500c(m200m, rhoc, rhom, m200c=None):
+    # now get analytic mass
+    mass = m_NFW(r500c, c200c * r200m / r200c, r200m, rhom, Delta=200)
+
+    return mass - m500c
+
+def m200m_to_m500c(m200m, rhoc, rhom, h, m200c=None):
     '''
     Give m500c for the an m200m virial mass halo
 
@@ -431,7 +467,7 @@ def m200m_to_m500c(m200m, rhoc, rhom, m200c=None):
         m200c = m200m_to_m200c(m200m, rhoc, rhom)
 
     m500c = opt.brentq(massdiff_5c2m, m200m/10., m200m,
-                       args=(m200m, m200c, rhoc, rhom))
+                       args=(m200m, m200c, rhoc, rhom, h))
 
     return m500c
 
@@ -439,25 +475,24 @@ def m200m_to_m500c(m200m, rhoc, rhom, m200c=None):
 # End of m200m_to_m500c()
 # ------------------------------------------------------------------------------
 
-def massdiff_2m2c(m200m, m200c, rhoc, rhom):
+def massdiff_2m2c(m200m, m200c, rhoc, rhom, h):
     '''
     Integrate an NFW halo with m200m up to r200c and return the mass difference
     between the integral and m200c
     '''
+    # compute radii
     r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
-    r_range = np.logspace(-4, np.log10(r200c), 1000)
-
     r200m = mass_to_radius(m200m, 200 * rhom)
-    dens = profile_NFW(r_range, np.array([m200m]),
-                             c_correa(m200c, 0).reshape(-1),
-                             np.array([r200m]),
-                             rhom,
-                             Delta=200)
-    mass_int = m_h(dens, r_range)
 
-    return mass_int - m200c
+    # compute concentration
+    c200c = c_correa(m200c, 0, h).reshape(-1)
 
-def m200c_to_m200m(m200c, rhoc, rhom):
+    # now compute analytic mass
+    mass = m_NFW(r200c, c200c * r200m / r200c, r200m, rhom, Delta=200)
+
+    return mass - m200c
+
+def m200c_to_m200m(m200c, rhoc, rhom, h):
     '''
     Give the virial mass for the halo corresponding to m200c
 
@@ -473,7 +508,7 @@ def m200c_to_m200m(m200c, rhoc, rhom):
     '''
     # 1e19 Msun is ~maximum for c_correa
     m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
-                       args=(m200c, rhoc, rhom))
+                       args=(m200c, rhoc, rhom, h))
 
     return m200m
 
@@ -481,25 +516,24 @@ def m200c_to_m200m(m200c, rhoc, rhom):
 # End of m200c_to_m200m()
 # ------------------------------------------------------------------------------
 
-def massdiff_2c2m(m200c, m200m, rhoc, rhom):
+def massdiff_2c2m(m200c, m200m, rhoc, rhom, h):
     '''
     Integrate an NFW halo with m200m up to r200c and return the mass difference
     between the integral and m200c
     '''
+    # compute radii
     r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
-    r_range = np.logspace(-4, np.log10(r200c), 1000)
-
     r200m = mass_to_radius(m200m, 200 * rhom)
-    dens = profile_NFW(r_range, np.array([m200m]),
-                       c_correa(m200c, 0).reshape(-1),
-                       np.array([r200m]),
-                       rhom,
-                       Delta=200)
-    mass_int = m_h(dens, r_range)
 
-    return mass_int - m200c
+    # compute concentration
+    c200c = c_correa(m200c, 0, h).reshape(-1)
 
-def m200m_to_m200c(m200m, rhoc, rhom):
+    # now get analytic mass
+    mass = m_NFW(r200c, c200c * r200m / r200c, r200m, rhom, Delta=200)
+
+    return mass - m200c
+
+def m200m_to_m200c(m200m, rhoc, rhom, h):
     '''
     Give m200c for the an m200m virial mass halo
 
@@ -515,7 +549,7 @@ def m200m_to_m200c(m200m, rhoc, rhom):
     '''
     # 1e19 Msun is ~maximum for c_correa
     m200c = opt.brentq(massdiff_2c2m, m200m / 10., m200m,
-                       args=(m200m, rhoc, rhom))
+                       args=(m200m, rhoc, rhom, h))
 
     return m200c
 
@@ -523,42 +557,45 @@ def m200m_to_m200c(m200m, rhoc, rhom):
 # End of m200m_to_m200c()
 # ------------------------------------------------------------------------------
 
-def massdiff_2c5c(m200c, m500c, rhoc, rhom):
+def massdiff_2c5c(m200c, m500c, rhoc, rhom, h):
     '''
     Integrate an NFW halo with m200c up to r500c and return the mass difference
     between the integral and m500c
     '''
+    # compute radii
     r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
-    r_range = np.logspace(-4, np.log10(r500c), 1000)
+    r200c = mass_to_radius(m200c, 200 * rhoc)
 
-    m200m = m200c_to_m200m(m200c, rhoc, rhom)
+    m200m = m200c_to_m200m(m200c, rhoc, rhom, h)
     r200m = mass_to_radius(m200m, 200 * rhom)
-    dens = profile_NFW(r_range, np.array([m200m]),
-                             c_correa(m200c, 0).reshape(-1),
-                             np.array([r200m]),
-                             rhom,
-                             Delta=200)
+
+    # compute concentration
+    c200c = c_correa(m200c, 0, h).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r500c, c200c, r200c, rhoc, Delta=200.)
+
     mass_int = m_h(dens, r_range)
 
     return mass_int - m500c
 
-def m500c_to_m200c(m500c, rhoc, rhom):
+def m500c_to_m200c(m500c, rhoc, rhom, h):
     '''
     Give m200c for the an m500c virial mass halo
 
     Parameters
     ----------
-    m500c : float
+    m500c : float [M_sun / h]
       halo mass at 500 times the universe critical density
 
     Returns
     -------
-    m200c : float
+    m200c : float [M_sun / h]
       halo mass at 200 times the universe critical density
     '''
     # 1e19 Msun is ~maximum for c_correa
     m200c = opt.brentq(massdiff_2c5c, m500c, 10. * m500c,
-                       args=(m500c, rhoc, rhom))
+                       args=(m500c, rhoc, rhom, h))
 
     return m200c
 
@@ -687,7 +724,7 @@ def extrapolate_plaw(x_range, func, verbose=False):
 
         func[idx_nan:] = func[idx_nan] * \
                          (x_range[idx_nan:]/x_range[idx_nan])**slope
-    if verbose: print 'Power law slope: %f'%slope
+    if verbose: print('Power law slope: %f'%slope)
     return func
 
 # ------------------------------------------------------------------------------

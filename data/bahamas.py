@@ -205,9 +205,9 @@ def plot_dm_bahamas():
     box = ax.get_position()
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
     # Put a legend to the right of the current axis
-    handles = np.array(zip(lines_dmo, lines), dtype=object).reshape(-1,2)
+    handles = np.array(list(zip(lines_dmo, lines)), dtype=object).reshape(-1,2)
     # handles needs to be list of tuples
-    handles = map(tuple, handles)
+    handles = list(map(tuple, handles))
     labels = np.array([[r'$M_{\mathrm{DMO}}=10^{%.1f}$'%np.log10(c),
                         r'$M_{\mathrm{AGN}}=10^{%.1f}$'%np.log10(c)]
                        for c in m[::skip]]).reshape(-1)
@@ -1712,8 +1712,8 @@ def plot_gas_hot_fit_bahamas_median(m200, m_c, a_c, b_c, m_s, a_s, b_s, r_0):
 
     b_s_1 = np.array([np.median(b_s[m_c>0][(m_bin_idx == m_bin) & sl_ac]) for m_bin in np.arange(1, len(m_bins))])
     b_s_2 = np.array([np.median(b_s[m_c>0][(m_bin_idx == m_bin) & ~sl_ac]) for m_bin in np.arange(1, len(m_bins))])
-    print b_s_1
-    print b_s_2
+    print(b_s_1)
+    print(b_s_2)
 
     ax4.plot(np.log10(m),
             b_s_1,
@@ -3303,7 +3303,7 @@ def fit_prms(x=500, m_cut=1e13, prms=p.prms):
         beta = np.median(b[m500 > m_cut])
 
     elif x == 200:
-        m200 = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m)
+        m200 = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m, prms.h)
                          for m in m500[m500 > m_cut]])
         r200 = tools.mass_to_radius(m200, 200 * prms.rho_m)
 
