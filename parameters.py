@@ -318,6 +318,10 @@ class Parameters(Cache):
     def f_dm(self):
         return 1 - self.omegab/self.omegam
 
+    @cached_property('omegab', 'omegam')
+    def f_b(self):
+        return self.omegab / self.omegam
+
     @cached_property('f_dm', 'rho_m')
     def rho_dm(self):
         return self.f_dm * self.rho_m

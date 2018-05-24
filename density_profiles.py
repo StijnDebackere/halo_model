@@ -610,7 +610,7 @@ def profile_delta(r_range, m_range):
     '''
     profile = np.zeros_like(r_range, dtype=float)
 
-    profile[:,0] = 1.
+    profile[...,0] = 1.
     profile *= m_range.reshape(-1,1)
 
     return profile
@@ -621,8 +621,8 @@ def profile_delta(r_range, m_range):
 
 def profile_delta_f(k_range, m_range):
     '''
-    Returns the analytic Fourier transform of the delta profile for m_range along
-    axis 0 and k_range along axis 1 (and optional z_range along axis 2).
+    Returns the normalized analytic Fourier transform of the delta profile for
+    m_range along axis 0 and k_range along axis 1.
 
     Parameters
     ----------
@@ -637,7 +637,6 @@ def profile_delta_f(k_range, m_range):
       array containing Fourier transform of delta profile
     '''
     profile = np.ones(m_range.shape + k_range.shape, dtype=float)
-    # profile /= m_range.reshape(-1,1)
 
     return profile
 

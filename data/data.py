@@ -50,20 +50,20 @@ def read_croston():
     Z = data[:,4]
 
     # Load in croston data -> n = n_e
-    r = [np.loadtxt(f)[:,0] for idx, f in enumerate(files)] * 10**(-3) #[Mpc]
+    r = [np.loadtxt(f)[:,0] * 10**(-3) for idx, f in enumerate(files)] #[Mpc]
     rx = [np.loadtxt(f)[:,1] for idx, f in enumerate(files)]
     n = [np.loadtxt(f)[:,2] for idx, f in enumerate(files)]
     n_err = [np.loadtxt(f)[:,3] for idx, f in enumerate(files)]
 
     # Convert electron densities to gas density
-    # rho = mu * m_p * n_gas -> fully ionised: mu=0.61 (X=0.707, Y=0.290)
+    # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.2461, Z=0.0039)
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
     #       = (2 + 3Y/(4X))n_H
     # n_He = Y/(4X) n_H
-    # n_e = (2 + 3Y/(4X)) / (1 + Y/(4X)) n
+    # n_e = (2 + 3Y/(4X)) / (1 + Y/(2X)) n
     # => n_gas = 1.93 n_e
     # calculate correct mu factor for Z metallicity gas
-    n2rho = 1.93 * 0.61 * const.m_p.cgs * 1/u.cm**3 # in cgs
+    n2rho = 1.93 * 0.59 * const.m_p.cgs * 1/u.cm**3 # in cgs
     # change to ``cosmological'' coordinates
     cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
     rho =  [(ne * n2rho * cgs2cos).value for ne in n]
@@ -150,11 +150,11 @@ def read_eckert():
     idcs = [re.search('[0-9]*_nh.fits', f).span() for f in fnames]
     numdata = np.array([int(fnames[idx][i[0]:i[1]][:-8])
                         for idx,i in enumerate(idcs)])
-    # rho = mu * m_p * n_gas -> fully ionised: mu=0.61 (X=0.707, Y=0.290)
+    # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.2461, Z=0.0039)
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
     # n_He = Y/(4X) n_H
-    # => n_gas = 2.31 n_H
-    n2rho = 2.21 * 0.61 * const.m_p.cgs * 1/u.cm**3 # in cgs
+    # => n_gas = 2.25 n_H
+    n2rho = 2.25 * 0.59 * const.m_p.cgs * 1/u.cm**3 # in cgs
     cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
 
     r500 = np.empty((0,), dtype=float)
@@ -385,7 +385,7 @@ def bin_eckert():
 
 def prof_gas_hot(x, sl, a, b, m_sl, r500):
     '''beta profile'''
-    profile = (1 + (x/a)**2)**(-b/2)
+    profile = (1 + (x/a)**2)**(-3*b/2)
     mass = tools.m_h(profile[sl], x[sl] * r500)
     profile *= m_sl/mass
 
@@ -434,12 +434,7 @@ def fit_croston():
 
         # Determine different profile masses
         mass = tools.m_h(prof[sl], r[sl] * r500[idx])
-        mass_actual = tools.m_h(prof[sl], r[sl] * r500[idx])
-        # print 'f_gas,500c_actual :', mass_actual / m500[idx]
-        # print 'f_gas,500c_fitted :', mass / m500[idx]
-        # print '-------------------'
         m500gas = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
-        m500gas_actual = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
 
         # Need to perform the fit for [0.15,1] r500c -> mass within this region
         # need to match
@@ -447,13 +442,17 @@ def fit_croston():
         popt, pcov = opt.curve_fit(lambda r, a, b: \
                                    # , c:\
                                    prof_gas_hot(r, sl_fit, a, b,
-                                                  # , c, \
-                                                  mass, r500[idx]),
+                                                # , c, \
+                                                mass, r500[idx]),
                                    # r[sl], prof[sl], bounds=([0, 0, 0.5],
                                    #                          [1, 5, 10]))
                                    r[sl], prof[sl], bounds=([0, 0],
                                                             [1, 5]))
 
+        # print('f_gas,500c_actual :', m500g[idx] / m500[idx])
+        # print('f_gas,500c_fitted :', m500gas / m500[idx])
+        # print('m_gas,500c_fitted / m_gas,500c_actual', m500gas / m500g[idx])
+        # print('-------------------')
         # plt.plot(r, prof, label='obs')
         # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # , popt[2],
         #                          m500gas, r500[idx]),
@@ -463,7 +462,6 @@ def fit_croston():
         # plt.yscale('log')
         # plt.legend()
         # plt.show()
-        print(mass / m500g[idx])
 
         # Final fit will need to reproduce the m500gas mass
         a = np.append(a, popt[0])
@@ -537,6 +535,7 @@ def fit_eckert():
                                    r[sl], prof[sl], bounds=([0, 0],
                                                             [1, 5]))
 
+        # plt.clf()
         # plt.plot(r, prof, label='obs')
         # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # popt[2],
         #                          m500gas, r500[idx]),
@@ -891,6 +890,47 @@ def f_gas_prms_debiased(prms):
 # End of f_gas_prms_debiased()
 # ------------------------------------------------------------------------------
 
+def f_stars(m200m, comp='all'):
+    '''
+    Return the stellar fraction as a function of halo mass as found by
+    Zu & Mandelbaum (2015).
+
+    For m200m < 1e10 M_sun/h we return f_stars=0
+    For m200m > 1e16 M_sun/h we return f_stars=1.41e-2
+
+    Parameters
+    ----------
+    m200m : (m,) array or float [M_sun/h]
+      halo mass with respect to mean density of universe
+
+    Returns
+    -------
+    f_stars : (m,) array
+      total stellar fraction for the halo mass
+    '''
+    comp_options = ['all', 'cen', 'sat']
+    if comp not in comp_options:
+        raise ValueError('comp needs to be in {}'.format(comp_options))
+    m_h, f_stars, f_cen, f_sat = np.loadtxt(ddir +
+                                              'data_mccarthy/stars/StellarFraction-Mh.txt',
+                                              unpack=True)
+
+    if comp == 'all':
+        f_stars_interp = interp.interp1d(m_h, f_stars,
+                                         fill_value=(0,f_stars[-1]))
+    elif comp == 'cen':
+        f_stars_interp = interp.interp1d(m_h, f_cen,
+                                         fill_value=(0,f_cen[-1]))
+    else:
+        f_stars_interp = interp.interp1d(m_h, f_sat,
+                                         fill_value=(0,f_sat[-1]))
+
+    return f_stars_interp(m200m)
+
+# ------------------------------------------------------------------------------
+# End of f_stars()
+# ------------------------------------------------------------------------------
+
 def prof_prms(mean=False):
     if mean:
         with open('data/croston_200.p', 'rb') as f:
@@ -941,7 +981,7 @@ def prof_prms(mean=False):
 # End of prof_prms()
 # ------------------------------------------------------------------------------
 def prof_beta(r_range, rc, beta):
-    return 1. / (1 + (r_range/rc)**2)**(beta/2)
+    return 1. / (1 + (r_range/rc)**2)**(3 * beta /2)
 
 def minimize(prms, sl500, m500, m200, r_range):
     '''
@@ -979,7 +1019,7 @@ def beta_mass(f500c, f200m, prms=p.prms):
     rc = np.empty((0,), dtype=float)
     for idx, f in enumerate(f500c):
         sl500 = (r[idx] <= r500c[idx])
-        res = opt.minimize(minimize, [0.5, 3./2],
+        res = opt.minimize(minimize, [1./3, 3.],
                            args=(sl500, f * m500c[idx], f200m[idx] * m200m[idx],
                                  r[idx]),
                            bounds=((0,10), (0,5)))
@@ -1156,15 +1196,15 @@ def m200dmo_to_m200b(m_dmo, prms):
 # End of m200dmo_to_m200b()
 # ------------------------------------------------------------------------------
 
-def m200b_to_m200dmo(m_b, f_gas, prms):
+def m200b_to_m200dmo(m_b, f_model, prms):
     '''
     Get the relation between the measured halo mass and the dark matter only
     equivalent mass according to the relation
 
-        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
+        m_dmo(m_b) = m_b / ( 1 - (f_b - f_model(m_b)) )
     '''
     f_b = 1 - prms.f_dm
-    m200dmo = m_b / (1 - (f_b - f_gas))
+    m200dmo = m_b / (1 - (f_b - f_model))
 
     return m200dmo
 
@@ -1202,7 +1242,7 @@ def plot_profiles_paper(prms=prms):
     ax1.set_xlim([1e-3, 1e1])
     ax1.set_ylim([1e1, 1e5])
     ticks = ax1.get_xticklabels()
-    ticks[-1].set_visible(False)
+    ticks[0].set_visible(False)
 
     ax1.xaxis.set_tick_params(pad=8)
     ax1.set_xscale('log')
@@ -1250,6 +1290,8 @@ def plot_profiles_paper(prms=prms):
     # text = ax3.set_title(r'Eckert+16 binned')
     # title_props = text.get_fontproperties()
 
+    plt.savefig('obs_profiles.pdf', transparent=True,
+                bbox_inches='tight')
     plt.show()
 
 # ------------------------------------------------------------------------------
@@ -1393,7 +1435,7 @@ def plot_fit_profiles_paper():
     for idx, r, prof in zip(np.arange(len(r500_c)), rx_c, rho_c):
         sl = ((prof > 0) & (r <= 1.))
         fit = prof_gas_hot(r, sl, a_c[idx], b_c[idx], msl_c[idx], r500_c[idx])
-        ax3.plot(r[1:], (fit[1:] - prof[1:]) / prof[1:], ls='-', lw=0.5, c='k')
+        ax3.plot(r[1:], (prof[1:] - fit[1:]) / fit[1:], ls='-', lw=0.5, c='k')
 
         cum_mass_fit = np.array([tools.m_h(fit[:i], r[:i] * r500_c[idx])
                                    for i in np.arange(1, r.shape[0])])
@@ -1402,7 +1444,7 @@ def plot_fit_profiles_paper():
         m500_fit_c = np.append(m500_fit_c, tools.m_h(fit, r * r500_c[idx]))
         m500_prof_c = np.append(m500_prof_c, tools.m_h(prof, r * r500_c[idx]))
 
-        ax1.plot(r[1:], (cum_mass_fit - cum_mass_prof) / m500_prof_c[idx],
+        ax1.plot(r[1:], (cum_mass_prof - cum_mass_fit) / m500_fit_c[idx],
                  ls='-', lw=0.5, c='k')
 
         # ax1.plot(r, fit, ls='--', lw=0.5, c='r')
@@ -1410,21 +1452,21 @@ def plot_fit_profiles_paper():
 
     ax3.set_ylim([-0.6, 0.4])
     ticks = ax3.get_yticklabels()
-    ticks[-6].set_visible(False)
+    # ticks[-6].set_visible(False)
 
     ax3.set_xscale('log')
-    ax3.set_ylabel(r'$\rho_\mathrm{fit}(r)/\rho_\mathrm{obs}(r) - 1$')
+    ax3.set_ylabel(r'$\rho_\mathrm{obs}(r)/\rho_\mathrm{fit}(r) - 1$')
     ax3.set_xticklabels([])
     ax3.set_title(r'Croston+08')
 
     ax1.set_ylim([-0.1,0.1])
     ticks = ax1.get_xticklabels()
-    ticks[-5].set_visible(False)
+    # ticks[-5].set_visible(False)
 
     ax1.xaxis.set_tick_params(pad=8)
     ax1.set_xscale('log')
     ax1.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-8)
-    ax1.set_ylabel(r'$\frac{m_\mathrm{fit}(<r) - m_\mathrm{obs}(<r)}{m_\mathrm{gas,500c}}$')
+    ax1.set_ylabel(r'$\frac{m_\mathrm{obs}(<r) - m_\mathrm{fit}(<r)}{m_\mathrm{fit,500c}}$')
 
     # get median binned profiles
     r_med, rho_med, rho_std, m500_med, r500_med = bin_eckert()
@@ -1444,7 +1486,7 @@ def plot_fit_profiles_paper():
         m500_fit_e = np.append(m500_fit_e, tools.m_h(fit, r * r500_e[idx]))
         m500_prof_e = np.append(m500_prof_e, tools.m_h(prof, r * r500_e[idx]))
 
-        ax2.plot(r[1:], (cum_mass_fit - cum_mass_prof) / m500_prof_e[idx],
+        ax2.plot(r[1:], (cum_mass_prof - cum_mass_fit) / m500_fit_e[idx],
                  ls='-', lw=0.5, c='k')
 
         # ax2.plot(r, fit, ls='--', lw=0.5, c='k')
@@ -1472,113 +1514,114 @@ def plot_fit_profiles_paper():
     ax2.set_xscale('log')
     ax2.set_yticklabels([])
     ax2.set_xlabel(r'$r/r_\mathrm{500c}$', labelpad=-8)
+    plt.savefig('obs_profiles_fit.pdf', transparent=True, bbox_inches='tight')
     plt.show()
 
 # ------------------------------------------------------------------------------
 # End of plot_fit_profiles()
 # ------------------------------------------------------------------------------
 
-def corr_fit(x, a, b):
-    return a + b * x
+# def corr_fit(x, a, b):
+#     return a + b * x
 
-def plot_correlation():
-    with open('data/croston_500.p', 'rb') as f:
-        data_c = pickle.load(f)
-    with open('data/eckert_500.p', 'rb') as f:
-        data_e = pickle.load(f)
-    beta, rc, m500c, r, prof_h = beta_mass()
+# def plot_correlation():
+#     with open('data/croston_500.p', 'rb') as f:
+#         data_c = pickle.load(f)
+#     with open('data/eckert_500.p', 'rb') as f:
+#         data_e = pickle.load(f)
+#     beta, rc, m500c, r, prof_h = beta_mass()
 
-    m500c_d = np.append(data_c['m500c'], data_e['m500c'])
-    rc_d = np.append(data_c['rc'], data_e['rc'])
-    beta_d = np.append(data_c['b'], data_e['b'])
+#     m500c_d = np.append(data_c['m500c'], data_e['m500c'])
+#     rc_d = np.append(data_c['rc'], data_e['rc'])
+#     beta_d = np.append(data_c['b'], data_e['b'])
 
-    sl = (rc_d > 1e-2)
+#     sl = (rc_d > 1e-2)
 
-    copt, ccov = opt.curve_fit(corr_fit, np.log10(rc_d[sl]), np.log10(beta_d[sl]))
-    corr_prms = {"a": copt[0],
-                 "b": copt[1]}
+#     copt, ccov = opt.curve_fit(corr_fit, np.log10(rc_d[sl]), np.log10(beta_d[sl]))
+#     corr_prms = {"a": copt[0],
+#                  "b": copt[1]}
 
-    fig = plt.figure(figsize=(20,6))
-    fig.subplots_adjust(left=0.05, right=0.95)
-    ax1 = fig.add_subplot(131)
-    ax2 = fig.add_subplot(132)
-    ax3 = fig.add_subplot(133)
+#     fig = plt.figure(figsize=(20,6))
+#     fig.subplots_adjust(left=0.05, right=0.95)
+#     ax1 = fig.add_subplot(131)
+#     ax2 = fig.add_subplot(132)
+#     ax3 = fig.add_subplot(133)
 
-    pl.set_style()
-    # Plot rc mass dependence
-    ax1.set_prop_cycle(pl.cycle_mark())
-    ax1.plot(data_e['m500c'], data_e['rc'], label=r'Eckert+16')
-    ax1.plot(data_c['m500c'], data_c['rc'], label=r'Croston+08')
-    ax1.plot(m500c, rc, label=r'$m_\mathrm{200m}$ matched')
-    ax1.set_xlabel(r'$m_\mathrm{500c}/\mathrm{M_\odot}$')
-    ax1.set_ylabel(r'$r_c/r_\mathrm{500c}$')
-    ax1.set_ylim(ymin=1e-2)
-    ax1.set_xscale('log')
-    ax1.set_yscale('log')
-    ax1.legend(loc='best')
+#     pl.set_style()
+#     # Plot rc mass dependence
+#     ax1.set_prop_cycle(pl.cycle_mark())
+#     ax1.plot(data_e['m500c'], data_e['rc'], label=r'Eckert+16')
+#     ax1.plot(data_c['m500c'], data_c['rc'], label=r'Croston+08')
+#     ax1.plot(m500c, rc, label=r'$m_\mathrm{200m}$ matched')
+#     ax1.set_xlabel(r'$m_\mathrm{500c}/\mathrm{M_\odot}$')
+#     ax1.set_ylabel(r'$r_c/r_\mathrm{500c}$')
+#     ax1.set_ylim(ymin=1e-2)
+#     ax1.set_xscale('log')
+#     ax1.set_yscale('log')
+#     ax1.legend(loc='best')
 
-    # Plot rc mass dependence
-    ax2.set_prop_cycle(pl.cycle_mark())
-    ax2.plot(data_e['m500c'], data_e['b'], label=r'Eckert+16')
-    ax2.plot(data_c['m500c'], data_c['b'], label=r'Croston+08')
-    ax2.plot(m500c, beta, label=r'$m_\mathrm{200m}$ matched')
-    ax2.set_xlabel(r'$m_\mathrm{500c}/\mathrm{M_\odot}$')
-    ax2.set_ylabel(r'$\beta$')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax2.legend(loc='best')
+#     # Plot rc mass dependence
+#     ax2.set_prop_cycle(pl.cycle_mark())
+#     ax2.plot(data_e['m500c'], data_e['b'], label=r'Eckert+16')
+#     ax2.plot(data_c['m500c'], data_c['b'], label=r'Croston+08')
+#     ax2.plot(m500c, beta, label=r'$m_\mathrm{200m}$ matched')
+#     ax2.set_xlabel(r'$m_\mathrm{500c}/\mathrm{M_\odot}$')
+#     ax2.set_ylabel(r'$\beta$')
+#     ax2.set_xscale('log')
+#     ax2.set_yscale('log')
+#     ax2.legend(loc='best')
 
-    ############################################################################
-    # Plot correlation
-    ax3.scatter(np.median(rc_d), np.median(beta_d), c='r', marker='x', s=40)
-    s1 = ax3.scatter(data_e['rc'], data_e['b'], marker='o',
-                    c=np.log10(data_e['m500c']),
-                    label=r'Eckert+16', cmap='magma', lw=0)
-    s2 = ax3.scatter(data_c['rc'], data_c['b'], marker='D',
-                    c=np.log10(data_c['m500c']),
-                    label=r'Croston+08', cmap='magma', lw=0)
-    s3 = ax3.scatter(rc, beta, marker='^',
-                    c=np.log10(m500c), label=r'$m_\mathrm{200m}$ matched',
-                    cmap='magma', lw=0)
+#     ############################################################################
+#     # Plot correlation
+#     ax3.scatter(np.median(rc_d), np.median(beta_d), c='r', marker='x', s=40)
+#     s1 = ax3.scatter(data_e['rc'], data_e['b'], marker='o',
+#                     c=np.log10(data_e['m500c']),
+#                     label=r'Eckert+16', cmap='magma', lw=0)
+#     s2 = ax3.scatter(data_c['rc'], data_c['b'], marker='D',
+#                     c=np.log10(data_c['m500c']),
+#                     label=r'Croston+08', cmap='magma', lw=0)
+#     s3 = ax3.scatter(rc, beta, marker='^',
+#                     c=np.log10(m500c), label=r'$m_\mathrm{200m}$ matched',
+#                     cmap='magma', lw=0)
 
-    # Plot fit to correlation
-    r_bins = np.logspace(np.log10(rc_d[sl].min()), np.log10(rc_d[sl].max()), 10)
-    r = tools.bins2center(r_bins)
-    r_bin_idx = np.digitize(rc_d[sl], r_bins)
-    med = np.array([np.median(beta_d[sl][r_bin_idx == r_bin]) for r_bin in
-                    np.arange(1, len(r_bins))])
-    # q16 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 16) for r_bin in
-    #                 np.arange(1, len(r_bins))])
-    # q84 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 84) for r_bin in
-    #                 np.arange(1, len(r_bins))])
-    ax3.set_prop_cycle(pl.cycle_line())
-    ax3.plot(r, np.power(10, corr_fit(np.log10(r), **corr_prms)),
-            ls='-', c='k', lw=1)
-    ax3.plot(r, med, ls='--', c='k', lw=0.5)
-    # ax3.plot(r, q16, ls='-.', c='k', lw=0.5)
-    # ax3.plot(r, q84, ls='-.', c='k', lw=0.5)
-    # ax3.set_xlim(xmin=1e-3)
-    ax3.set_xlabel(r'$r_c/r_\mathrm{500c}$')
-    ax3.set_ylabel(r'$\beta$')
-    ax3.set_xscale('log')
-    ax3.set_yscale('log')
-    cb = fig.colorbar(s1)
-    cb.set_label(r'$\log_{10} m_\mathrm{500c}/\mathrm{M_\odot}$',
-                 rotation=270, labelpad=25)
+#     # Plot fit to correlation
+#     r_bins = np.logspace(np.log10(rc_d[sl].min()), np.log10(rc_d[sl].max()), 10)
+#     r = tools.bins2center(r_bins)
+#     r_bin_idx = np.digitize(rc_d[sl], r_bins)
+#     med = np.array([np.median(beta_d[sl][r_bin_idx == r_bin]) for r_bin in
+#                     np.arange(1, len(r_bins))])
+#     # q16 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 16) for r_bin in
+#     #                 np.arange(1, len(r_bins))])
+#     # q84 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 84) for r_bin in
+#     #                 np.arange(1, len(r_bins))])
+#     ax3.set_prop_cycle(pl.cycle_line())
+#     ax3.plot(r, np.power(10, corr_fit(np.log10(r), **corr_prms)),
+#             ls='-', c='k', lw=1)
+#     ax3.plot(r, med, ls='--', c='k', lw=0.5)
+#     # ax3.plot(r, q16, ls='-.', c='k', lw=0.5)
+#     # ax3.plot(r, q84, ls='-.', c='k', lw=0.5)
+#     # ax3.set_xlim(xmin=1e-3)
+#     ax3.set_xlabel(r'$r_c/r_\mathrm{500c}$')
+#     ax3.set_ylabel(r'$\beta$')
+#     ax3.set_xscale('log')
+#     ax3.set_yscale('log')
+#     cb = fig.colorbar(s1)
+#     cb.set_label(r'$\log_{10} m_\mathrm{500c}/\mathrm{M_\odot}$',
+#                  rotation=270, labelpad=25)
 
-    # Set label color to black
-    s1.set_color('k')
-    s2.set_color('k')
-    s3.set_color('k')
-    handles = [s1, s2, s3]
-    labs = [s1.get_label(), s2.get_label(), s3.get_label()]
-    ax3.legend(handles, labs, loc=1)
+#     # Set label color to black
+#     s1.set_color('k')
+#     s2.set_color('k')
+#     s3.set_color('k')
+#     handles = [s1, s2, s3]
+#     labs = [s1.get_label(), s2.get_label(), s3.get_label()]
+#     ax3.legend(handles, labs, loc=1)
 
-    plt.show()
+#     plt.show()
 
-# ------------------------------------------------------------------------------
-# End of plot_correlation()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of plot_correlation()
+# # ------------------------------------------------------------------------------
 
 def plot_profiles_croston_presentation():
     with open('data/croston.p', 'rb') as f:
@@ -1716,10 +1759,10 @@ def plot_fit_prms_paper(prms=prms):
     rc = np.append(rc_e, rc_c)
     rc_err = np.append(rc_e_err, rc_c_err)
 
-    b_e = data_e['b'] / 3. # equal to literature standard
-    b_c = data_c['b'] / 3.
-    b_e_err = data_e['berr'] / 3. # equal to literature standard
-    b_c_err = data_c['berr'] / 3.
+    b_e = data_e['b']
+    b_c = data_c['b']
+    b_e_err = data_e['berr']
+    b_c_err = data_c['berr']
     beta = np.append(b_e, b_c)
     beta_err = np.append(b_e_err, b_c_err)
 
@@ -1808,84 +1851,84 @@ def plot_fit_prms_paper(prms=prms):
 # End of plot_fit_prms_paper()
 # ------------------------------------------------------------------------------
 
-def plot_correlation_presentation():
-    with open('data/croston_500.p', 'rb') as f:
-        data_c = pickle.load(f)
-    with open('data/eckert_500.p', 'rb') as f:
-        data_e = pickle.load(f)
-    beta, rc, m500c, r, prof_h = beta_mass()
+# def plot_correlation_presentation():
+#     with open('data/croston_500.p', 'rb') as f:
+#         data_c = pickle.load(f)
+#     with open('data/eckert_500.p', 'rb') as f:
+#         data_e = pickle.load(f)
+#     beta, rc, m500c, r, prof_h = beta_mass()
 
-    m500c_d = np.append(data_c['m500c'], data_e['m500c'])
-    rc_d = np.append(data_c['rc'], data_e['rc'])
-    beta_d = np.append(data_c['b'], data_e['b'])
+#     m500c_d = np.append(data_c['m500c'], data_e['m500c'])
+#     rc_d = np.append(data_c['rc'], data_e['rc'])
+#     beta_d = np.append(data_c['b'], data_e['b'])
 
-    sl = (rc_d > 1e-2)
+#     sl = (rc_d > 1e-2)
 
-    copt, ccov = opt.curve_fit(corr_fit, np.log10(rc_d[sl]), np.log10(beta_d[sl]))
-    corr_prms = {"a": copt[0],
-                 "b": copt[1]}
+#     copt, ccov = opt.curve_fit(corr_fit, np.log10(rc_d[sl]), np.log10(beta_d[sl]))
+#     corr_prms = {"a": copt[0],
+#                  "b": copt[1]}
 
-    fig = plt.figure(figsize=(10,9))
-    ax3 = fig.add_subplot(111)
+#     fig = plt.figure(figsize=(10,9))
+#     ax3 = fig.add_subplot(111)
 
-    pl.set_style('mark')
-    ############################################################################
-    # Plot correlation
-    ax3.scatter(np.median(rc_d), np.median(beta_d), c='r', marker='x', s=80)
-    s1 = ax3.scatter(data_e['rc'], data_e['b'], marker='o',
-                     c=np.log10(data_e['m500c']),
-                     label=r'Eckert+16', cmap='magma', lw=0, s=80)
-    s2 = ax3.scatter(data_c['rc'], data_c['b'], marker='D',
-                    c=np.log10(data_c['m500c']),
-                    label=r'Croston+08', cmap='magma', lw=0, s=80)
-    s3 = ax3.scatter(rc, beta, marker='^',
-                    c=np.log10(m500c), label=r'$m_\mathrm{200m}$ matched',
-                    cmap='magma', lw=0, s=80)
+#     pl.set_style('mark')
+#     ############################################################################
+#     # Plot correlation
+#     ax3.scatter(np.median(rc_d), np.median(beta_d), c='r', marker='x', s=80)
+#     s1 = ax3.scatter(data_e['rc'], data_e['b'], marker='o',
+#                      c=np.log10(data_e['m500c']),
+#                      label=r'Eckert+16', cmap='magma', lw=0, s=80)
+#     s2 = ax3.scatter(data_c['rc'], data_c['b'], marker='D',
+#                     c=np.log10(data_c['m500c']),
+#                     label=r'Croston+08', cmap='magma', lw=0, s=80)
+#     s3 = ax3.scatter(rc, beta, marker='^',
+#                     c=np.log10(m500c), label=r'$m_\mathrm{200m}$ matched',
+#                     cmap='magma', lw=0, s=80)
 
-    # Plot fit to correlation
-    r_bins = np.logspace(np.log10(rc_d[sl].min()), np.log10(rc_d[sl].max()), 10)
-    r = tools.bins2center(r_bins)
-    r_bin_idx = np.digitize(rc_d[sl], r_bins)
-    med = np.array([np.median(beta_d[sl][r_bin_idx == r_bin]) for r_bin in
-                    np.arange(1, len(r_bins))])
-    # q16 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 16) for r_bin in
-    #                 np.arange(1, len(r_bins))])
-    # q84 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 84) for r_bin in
-    #                 np.arange(1, len(r_bins))])
-    ax3.plot(r, np.power(10, corr_fit(np.log10(r), **corr_prms)),
-             ls='-', c='k', lw=1, marker='None')
-    ax3.plot(r, med, ls='--', c='k', lw=0.5, marker='None')
-    # ax3.plot(r, q16, ls='-.', c='k', lw=0.5)
-    # ax3.plot(r, q84, ls='-.', c='k', lw=0.5)
-    # ax3.set_xlim(xmin=1e-3)
-    ax3.set_xlabel(r'$r_c/r_\mathrm{500c}$')
-    ax3.set_ylabel(r'$\beta$')
-    ax3.set_xscale('log')
-    ax3.set_ylim([1,4])
-    ax3.set_yscale('log')
-    ax3.set_yticks([1,2,3,4])
-    # ax3.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
-    ax3.set_yticklabels(["1","2","3","4"])
-    cb = fig.colorbar(s1)
-    cb.set_label(r'$\log_{10} m_\mathrm{500c}/\mathrm{M_\odot}$',
-                 rotation=270, labelpad=30)
+#     # Plot fit to correlation
+#     r_bins = np.logspace(np.log10(rc_d[sl].min()), np.log10(rc_d[sl].max()), 10)
+#     r = tools.bins2center(r_bins)
+#     r_bin_idx = np.digitize(rc_d[sl], r_bins)
+#     med = np.array([np.median(beta_d[sl][r_bin_idx == r_bin]) for r_bin in
+#                     np.arange(1, len(r_bins))])
+#     # q16 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 16) for r_bin in
+#     #                 np.arange(1, len(r_bins))])
+#     # q84 = np.array([np.percentile(beta_d[sl][r_bin_idx == r_bin], 84) for r_bin in
+#     #                 np.arange(1, len(r_bins))])
+#     ax3.plot(r, np.power(10, corr_fit(np.log10(r), **corr_prms)),
+#              ls='-', c='k', lw=1, marker='None')
+#     ax3.plot(r, med, ls='--', c='k', lw=0.5, marker='None')
+#     # ax3.plot(r, q16, ls='-.', c='k', lw=0.5)
+#     # ax3.plot(r, q84, ls='-.', c='k', lw=0.5)
+#     # ax3.set_xlim(xmin=1e-3)
+#     ax3.set_xlabel(r'$r_c/r_\mathrm{500c}$')
+#     ax3.set_ylabel(r'$\beta$')
+#     ax3.set_xscale('log')
+#     ax3.set_ylim([1,4])
+#     ax3.set_yscale('log')
+#     ax3.set_yticks([1,2,3,4])
+#     # ax3.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+#     ax3.set_yticklabels(["1","2","3","4"])
+#     cb = fig.colorbar(s1)
+#     cb.set_label(r'$\log_{10} m_\mathrm{500c}/\mathrm{M_\odot}$',
+#                  rotation=270, labelpad=30)
 
-    # Set label color to black
-    s1.set_color('k')
-    s2.set_color('k')
-    s3.set_color('k')
-    handles = [s1, s2, s3]
-    labs = [s1.get_label(), s2.get_label(), s3.get_label()]
-    # handles = [s1, s2]
-    # labs = [s1.get_label(), s2.get_label()]
-    ax3.legend(handles, labs, loc=2)
-    plt.savefig('obs_corr_matched.pdf', transparent=True)
+#     # Set label color to black
+#     s1.set_color('k')
+#     s2.set_color('k')
+#     s3.set_color('k')
+#     handles = [s1, s2, s3]
+#     labs = [s1.get_label(), s2.get_label(), s3.get_label()]
+#     # handles = [s1, s2]
+#     # labs = [s1.get_label(), s2.get_label()]
+#     ax3.legend(handles, labs, loc=2)
+#     plt.savefig('obs_corr_matched.pdf', transparent=True)
 
-    plt.show()
+#     plt.show()
 
-# ------------------------------------------------------------------------------
-# End of plot_correlation_presentation()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of plot_correlation_presentation()
+# # ------------------------------------------------------------------------------
 
 def plot_beta_presentation():
     with open('data/croston.p', 'rb') as f:
@@ -1935,15 +1978,15 @@ def plot_beta_rc_paper():
     with open('eckert_500.p', 'rb') as f:
         data_e = pickle.load(f)
 
-    beta = np.concatenate([data_c['b'], data_e['b']], axis=0) / 3.
+    beta = np.concatenate([data_c['b'], data_e['b']], axis=0)
     rc = np.concatenate([data_c['rc'], data_e['rc']], axis=0)
     m500c = np.concatenate([data_c['m500c'], data_e['m500c']])
 
     pl.set_style('mark')
     fig = plt.figure(figsize=(10,8))
     ax = fig.add_subplot(111)
-    ax.plot(data_e['m500c'], data_e['b'] / 3., label='Eckert+16')
-    ax.plot(data_c['m500c'], data_c['b'] / 3., label='Croston+08')
+    ax.plot(data_e['m500c'], data_e['b'], label='Eckert+16')
+    ax.plot(data_c['m500c'], data_c['b'], label='Croston+08')
     ax.axhline(y=np.median(beta), color='k')
     ax.text(1.01 * m500c.min(), 1.01 * np.median(beta), s='median')
     ax.set_xlabel(r'$m_\mathrm{500c} \,[\mathrm{M_\odot}]$')

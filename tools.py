@@ -4,10 +4,40 @@ import inspect
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.integrate
+from scipy.special import hyp2f1
 import scipy.optimize as opt
 from . import commah
 
 import pdb
+
+def _check_iterable(prms):
+    '''
+    Go through prms and make them iterable. Useful if not sure if input
+    is scalar or array
+
+    Parameters
+    ----------
+    prms : list
+      list of parameters to check
+
+    Returns
+    -------
+    prms_iterable : list
+      list of all parameters as lists
+    '''
+    prms_iterable = []
+
+    for prm in prms:
+        prm = np.asarray(prm)
+        if prm.shape == ():
+            prm = prm.reshape(-1)
+        prms_iterable.append(prm)
+
+    return prms_iterable
+
+# ------------------------------------------------------------------------------
+# End of _check_iterable()
+# ------------------------------------------------------------------------------
 
 def merge_dicts(*dict_args):
     '''
@@ -335,6 +365,70 @@ def m_NFW(r, c_x, r_x, rho_mean, Delta=200):
 # End of m_NFW()
 # ------------------------------------------------------------------------------
 
+def m_beta(r, beta, r_c, mgas_500c, r500c):
+    '''
+    Return the analytic enclosed mass for the beta profile normalized to
+    mgas_500c at r500c
+
+    Parameters
+    ----------
+    r : float or (r,) array if (m,) array, assume matched
+      radii to compute for
+    beta : float or (m,) array
+      beta slope of the profile
+    r_c : float or (m,) array
+      core radius r_c of the profile
+    mgas_500c : float or (m,) array
+      gas mass at r500c
+    r500c : float or (m,) array
+      radius corresponding to halo mass m500c
+    '''
+    r, beta, r_c, mgas_500c, r500c = _check_iterable([r, beta, r_c,
+                                                      mgas_500c, r500c])
+
+    if r.shape != beta.shape:
+        # reshape inputs
+        r = r.reshape(-1,1)
+        beta = beta.reshape(1,-1)
+        r_c = r_c.reshape(1,-1)
+        mgas_500c = mgas_500c.reshape(1,-1)
+        r500c = r500c.reshape(1,-1)
+
+    norm = (4./3 * np.pi * r500c**3 * hyp2f1(3./2, 3 * beta / 2,
+                                             5./2, -(r500c / r_c)**2))
+    rho_0 = mgas_500c / norm
+    m = 4./3 * np.pi * rho_0 * r**3 * hyp2f1(3./2, 3 * beta / 2,
+                                             5./2, -(r/r_c)**2)
+
+    return m
+
+# ------------------------------------------------------------------------------
+# End of m_beta()
+# ------------------------------------------------------------------------------
+@np.vectorize
+def r_where_m_beta(m, beta, r_c, mgas_500c, r500c):
+    '''
+    Return the radius where the beta profile mass is m
+
+    Parameters
+    ----------
+    m : float (m,) array
+      masses to get r for
+    beta : float or (m,) array
+      beta slope of the profile
+    r_c : float or (m,) array
+      core radius r_c of the profile
+    mgas_500c : float or (m,) array
+      gas mass at r500c
+    r500c : float or (m,) array
+      radius corresponding to halo mass m500c
+    '''
+    r = opt.brentq(lambda r, m, beta, r_c, mgas_500c, r500c: \
+                       m - m_beta(r, beta, r_c, mgas_500c, r500c),
+                   0, 100, args=(m, beta, r_c, mgas_500c, r500c))
+
+    return r
+
 def mass_to_radius(m, mean_dens):
     '''
     Calculate radius of a region of space from its mass.
@@ -389,7 +483,7 @@ def radius_to_mass(r, mean_dens):
 # End of radius_to_mass()
 # ------------------------------------------------------------------------------
 
-def massdiff_2m5c(m200m, m500c, rhoc, rhom):
+def massdiff_2m5c(m200m, m500c, rhoc, rhom, h):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
@@ -399,15 +493,17 @@ def massdiff_2m5c(m200m, m500c, rhoc, rhom):
     r200m = mass_to_radius(m200m, 200 * rhom)
 
     # compute concentration
-    m200c = m200m_to_m200c(m200m, rhoc, rhom)
+    m200c = m200m_to_m200c(m200m, rhoc, rhom, h)
     c200c = c_correa(m200c, 0, h).reshape(-1)
+    r200c = mass_to_radius(m200c, 200 * rhoc)
 
     # now get analytic mass
     mass = m_NFW(r500c, c200c * r200m / r200c, r200m, rhom, Delta=200.)
 
     return mass - m500c
 
-def m500c_to_m200m(m500c, rhoc, rhom):
+@np.vectorize
+def m500c_to_m200m(m500c, rhoc, rhom, h):
     '''
     Give the virial mass for the halo corresponding to m500c
 
@@ -422,7 +518,7 @@ def m500c_to_m200m(m500c, rhoc, rhom):
       corresponding halo model halo virial mass
     '''
     m200m = opt.brentq(massdiff_2m5c, m500c, 10. * m500c,
-                       args=(m500c, rhoc, rhom))
+                       args=(m500c, rhoc, rhom, h))
 
     return m200m
 
@@ -448,6 +544,7 @@ def massdiff_5c2m(m500c, m200m, m200c, rhoc, rhom, h):
 
     return mass - m500c
 
+@np.vectorize
 def m200m_to_m500c(m200m, rhoc, rhom, h, m200c=None):
     '''
     Give m500c for the an m200m virial mass halo
@@ -492,6 +589,7 @@ def massdiff_2m2c(m200m, m200c, rhoc, rhom, h):
 
     return mass - m200c
 
+@np.vectorize
 def m200c_to_m200m(m200c, rhoc, rhom, h):
     '''
     Give the virial mass for the halo corresponding to m200c
@@ -533,6 +631,7 @@ def massdiff_2c2m(m200c, m200m, rhoc, rhom, h):
 
     return mass - m200c
 
+@np.vectorize
 def m200m_to_m200c(m200m, rhoc, rhom, h):
     '''
     Give m200c for the an m200m virial mass halo
@@ -579,6 +678,7 @@ def massdiff_2c5c(m200c, m500c, rhoc, rhom, h):
 
     return mass_int - m500c
 
+@np.vectorize
 def m500c_to_m200c(m500c, rhoc, rhom, h):
     '''
     Give m200c for the an m500c virial mass halo
