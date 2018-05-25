@@ -839,10 +839,40 @@ def plot_parameters(mean=False):
 # ------------------------------------------------------------------------------
 
 def f_gas(m, log10mc, a, prms):
+    '''
+    Return the f_gas(m500c) relation for m. The relation cannot exceed
+    f_gas = f_b - f_stars(m200m(m500c))
+
+    Parameters
+    ----------
+    m : array [M_sun / h]
+      values of m500c to compute f_gas for
+    log10mc : float
+      the turnover mass for the relation in log10([M_sun/h])
+    a : float
+      the strength of the transition
+    prms : Parameters object
+      relevant cosmological parameters
+
+    Returns
+    -------
+    f_gas : array
+      gas fraction at r500c for m
+    '''
+    # this is the asymptotic stellar fraction from the iHOD model from
+    # Zu & Mandelnaum (2015), gas fraction needs to be f_b - f_s
+    f_s = 0.01413356
     x = np.log10(m) - log10mc
-    return (prms.omegab/prms.omegam) * (0.5 * (1 + np.tanh(x / a)))
+    return (prms.omegab/prms.omegam - f_s) * (0.5 * (1 + np.tanh(x / a)))
+
+# ------------------------------------------------------------------------------
+# End of f_gas()
+# ------------------------------------------------------------------------------
 
 def f_gas_prms(prms, q=50):
+    '''
+    Compute best fit parameters to the f_gas(m500c) relation
+    '''
     m500_obs, f_obs = np.loadtxt(ddir +
                                  'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                                  unpack=True)
@@ -852,6 +882,7 @@ def f_gas_prms(prms, q=50):
     # data assumed h=0.7
     m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m) * 0.7
     m = tools.bins2center(m_bins)
+
     m_bin_idx = np.digitize(10**(m500_obs) * 0.7, m_bins)
 
     f_q = np.array([np.percentile(f_obs[m_bin_idx == m_bin], q)
@@ -916,13 +947,13 @@ def f_stars(m200m, comp='all'):
                                               unpack=True)
 
     if comp == 'all':
-        f_stars_interp = interp.interp1d(m_h, f_stars,
+        f_stars_interp = interp.interp1d(m_h, f_stars, bounds_error=False,
                                          fill_value=(0,f_stars[-1]))
     elif comp == 'cen':
-        f_stars_interp = interp.interp1d(m_h, f_cen,
+        f_stars_interp = interp.interp1d(m_h, f_cen, bounds_error=False,
                                          fill_value=(0,f_cen[-1]))
     else:
-        f_stars_interp = interp.interp1d(m_h, f_sat,
+        f_stars_interp = interp.interp1d(m_h, f_sat, bounds_error=False,
                                          fill_value=(0,f_sat[-1]))
 
     return f_stars_interp(m200m)
@@ -1326,19 +1357,6 @@ def plot_gas_fractions_paper(prms):
     fq15_prms = f_gas_prms(prms, q=15)
     fq85_prms = f_gas_prms(prms, q=85)
 
-    ##########################################################################
-    # Get shadow twiny instance for ratio plot, to also have m200m
-    # need it in this order to get correct yticks with log scale, since
-    # twin instance seems to mess things up...
-    axs = ax.twiny()
-    m200 = np.array([tools.m500c_to_m200m(mass, prms.rho_crit, prms.rho_m, prms.h)
-                     for mass in m])
-    axs.plot(m200, m200)
-    axs.cla()
-
-    axs.tick_params(axis='x', pad=5)
-
-
     ax.set_prop_cycle(pl.cycle_mark())
     ax.plot(10**(m500_obs[23:33]), f_obs[23:33], marker='o',
              label=r'Vikhlinin+2006')
@@ -1367,20 +1385,36 @@ def plot_gas_fractions_paper(prms):
     # ax.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1)
     # ax.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1)
 
-    ax.xaxis.set_tick_params(pad=8)
-    ax.set_xlim([1e13, 10**(15.5)])
-    ax.set_ylim([0.01, 0.17])
+    m500c_min = 1e13
+    m500c_max = 10**(15.5)
 
-    axs.set_xlim(tools.m500c_to_m200m(ax.get_xlim()[0], prms.rho_crit, prms.rho_m, prms.h),
-                 tools.m500c_to_m200m(ax.get_xlim()[-1], prms.rho_crit, prms.rho_m, prms.h))
+    ##########################################################################
+    # Get shadow twiny instance for ratio plot, to also have m200m
+    # need it in this order to get correct yticks with log scale, since
+    # twin instance seems to mess things up...
+    axs = ax.twiny()
+    m200 = np.array([tools.m500c_to_m200m(mass, prms.rho_crit, prms.rho_m, prms.h)
+                     for mass in [m500c_min, m500c_max]])
+    axs.plot(m200, m200)
+    axs.cla()
 
     ax.set_xscale('log')
     axs.set_xscale('log')
 
+    # set plot parameters
+    ax.xaxis.set_tick_params(pad=8)
+    ax.set_xlim([m500c_min, m500c_max])
+    ax.set_ylim([0.01, 0.17])
+
+    axs.tick_params(axis='x', pad=5)
+    axs.set_xlim(m200)
+
+
     text = ax.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M_\odot}]$')
     ax.set_ylabel(r'$f_{\mathrm{gas,500c}}$')
     title_props = text.get_fontproperties()
-    leg = ax.legend(loc='best', numpoints=1, frameon=True, framealpha=0.8)
+    leg = ax.legend(loc=4, numpoints=1, frameon=True, framealpha=0.8,
+                    fontsize=18)
     leg.get_frame().set_linewidth(0.0)
 
 
@@ -1397,8 +1431,7 @@ def plot_gas_fractions_paper(prms):
                          f_bar * 0.95), textcoords='data',
                  fontproperties=title_props)
 
-    plt.savefig('obs_gas_fractions.pdf')
-    plt.show()
+    plt.savefig('obs_gas_fractions.pdf', transparent=True, bbox_inches='tight')
 
 # ------------------------------------------------------------------------------
 # End of plot_gas_fractions_paper()
