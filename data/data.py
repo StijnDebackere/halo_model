@@ -42,18 +42,32 @@ def read_croston():
     idcs = [re.search('[0-9]*.dat', f).span() for f in fnames]
     sysnum = [int(fnames[idx][i[0]:i[1]][:-4]) for idx,i in enumerate(idcs)]
 
+    # -------------------------------------------------------------------------- #
+    # We leave all the original h_70 scalings, we scale our model when comparing #
+    # -------------------------------------------------------------------------- #
+
     data = np.loadtxt(ddir + 'Pratt09.dat')
     z = data[:,0]
-    r500 = data[:,1] * 1e-3 # [Mpc/h70]
-    mgas500 = np.power(10, data[:,2]) # [Msun/h70^(5/2)]
-    mgas500_err = data[:,3]
+    # r500 = data[:,1] * 1e-3 * 0.7 # [Mpc/h]
+    # mgas500 = np.power(10, data[:,2]) * (0.7)**(5./2) # [Msun/h^(5/2)]
+    # mgas500_err = np.power(10, data[:,3]) * (0.7)**(5./2) # [Msun/h^(5/2)]
+    r500 = data[:,1] * 1e-3 # [Mpc/h_70]
+    mgas500 = np.power(10, data[:,2]) # [Msun/h_70^(5/2)]
+    mgas500_err = np.power(10, data[:,3]) # [Msun/h_70^(5/2)]
     Z = data[:,4]
 
     # Load in croston data -> n = n_e
-    r = [np.loadtxt(f)[:,0] * 10**(-3) for idx, f in enumerate(files)] #[Mpc]
+    # r = [np.loadtxt(f)[:,0] * 10**(-3) * 0.7 for idx, f in enumerate(files)] # [Mpc/h]
+    r = [np.loadtxt(f)[:,0] * 10**(-3) for idx, f in enumerate(files)] # [Mpc/h_70]
     rx = [np.loadtxt(f)[:,1] for idx, f in enumerate(files)]
-    n = [np.loadtxt(f)[:,2] for idx, f in enumerate(files)]
-    n_err = [np.loadtxt(f)[:,3] for idx, f in enumerate(files)]
+
+    # from Flux ~ EM ~ 1/d_A^2 * int n^2 dV ~ h^2 * h^-3 * [n^2]
+    # where n is theoretical model and Flux is measurement, so n^2 ~ F * h
+    # n ~ h^(1/2)
+    # n = [np.loadtxt(f)[:,2] / (0.7)**(0.5) for idx, f in enumerate(files)] # [cm^-3 h^(1/2)]
+    # n_err = [np.loadtxt(f)[:,3] / (0.7)**(0.5) for idx, f in enumerate(files)] # [cm^-3 h^(1/2)]
+    n = [np.loadtxt(f)[:,2] for idx, f in enumerate(files)] # [cm^-3 h_70^(1/2)]
+    n_err = [np.loadtxt(f)[:,3] for idx, f in enumerate(files)] # [cm^-3 h_70^(1/2)]
 
     # Convert electron densities to gas density
     # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.2461, Z=0.0039)
@@ -74,14 +88,20 @@ def read_croston():
     for idx, prof in enumerate(rho):
         idx_500 = np.argmin(np.abs(rx[idx] - 1))
         mgas = np.append(mgas,
-                         tools.m_h(prof[:idx_500+1],
-                                   rx[idx][:idx_500+1]*r500[sysnum[idx]-1]))
+                         tools.m_h(prof[:idx_500+1], rx[idx][:idx_500+1] *
+                                   r500[sysnum[idx]-1]))
         m500gas = np.append(m500gas, mgas500[sysnum[idx] - 1])
         # print mgas[idx]
         # print mgas500[sysnum[idx]-1]
         # print '-----------'
 
-    #     plt.plot(rx[idx], prof)
+    ratio = mgas/m500gas
+    print('Croston derived gas masses:')
+    print('median: ', np.median(ratio))
+    print('q15:    ', np.percentile(ratio, q=15))
+    print('q85:    ', np.percentile(ratio, q=85))
+
+    # plt.plot(rx[idx], prof)
 
     # plt.xscale('log')
     # plt.yscale('log')
@@ -106,7 +126,8 @@ def read_croston():
     # plt.legend()
     # plt.show()
 
-    data = {'m500gas': m500gas,
+    # we save our gas mass determinations!
+    data = {'m500gas': mgas,
             'r500': r500,
             'rx': rx,
             'rho': rho}
@@ -128,15 +149,20 @@ def read_eckert():
     mdata = fits.open(ddir + 'XXL100GC.fits')
     units = mdata[1].header
 
+    # -------------------------------------------------------------------------- #
+    # We leave all the original h_70 scalings, we scale our model when comparing #
+    # -------------------------------------------------------------------------- #
+
     # number of cluster
     num = mdata[1].data['xlssc']
-    z = mdata[1].data['z']
-    # z_err = mdata[1].data['ez'] #?
-    # r500mt = mdata[1].data['r500mt'] # same as in fits files
-    m500mt = mdata[1].data['M500MT']
-    m500mt_err = mdata[1].data['M500MT_err']
-    mgas500 = mdata[1].data['Mgas500']
-    mgas500_err = mdata[1].data['Mgas500_err']
+    # m500mt = mdata[1].data['M500MT'] * 0.7 # [Msun/h]
+    # m500mt_err = mdata[1].data['M500MT_err'] * 0.7 # [Msun/h]
+    # mgas500 = mdata[1].data['Mgas500'] * (0.7)**(5./2) # [Msun/h^(5/2)]
+    # mgas500_err = mdata[1].data['Mgas500_err'] * (0.7)**(5./2) # [Msun/h^(5/2)]
+    m500mt = mdata[1].data['M500MT'] # [Msun/h_70]
+    m500mt_err = mdata[1].data['M500MT_err'] # [Msun/h_70]
+    mgas500 = mdata[1].data['Mgas500'] # [Msun/h_70^(5/2)]
+    mgas500_err = mdata[1].data['Mgas500_err'] # [Msun/h_70^(5/2)]
     mdata.close()
 
     m500mt *= 1e13
@@ -154,7 +180,7 @@ def read_eckert():
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
     # n_He = Y/(4X) n_H
     # => n_gas = 2.25 n_H
-    n2rho = 2.25 * 0.59 * const.m_p.cgs * 1/u.cm**3 # in cgs
+    n2rho = 2.25 * 0.59 * const.m_p.cgs * 1./u.cm**3 # [cm^-3]
     cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
 
     r500 = np.empty((0,), dtype=float)
@@ -166,16 +192,22 @@ def read_eckert():
         # actual data
         data = fits.open(f)
         z = np.append(z, data[1].header['REDSHIFT'])
+
+        # r500 = np.append(r500, data[1].header['R500'] * 1e-3 * 0.7) # [Mpc/h]
+        r500 = np.append(r500, data[1].header['R500'] * 1e-3) # [Mpc/h_70]
+
         # !!!! check whether this still needs correction factor from weak lensing
         # Currently included it, but biases the masses, since this wasn't done in
         # measurement by Eckert, of course
-        r500 = np.append(r500, data[1].header['R500'] * 1e-3) # [Mpc]
         rx.append(data[1].data['RADIUS'] * (1.3)**(1./3))
         # rx.append(data[1].data['RADIUS'])
-        rho.append(data[1].data['NH'] * n2rho * cgs2cos)
-        rho_err.append(data[1].data['ENH'] * n2rho * cgs2cos)
-        data.close()
 
+        # rho.append(data[1].data['NH'] * n2rho * cgs2cos / (0.7)**(0.5)) # [cm^-3 h^(1/2)]
+        # rho_err.append(data[1].data['ENH'] * n2rho * cgs2cos / (0.7)**(0.5)) # [cm^-3 h^(1/2)]
+        rho.append(data[1].data['NH'] * n2rho * cgs2cos) # [cm^-3 h_70^(1/2)]
+        rho_err.append(data[1].data['ENH'] * n2rho * cgs2cos) # [cm^-3 h_70^(1/2)]
+
+        data.close()
 
     mgas = np.empty((0,), dtype=float)
     m500gas = np.empty((0,), dtype=float)
@@ -188,13 +220,13 @@ def read_eckert():
         mdata2data = np.append(mdata2data, (num == numdata[idx]).nonzero()[0][0])
         # print mgas[idx]
         # print mgas500[mdata2data[idx]]
-        # print '------------'-
+        # print '------------'
 
     m500gas = mgas500[mdata2data]
     m500 = m500mt[mdata2data]
 
     ratio = mgas/m500gas
-    print('Derived gas masses:')
+    print('Eckert derived gas masses, too high if corrected rx for bias!!!:')
     print('median: ', np.median(ratio))
     print('q15:    ', np.percentile(ratio, q=15))
     print('q85:    ', np.percentile(ratio, q=85))
@@ -227,7 +259,8 @@ def read_eckert():
     # plt.legend()
     # plt.show()
 
-    data = {'m500gas': m500gas,
+    # we save our gas mass determinations!
+    data = {'m500gas': mgas,
             'r500': r500,
             'rx': rx,
             'rho': rho}
@@ -241,78 +274,9 @@ def read_eckert():
 # End of read_eckert()
 # ------------------------------------------------------------------------------
 
-def bin_croston():
-    with open('data/croston.p', 'rb') as f:
-        data_croston = pickle.load(f)
-
-    r500 = data_croston['r500']
-    m500g = data_croston['m500gas']
-    rx = data_croston['rx']
-    rho = data_croston['rho']
-
-    # number of points to mass bin
-    n_m = 10
-    m_bins = np.logspace(np.log10(m500g).min(), np.log10(m500g).max(), n_m)
-    m_bin_idx = np.digitize(m500g, m_bins)
-
-    r_min = 0.
-    r_max = 3.
-    # number of points in new profile
-    n_r = 20
-    r_ranges = np.empty((n_m-1, n_r), dtype=float)
-    rho_med = np.empty((n_m-1, n_r), dtype=float)
-    m500_med = np.empty((n_m-1), dtype=float)
-    r500_med = np.empty((n_m-1), dtype=float)
-
-    pl.set_style('line')
-    for idx_m, m_bin in enumerate(np.arange(1, len(m_bins))):
-        idx_in_bin = (m_bin_idx == m_bin)
-        m500_med[idx_m] = np.median(m500g[idx_in_bin])
-        r500_med[idx_m] = np.median(r500[idx_in_bin])
-        for idx in idx_in_bin.nonzero()[0]:
-            # find maximum allowed rx range in bin
-            if r_min < rx[idx].min():
-                r_min = rx[idx].min()
-            if r_max > rx[idx].max():
-                r_max = rx[idx].max()
-
-        # need to add small offsets for interpolation, can go wrong otherwise
-        r_range = np.logspace(np.log10(r_min+0.001), np.log10(r_max-0.001), n_r)
-        # need another loop to extrapolate function
-        rho_new = np.empty((0, n_r))
-        for idx in idx_in_bin.nonzero()[0]:
-            f_rho = interp.interp1d(rx[idx], rho[idx])
-            rho_new = np.concatenate([rho_new, f_rho(r_range).reshape(1,-1)],
-                                     axis=0)
-
-        r_ranges[idx_m] = r_range
-        rho_med[idx_m] = np.median(rho_new, axis=0)
-
-        # for t in rho_new:
-        #     print t
-        #     t[t <= 0] = np.nan
-        #     if (t <= 0).sum() == 0:
-        #         plt.plot(r_range, t)
-        # plt.plot(r_range, rho_med[idx_m], label=r'median')
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.legend(loc='best')
-        # plt.show()
-
-    return r_ranges, rho_med, m500_med, r500_med
-
-# ------------------------------------------------------------------------------
-# End of bin_croston()
-# ------------------------------------------------------------------------------
-
 def bin_eckert():
-    with open('data/eckert.p', 'rb') as f:
-        data_eckert = pickle.load(f)
-
-    r500 = data_eckert['r500']
-    m500g = data_eckert['m500gas']
-    rx = data_eckert['rx']
-    rho = data_eckert['rho']
+    # these are all assuming h_70!!
+    m500g, r500, rx, rho = read_eckert()
 
     # number of points to mass bin
     n_m = 11 # bin edges, not centers -> +1
@@ -400,23 +364,11 @@ def fit_croston():
     '''
     Fit profiles to the observations
     '''
-    with open('data/croston.p', 'rb') as f:
-        data_croston = pickle.load(f)
+    # these are all assuming h_70!
+    m500g, r500, rx, rho = read_croston()
 
-    r500 = data_croston['r500']
-    rx = data_croston['rx']
-    rho = data_croston['rho']
-    m500g = data_croston['m500gas']
-
-    # r500 is in Mpc but was normalized with r/h_70
-    # we need r in terms of Mpc/h for halo model -> need to ``unnormalise''
-    r500 = r500 * 0.7
-    # same for rho, we need it in terms of density * h**2
-    rho = [r / 0.7**2 for r in rho]
-    # same for m500g, in terms of mass / h
-    m500g = m500g * 0.7
-
-    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit)
+    # we need to plug in the 0.7^2
+    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit * 0.7**2)
 
     pl.set_style()
     a = np.empty((0,), dtype=float)
@@ -479,26 +431,11 @@ def fit_croston():
 # ------------------------------------------------------------------------------
 
 def fit_eckert():
-    # with open('eckert.p', 'rb') as f:
-    #     data_eckert = cPickle.load(f)
-
-    # r500 = data_eckert['r500']
-    # m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit)
-    # m500g = data_eckert['m500gas']
-    # rx = data_eckert['rx']
-    # rho = data_eckert['rho']
+    # these are all assuming h_70!!
     rx, rho, rho_std, m500g, r500 = bin_eckert()
 
-    # r500 is in Mpc but was normalized with r/h_70
-    # we need r in terms of Mpc/h for halo model -> need to ``unnormalise''
-    r500 = r500 * 0.7
-    # same for rho, we need it in terms of density * h**2
-    rho = rho / 0.7**2
-    rho_std = rho_std / 0.7**2
-    # same for m500g, in terms of mass / h
-    m500g = m500g * 0.7
-
-    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit)
+    # we need to plug in the 0.7^2
+    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit * 0.7**2)
 
     pl.set_style()
     a = np.empty((0,), dtype=float)
@@ -516,12 +453,11 @@ def fit_eckert():
 
         # Determine different profile masses
         mass = tools.m_h(prof[sl], r[sl] * r500[idx])
-        # print 'm_gas500/m_gas500_actual - 1', (mass - mass_actual) / mass_actual
-        # print 'f_gas,500c_actual :', mass_actual / m500[idx]
-        # print 'f_gas,500c_fitted :', mass / m500[idx]
-        # print '-------------------'
         m500gas = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
-        m500gas_actual = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
+        # print 'm_gas500_actual/m_gas500_fit - 1 =', (m500g - m500gas) / m500gas
+        # print 'f_gas,500c_actual :', m500g / m500[idx]
+        # print 'f_gas,500c_fitted :', m500gas / m500[idx]
+        # print '-------------------'
 
         # Need to perform the fit for [0.15,1] r500c -> mass within this region
         # need to match
@@ -529,7 +465,7 @@ def fit_eckert():
         popt, pcov = opt.curve_fit(lambda r, a, b: \
                                    # , c:\
                                    prof_gas_hot(r, sl_fit, a, b, # , c,
-                                                  mass, r500[idx]),
+                                                mass, r500[idx]),
                                    # r[sl], prof[sl], bounds=([0, 0, 0.5],
                                    #                          [1, 5, 10]))
                                    r[sl], prof[sl], bounds=([0, 0],
@@ -564,50 +500,41 @@ def fit_eckert():
 
 def convert_hm():
     '''
-    Save fit parameters and masses for both m500c & m200m
+    Save fit parameters and masses for both m500c & m200m, with m500c and m200m
+    in Hubble units, but the best fit parameters corresponding to the h=0.7 best
+    fit to the data.
+
+    Running this redoes the whole analysis, i.e. reading in all the data
+    and analyzing it.
     '''
-    # rcc, rccerr, bc, bcerr, rxc, rxcerr, mgc = fit_croston()
-    # rce, rceerr, be, beerr, rxe, rxeerr, mge = fit_eckert()
+    # All of assume h=0.7
     rcc, rccerr, bc, bcerr, mslc, mgc, r500c = fit_croston()
     rce, rceerr, be, beerr, msle, mge, r500e = fit_eckert()
 
-    # m500 values determined by observers
-    m500c = tools.radius_to_mass(r500c, 500 * p.prms.rho_crit)
-    m500e = tools.radius_to_mass(r500e, 500 * p.prms.rho_crit)
+    # these will be fit with the halo model, for which we scale out h=0.7
+    m500c = tools.radius_to_mass(r500c * 0.7, 500 * p.prms.rho_crit)
+    m500e = tools.radius_to_mass(r500e * 0.7, 500 * p.prms.rho_crit)
 
     # Get 500crit values
     m500cc = gas.mgas_to_m500c(mgc)
     m500ce = gas.mgas_to_m500c(mge)
-    r500cc = tools.mass_to_radius(m500cc, 500 * p.prms.rho_crit)
-    r500ce = tools.mass_to_radius(m500ce, 500 * p.prms.rho_crit)
+
+    # these will be fit with the halo model, for which we scale out h=0.7
+    r500cc = tools.mass_to_radius(m500cc * 0.7, 500 * p.prms.rho_crit)
+    r500ce = tools.mass_to_radius(m500ce * 0.7, 500 * p.prms.rho_crit)
 
     m_range = np.logspace(np.log10(np.min(m500e)),
                           np.log10(np.max(m500c)), 100)
-
-    # pl.set_style('mark')
-    # plt.plot(m500c, m500cc, label='Croston+08')
-    # plt.plot(m500e, m500ce, label='Eckert+16')
-    # plt.plot(m_range, m_range, lw=1, ls='-', markersize=0, c='k')
-    # plt.xlabel('$m_\mathrm{obs,500c}$')
-    # plt.ylabel('$m_\mathrm{hm,500c}$')
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.legend()
-    # plt.show()
 
     data_croston = {'rc': rcc,
                     'rcerr': rccerr,
                     'b': bc,
                     'berr': bcerr,
-                    # 'rx': rxc,
-                    # 'rxerr': rxcerr,
                     'm500c': m500cc}
     data_eckert = {'rc': rce,
                    'rcerr': rceerr,
                    'b': be,
                    'berr': beerr,
-                   # 'rx': rxe,
-                   # 'rxerr': rxeerr,
                    'm500c': m500ce}
 
     with open('data/croston_500.p', 'wb') as f:
@@ -616,7 +543,7 @@ def convert_hm():
     with open('data/eckert_500.p', 'wb') as f:
         pickle.dump(data_eckert, f)
 
-    # Get 200mean values
+    # Get 200mean values, all other values are also in Hubble units
     m200mc = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m, prms.h)
                        for m in m500cc])
     m200me = np.array([tools.m500c_to_m200m(m, prms.rho_crit, prms.rho_m, prms.h)
@@ -630,24 +557,16 @@ def convert_hm():
     rccerr *= r500cc/r200mc
     rce *= r500ce/r200me
     rceerr *= r500ce/r200me
-    # rxc *= r500cc/r200mc
-    # rxcerr *= r500cc/r200mc
-    # rxe *= r500ce/r200me
-    # rxeerr *= r500ce/r200me
 
     data_croston = {'rc': rcc,
                     'rcerr': rccerr,
                     'b': bc,
                     'berr': bcerr,
-                    # 'rx': rxc,
-                    # 'rxerr': rxcerr,
                     'm200m': m200mc}
     data_eckert = {'rc': rce,
                    'rcerr': rceerr,
                    'b': be,
                    'berr': beerr,
-                   # 'rx': rxe,
-                   # 'rxerr': rxeerr,
                    'm200m': m200me}
 
     with open('data/croston_200.p', 'wb') as f:
@@ -840,8 +759,7 @@ def plot_parameters(mean=False):
 
 def f_gas(m, log10mc, a, prms):
     '''
-    Return the f_gas(m500c) relation for m. The relation cannot exceed
-    f_gas = f_b - f_stars(m200m(m500c))
+    Return the f_gas(m500c) relation for m. The relation cannot exceed f_b
 
     Parameters
     ----------
@@ -856,14 +774,12 @@ def f_gas(m, log10mc, a, prms):
 
     Returns
     -------
-    f_gas : array
+    f_gas : array [h_70^(-3/2)]
       gas fraction at r500c for m
     '''
-    # this is the asymptotic stellar fraction from the iHOD model from
-    # Zu & Mandelnaum (2015), gas fraction needs to be f_b - f_s
-    f_s = 0.01413356
-    x = np.log10(m) - log10mc
-    return (prms.omegab/prms.omegam - f_s) * (0.5 * (1 + np.tanh(x / a)))
+    h = 0.7
+    x = np.log10(m/h) - (log10mc - np.log10(h))
+    return (prms.omegab/prms.omegam) * (0.5 * (1 + np.tanh(x / a)))
 
 # ------------------------------------------------------------------------------
 # End of f_gas()
@@ -871,7 +787,8 @@ def f_gas(m, log10mc, a, prms):
 
 def f_gas_prms(prms, q=50):
     '''
-    Compute best fit parameters to the f_gas(m500c) relation
+    Compute best fit parameters to the f_gas(m500c) relation with both f_gas and
+    m500c assuming h=0.7
     '''
     m500_obs, f_obs = np.loadtxt(ddir +
                                  'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
@@ -879,10 +796,11 @@ def f_gas_prms(prms, q=50):
 
     n_m = 15
 
-    # data assumed h=0.7
+    # the f_gas() assumes Hubble units, so we need to undo h=0.7
     m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m) * 0.7
     m = tools.bins2center(m_bins)
 
+    # m_bins is in Hubble units
     m_bin_idx = np.digitize(10**(m500_obs) * 0.7, m_bins)
 
     f_q = np.array([np.percentile(f_obs[m_bin_idx == m_bin], q)
@@ -907,8 +825,11 @@ def f_gas_prms_debiased(prms):
                                  'data_mccarthy/gas/M500_fgas_bias_corrected.dat',
                                  unpack=True)
 
+    # f_gas() assumes Hubble units
+    m500 = m500_obs * 0.7
+
     fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
-                                 m500_obs, f_obs,
+                                 m500, f_obs,
                                  bounds=([10, 0],
                                          [15, 10]))
 
@@ -962,130 +883,131 @@ def f_stars(m200m, comp='all'):
 # End of f_stars()
 # ------------------------------------------------------------------------------
 
-def prof_prms(mean=False):
-    if mean:
-        with open('data/croston_200.p', 'rb') as f:
-            data_c = pickle.load(f)
-        with open('data/eckert_200.p', 'rb') as f:
-            data_e = pickle.load(f)
-    else:
-        with open('data/croston_500.p', 'rb') as f:
-            data_c = pickle.load(f)
-        with open('data/eckert_500.p', 'rb') as f:
-            data_e = pickle.load(f)
+# def prof_prms(mean=False):
+#     if mean:
+#         with open('data/croston_200.p', 'rb') as f:
+#             data_c = pickle.load(f)
+#         with open('data/eckert_200.p', 'rb') as f:
+#             data_e = pickle.load(f)
+#     else:
+#         with open('data/croston_500.p', 'rb') as f:
+#             data_c = pickle.load(f)
+#         with open('data/eckert_500.p', 'rb') as f:
+#             data_e = pickle.load(f)
 
-    m500c = np.append(data_c['m500c'], data_e['m500c'])
-    rc = np.append(data_c['rc'], data_e['rc'])
-    rcerr = np.append(data_c['rcerr'], data_e['rcerr'])
-    b = np.append(data_c['b'], data_e['b'])
-    berr = np.append(data_c['berr'], data_e['berr'])
+#     m500c = np.append(data_c['m500c'], data_e['m500c'])
+#     rc = np.append(data_c['rc'], data_e['rc'])
+#     rcerr = np.append(data_c['rcerr'], data_e['rcerr'])
+#     b = np.append(data_c['b'], data_e['b'])
+#     berr = np.append(data_c['berr'], data_e['berr'])
 
-    sl = (rc > 1e-2)
+#     sl = (rc > 1e-2)
 
-    copt, ccov = opt.curve_fit(corr_fit, np.log10(rc)[sl], np.log10(b)[sl])
-    corr_prms = {"a": copt[0],
-                 "b": copt[1]}
+#     copt, ccov = opt.curve_fit(corr_fit, np.log10(rc)[sl], np.log10(b)[sl])
+#     corr_prms = {"a": copt[0],
+#                  "b": copt[1]}
 
-    rc_min = rc[sl].min()
-    rc_max = rc[sl].max()
+#     rc_min = rc[sl].min()
+#     rc_max = rc[sl].max()
 
-    rc_med = np.median(rc)
-    beta_med = np.median(b)
+#     rc_med = np.median(rc)
+#     beta_med = np.median(b)
 
-    # pl.set_style('mark')
-    # plt.plot(rc, b)
-    # plt.xscale('log')
-    # plt.yscale('log')
-    # plt.show()
+#     # pl.set_style('mark')
+#     # plt.plot(rc, b)
+#     # plt.xscale('log')
+#     # plt.yscale('log')
+#     # plt.show()
 
-    # rc_med = np.median(rc)
-    # rc_q16 = np.percentile(rc, 16)
-    # rc_q84 = np.percentile(rc, 84)
-    # b_med = np.median(b)
-    # b_q16 = np.percentile(b, 16)
-    # b_q84 = np.percentile(b, 84)
+#     # rc_med = np.median(rc)
+#     # rc_q16 = np.percentile(rc, 16)
+#     # rc_q84 = np.percentile(rc, 84)
+#     # b_med = np.median(b)
+#     # b_q16 = np.percentile(b, 16)
+#     # b_q84 = np.percentile(b, 84)
 
-    # return rc_med, rc_q16, rc_q84, b_med, b_q16, b_q84
-    return corr_prms, rc_min, rc_max, rc_med, beta_med
+#     # return rc_med, rc_q16, rc_q84, b_med, b_q16, b_q84
+#     return corr_prms, rc_min, rc_max, rc_med, beta_med
 
-# ------------------------------------------------------------------------------
-# End of prof_prms()
-# ------------------------------------------------------------------------------
-def prof_beta(r_range, rc, beta):
-    return 1. / (1 + (r_range/rc)**2)**(3 * beta /2)
+# # ------------------------------------------------------------------------------
+# # End of prof_prms()
+# # ------------------------------------------------------------------------------
 
-def minimize(prms, sl500, m500, m200, r_range):
-    '''
-    Force beta profile to contain m200 in r_range, and minimize difference
-    between m500 and m500 in profile through beta & rc
-    '''
-    prof = prof_beta(r_range, prms[0], prms[1])
-    norm = tools.m_h(prof, r_range)
-    prof *= m200 / norm
-    # add integration up to r500 -> force to be equal to m500
-    m500_new = tools.m_h(prof[sl500], r_range[sl500])
-    return np.abs(m500_new - m500)
+# def prof_beta(r_range, rc, beta):
+#     return 1. / (1 + (r_range/rc)**2)**(3 * beta /2)
 
-# ------------------------------------------------------------------------------
-# End of minimize()
-# ------------------------------------------------------------------------------
+# def minimize(prms, sl500, m500, m200, r_range):
+#     '''
+#     Force beta profile to contain m200 in r_range, and minimize difference
+#     between m500 and m500 in profile through beta & rc
+#     '''
+#     prof = prof_beta(r_range, prms[0], prms[1])
+#     norm = tools.m_h(prof, r_range)
+#     prof *= m200 / norm
+#     # add integration up to r500 -> force to be equal to m500
+#     m500_new = tools.m_h(prof[sl500], r_range[sl500])
+#     return np.abs(m500_new - m500)
 
-def beta_mass(f500c, f200m, prms=p.prms):
-    '''
-    Compute the fit parameters for the beta profile going through
-    f500c and f200m
-    '''
-    r = prms.r_range_lin
-    m200m = prms.m200m
-    r200m = prms.r200m
-    m500c = prms.m500c
-    r500c = prms.r500c
+# # ------------------------------------------------------------------------------
+# # End of minimize()
+# # ------------------------------------------------------------------------------
 
-    # # Gas fractions
-    # gas_prms = f_gas_prms(prms, q=50)
-    # f200m = 1 - prms.f_dm
-    # f500c = f_gas(m500c, **gas_prms[0])
+# def beta_mass(f500c, f200m, prms=p.prms):
+#     '''
+#     Compute the fit parameters for the beta profile going through
+#     f500c and f200m
+#     '''
+#     r = prms.r_range_lin
+#     m200m = prms.m200m
+#     r200m = prms.r200m
+#     m500c = prms.m500c
+#     r500c = prms.r500c
 
-    beta = np.empty((0,), dtype=float)
-    rc = np.empty((0,), dtype=float)
-    for idx, f in enumerate(f500c):
-        sl500 = (r[idx] <= r500c[idx])
-        res = opt.minimize(minimize, [1./3, 3.],
-                           args=(sl500, f * m500c[idx], f200m[idx] * m200m[idx],
-                                 r[idx]),
-                           bounds=((0,10), (0,5)))
-        # print res.x
-        rc = np.append(rc, res.x[0])
-        beta = np.append(beta, res.x[1])
+#     # # Gas fractions
+#     # gas_prms = f_gas_prms(prms, q=50)
+#     # f200m = 1 - prms.f_dm
+#     # f500c = f_gas(m500c, **gas_prms[0])
 
-    m500_h = np.empty((0,), dtype=float)
-    prof_h = np.zeros_like(r)
-    for idx, prof in enumerate(prof_h):
-        sl500 = (r[idx] <= r500c[idx])
+#     beta = np.empty((0,), dtype=float)
+#     rc = np.empty((0,), dtype=float)
+#     for idx, f in enumerate(f500c):
+#         sl500 = (r[idx] <= r500c[idx])
+#         res = opt.minimize(minimize, [1./3, 3.],
+#                            args=(sl500, f * m500c[idx], f200m[idx] * m200m[idx],
+#                                  r[idx]),
+#                            bounds=((0,10), (0,5)))
+#         # print res.x
+#         rc = np.append(rc, res.x[0])
+#         beta = np.append(beta, res.x[1])
 
-        # parameters should ensure match at f500c for f200m
-        p = prof_beta(r[idx], rc[idx], beta[idx])
-        norm = tools.m_h(p, r[idx])
-        p *= f200m[idx] * m200m[idx] / norm
+#     m500_h = np.empty((0,), dtype=float)
+#     prof_h = np.zeros_like(r)
+#     for idx, prof in enumerate(prof_h):
+#         sl500 = (r[idx] <= r500c[idx])
 
-        prof_h[idx] = p
-        m500_h = np.append(m500_h, tools.m_h(p[sl500], r[idx][sl500]))
+#         # parameters should ensure match at f500c for f200m
+#         p = prof_beta(r[idx], rc[idx], beta[idx])
+#         norm = tools.m_h(p, r[idx])
+#         p *= f200m[idx] * m200m[idx] / norm
 
-    m200_h = tools.m_h(prof_h, r)
+#         prof_h[idx] = p
+#         m500_h = np.append(m500_h, tools.m_h(p[sl500], r[idx][sl500]))
 
-    # print 'prms: '
-    # print beta
-    # print rc/r500c
-    # print 'mass fractions: '
-    # print m200_h / m200m
-    # print m500_h / m500c
-    # print f500c
+#     m200_h = tools.m_h(prof_h, r)
 
-    return beta, rc/r500c, m500c, r, prof_h
+#     # print 'prms: '
+#     # print beta
+#     # print rc/r500c
+#     # print 'mass fractions: '
+#     # print m200_h / m200m
+#     # print m500_h / m500c
+#     # print f500c
 
-# ------------------------------------------------------------------------------
-# End of beta_mass()
-# ------------------------------------------------------------------------------
+#     return beta, rc/r500c, m500c, r, prof_h
+
+# # ------------------------------------------------------------------------------
+# # End of beta_mass()
+# # ------------------------------------------------------------------------------
 
 # def beta_slope(f200m, prms=p.prms):
 #     '''
@@ -1187,15 +1109,15 @@ def fit_prms(x=500, q_rc=50, q_beta=50):
 # End of fit_prms()
 # ------------------------------------------------------------------------------
 
-def mass_diff(alpha, x_range, mass_ratio):
-    '''
-    Integrate power law such as to match mass ratio
-    '''
-    return tools.Integrate(x_range ** (alpha + 2.), x_range) - mass_ratio
+# def mass_diff(alpha, x_range, mass_ratio):
+#     '''
+#     Integrate power law such as to match mass ratio
+#     '''
+#     return tools.Integrate(x_range ** (alpha + 2.), x_range) - mass_ratio
 
-# ------------------------------------------------------------------------------
-# End of mass_diff()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of mass_diff()
+# # ------------------------------------------------------------------------------
 
 def massdiff_dmo2bar(m_bar, m_dmo, f_b, prms, fm):
     '''
@@ -1261,10 +1183,12 @@ def plot_profiles_paper(prms=prms):
     rx_c = data_c['rx']
     rx_e = data_e['rx']
 
-    rho_c = data_c['rho']
-    rho_e = data_e['rho']
+    rho_c = np.array(data_c['rho']) / 0.7**2
+    rho_e = np.array(data_e['rho']) / 0.7**2
 
-    rho_crit = prms.rho_crit * prms.h**2
+    m200_c = np.array(data_c['m200m'])
+
+    rho_crit = prms.rho_crit
 
     ax1.set_prop_cycle(cycler(c='k', lw=[0.5]))
     for r, prof in zip(rx_c, rho_c):
@@ -1456,11 +1380,11 @@ def plot_fit_profiles_paper():
     rx_c = data_c['rx']
     rx_e = data_e['rx']
 
-    r500_c = data_c['r500']
-    r500_e = data_e['r500']
+    r500_c = np.array(data_c['r500']) * 0.7
+    r500_e = np.array(data_e['r500']) * 0.7
 
-    rho_c = data_c['rho']
-    rho_e = data_e['rho']
+    rho_c = np.array(data_c['rho']) / 0.7**2
+    rho_e = np.array(data_e['rho']) / 0.7**2
 
     ax1.set_prop_cycle(cycler(c='k', lw=[0.5]))
     m500_fit_c = np.empty((0), dtype=float)
@@ -1504,13 +1428,18 @@ def plot_fit_profiles_paper():
     # get median binned profiles
     r_med, rho_med, rho_std, m500_med, r500_med = bin_eckert()
 
+    rho_med /= 0.7**2
+    rho_std /= 0.7**2
+    m500_med *= 0.7
+    r500_med *= 0.7
+
     ax2.set_prop_cycle(cycler(c='k', lw=[0.5]))
     m500_fit_e = np.empty((0), dtype=float)
     m500_prof_e = np.empty((0), dtype=float)
     for idx, r, prof in zip(np.arange(len(r500_med)), r_med, rho_med):
         sl = ((prof > 0) & (r <= 1.))
         fit = prof_gas_hot(r, sl, a_e[idx], b_e[idx], msl_e[idx], r500_med[idx])
-        ax4.plot(r[1:], (fit[1:] - prof[1:]) / prof[1:], ls='-', lw=0.5, c='k')
+        ax4.plot(r[1:], (prof[1:] - fit[1:]) / fit[1:], ls='-', lw=0.5, c='k')
 
         cum_mass_fit = np.array([tools.m_h(fit[:i], r[:i] * r500_e[idx])
                                    for i in np.arange(1, r.shape[0])])

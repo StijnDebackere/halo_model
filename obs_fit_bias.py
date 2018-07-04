@@ -38,6 +38,7 @@ def load_dm_dmo(prms=p.prms):
 
     f_dm = np.ones_like(m200m)
     c200m = prms.c_correa
+    # c200m = b.dm_c_dmo(m200m * prms.h)
     r200m = prms.r200m
 
     # general profile kwargs to be used for all components
@@ -85,6 +86,9 @@ def load_dm(m_dmo, prms=p.prms, bar2dmo=True):
     m200c = prms.m200c
     r200c = prms.r200c
 
+    # it is seen in Eagle that DM haloes do not really change their c(m200m)
+    # relation when fitting only the dark matter concentration as a function of
+    # TOTAL halo mass
     f_dm = np.ones_like(m200m) * prms.f_dm
     c200m = prms.c_correa
     r200m = prms.r200m
@@ -136,7 +140,7 @@ def load_dm(m_dmo, prms=p.prms, bar2dmo=True):
 # End of load_dm()
 # ------------------------------------------------------------------------------
 
-def load_dm_dmo_5r500c(prms=p.prms):
+def load_dm_dmo_rmax(r_max, prms=p.prms):
     '''
     Pure dark matter only component with NFW profile and f_dm = 1
     '''
@@ -146,7 +150,6 @@ def load_dm_dmo_5r500c(prms=p.prms):
     r200m = prms.r200m
 
     r_min = prms.r_range_lin[:,0]
-    r_max = (5 * r500c)
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
@@ -154,6 +157,7 @@ def load_dm_dmo_5r500c(prms=p.prms):
 
     f_dm = np.ones_like(m200m)
     c200m = prms.c_correa
+    # c200m = b.dm_c_dmo(m200m * prms.h)
 
     # relative position of virial radius
     x200m = r200m / r500c
@@ -176,7 +180,12 @@ def load_dm_dmo_5r500c(prms=p.prms):
                       'n': 80,
                       'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
-    dm_extra = {'profile': prof_dm}
+    # we want the analytic solution for the FT, since we cut of the profile at
+    # r200m
+    dm_extra = {'profile': prof_dm, 'profile_f': profs.profile_NFW_f,
+                'profile_f_args': {'c_x': c200m,
+                                   'r_x': r200m,
+                                   'rho_mean': prms.rho_m},}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
@@ -185,7 +194,7 @@ def load_dm_dmo_5r500c(prms=p.prms):
                       'm200m': m200m,
                       'p_lin': prms.p_lin,
                       'dndm': prms.dndm,
-                      'f_comp': f_dm,}
+                      'f_comp': f_dm}
 
     dm_kwargs = tools.merge_dicts(prof_dm_kwargs, comp_dm_kwargs)
 
@@ -196,7 +205,7 @@ def load_dm_dmo_5r500c(prms=p.prms):
 # End of load_dm_dmo_5r500c()
 # ------------------------------------------------------------------------------
 
-def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
+def load_dm_rmax(r_max, m_dmo, prms=p.prms, bar2dmo=True):
     '''
     Return NFW profiles with up to r200m and 0 up to 5r500c
     '''
@@ -209,7 +218,6 @@ def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
     r200m = prms.r200m
 
     r_min = prms.r_range_lin[:,0]
-    r_max = (5 * r500c)
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
@@ -239,7 +247,12 @@ def load_dm_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
                       'n': 80,
                       'taylor_err': 1.e-50}
     # --------------------------------------------------------------------------
-    dm_extra = {'profile': prof_dm}
+    # we want the analytic solution for the FT, since we cut of the profile at
+    # r200m
+    dm_extra = {'profile': prof_dm, 'profile_f': profs.profile_NFW_f,
+                'profile_f_args': {'c_x': c_x,
+                                   'r_x': r200m,
+                                   'rho_mean': prms.rho_m},}
     prof_dm_kwargs = tools.merge_dicts(profile_kwargs, dm_extra)
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
@@ -523,10 +536,10 @@ def load_gas_smooth_r500c_r200m(prms, fgas_200, f_stars):
 # End of load_gas_smooth_r500c_r200m()
 # ------------------------------------------------------------------------------
 
-def load_gas_5r500c(f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
-                    bar2dmo=True):
+def load_gas_rmax(r_max, f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
+                  bar2dmo=True):
     '''
-    Return beta profiles with fgas_200m = f_obs_extrapolated = fgas_5r500c
+    Return beta profiles with fgas_200m = f_obs_extrapolated = fgas_rmax
 
     Parameters
     ----------
@@ -552,7 +565,6 @@ def load_gas_5r500c(f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
     r200m = prms.r200m
 
     r_min = prms.r_range_lin[:,0]
-    r_max = (5 * r500c)
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
@@ -631,17 +643,19 @@ def load_gas_5r500c(f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
     return comp_gas
 
 # ------------------------------------------------------------------------------
-# End of load_gas_5r500c()
+# End of load_gas_rmax()
 # ------------------------------------------------------------------------------
 
-def load_gas_r500c_r200m_5r500c(f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
-                                bar2dmo=True):
+def load_gas_r500c_r200m_rmax(r_max, f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
+                              bar2dmo=True):
     '''
     Return beta profiles with fgas_200m = f_obs = fgas_5r500c, so 0 from r200m
     to 5r500c
 
     Parameters
     ----------
+    r_max : (m,) array
+      maximum radius for each halo mass to compute profile up to
     f_stars : (m,) array
       stellar fraction for each halo mass
     prms : p.Parameters object
@@ -664,10 +678,12 @@ def load_gas_r500c_r200m_5r500c(f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50
     r200m = prms.r200m
 
     r_min = prms.r_range_lin[:,0]
-    r_max = (5 * r500c)
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
+
+    # # will need to fill exact r500c values in r_range for uniform profile to match
+    # r500_in_range = np.zeros_like(m200m)
 
     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
     # gas fractions
@@ -759,10 +775,10 @@ def load_gas_r500c_r200m_5r500c(f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50
     return comp_gas
 
 # ------------------------------------------------------------------------------
-# End of load_gas_r500c_r200m_5r500c()
+# End of load_gas_r500c_r200m_rmax()
 # ------------------------------------------------------------------------------
 
-def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, f_stars, bar2dmo=True):
+def load_gas_smooth_r200m_rmax(r_max, m_dmo, prms, fgas_200, f_stars, bar2dmo=True):
     '''
     Return uniform profiles with fgas_200m = 0 and fgas_5r500c = f_b - fgas_200
 
@@ -786,7 +802,6 @@ def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, f_stars, bar2dmo=True):
     r200m = prms.r200m
 
     r_min = prms.r_range_lin[:,0]
-    r_max = (5 * r500c)
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
@@ -879,7 +894,7 @@ def prof_delta_f(k_range):
 
     return profile
 
-def load_stars(f_gas, prms=p.prms, bar2dmo=True):
+def load_centrals(f_gas, prms=p.prms, bar2dmo=True, f_comp='cen'):
     '''
     Return delta profiles with fstars_500c = f_obs
 
@@ -903,6 +918,7 @@ def load_stars(f_gas, prms=p.prms, bar2dmo=True):
 
     # stellar fraction
     f_stars = d.f_stars(m200m, comp='all')
+    f_cen = d.f_stars(m200m, comp=f_comp)
 
     prof_stars = np.zeros_like(r_range)
     prof_stars_f = np.zeros(m200m.shape + k_range.shape)
@@ -936,21 +952,21 @@ def load_stars(f_gas, prms=p.prms, bar2dmo=True):
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     if bar2dmo == False:
-        comp_stars_kwargs = {'name': 'stars',
+        comp_stars_kwargs = {'name': 'cen',
                              'r200m': r200m,
                              'm200m': m200m,
                              'p_lin': prms.p_lin,
                              'dndm': prms.dndm,
-                             'f_comp': f_stars}
+                             'f_comp': f_cen}
     else:
         prms_dmo = deepcopy(prms)
         prms_dmo.m200m = m_dmo
-        comp_stars_kwargs = {'name': 'stars',
+        comp_stars_kwargs = {'name': 'cen',
                              'r200m': r200m,
                              'm200m': m200m,
                              'p_lin': prms.p_lin,
                              'dndm': prms_dmo.dndm,
-                             'f_comp': f_stars}
+                             'f_comp': f_cen}
 
     stars_kwargs = tools.merge_dicts(prof_stars_kwargs, comp_stars_kwargs)
 
@@ -958,10 +974,97 @@ def load_stars(f_gas, prms=p.prms, bar2dmo=True):
     return comp_stars
 
 # ------------------------------------------------------------------------------
-# End of load_stars()
+# End of load_centrals()
 # ------------------------------------------------------------------------------
 
-def load_stars_5r500c(f_gas, prms=p.prms, bar2dmo=True):
+def load_satellites(f_gas, f_c=0.86, prms=p.prms, bar2dmo=True):
+    '''
+    Return NFW profiles with fstars_500c = f_obs
+
+    Parameters
+    ----------
+    f_c : float
+      ratio between c_sat(m) and c_dm(m) used in iHOD
+    prms : p.Parameters object
+      contains relevant model info
+    bar2dmo : bool
+      specifies whether to carry out hmf conversion for missing m200m
+    '''
+    # halo model parameters
+    # ! WATCH OUT ! These are the SPH equivalent masses and do thus not
+    # correspond to the DMO case, unless f_gas,200m + f_stars,200m = f_b
+    m200m = prms.m200m
+    m500c = prms.m500c
+    r500c = prms.r500c
+    r200m = prms.r200m
+
+    r_range = prms.r_range_lin
+    k_range = prms.k_range_lin
+
+    # stellar fraction
+    f_sat = d.f_stars(m200m, comp='sat')
+    f_stars = d.f_stars(m200m, comp='all')
+    c = f_c * prms.c_correa
+
+    # Can give the profile all of the halo model parameters, since it is
+    # a fit to observations, only the power spectrum calculation needs
+    # to convert these values to the DMO equivalent cases
+    profile_kwargs = {'r_range': prms.r_range_lin,
+                      'm_bar': prms.m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
+    # specific stars extra kwargs
+    stars_extra = {'profile': profs.profile_NFW,
+                   'profile_f': profs.profile_NFW_f,
+                   'profile_args': {'c_x': c,
+                                    'r_x': r200m,
+                                    'rho_mean': prms.rho_m},
+                   'profile_f_args': {'c_x': c,
+                                      'r_x': r200m,
+                                      'rho_mean': prms.rho_m},}
+    prof_stars_kwargs = tools.merge_dicts(profile_kwargs, stars_extra)
+
+    # Now we can determine the equivalent DMO masses from the f_gas - m relation
+    m_dmo = d.m200b_to_m200dmo(m200m, f_gas + f_stars, prms)
+    r_dmo = tools.mass_to_radius(m_dmo, 200 * prms.rho_m)
+
+    # # renormalize radial range
+    # r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
+    # # ! This is not necessary, since the radial range is not required
+    # # ! in the halo model, except for the density profiles which are fit
+    # # ! in the observations and thus do not need to be renormalized
+
+    # --------------------------------------------------------------------------
+    # additional kwargs for comp.Component
+    if bar2dmo == False:
+        comp_stars_kwargs = {'name': 'sat',
+                             'r200m': r200m,
+                             'm200m': m200m,
+                             'p_lin': prms.p_lin,
+                             'dndm': prms.dndm,
+                             'f_comp': f_sat}
+    else:
+        prms_dmo = deepcopy(prms)
+        prms_dmo.m200m = m_dmo
+        comp_stars_kwargs = {'name': 'sat',
+                             'r200m': r200m,
+                             'm200m': m200m,
+                             'p_lin': prms.p_lin,
+                             'dndm': prms_dmo.dndm,
+                             'f_comp': f_sat}
+
+    stars_kwargs = tools.merge_dicts(prof_stars_kwargs, comp_stars_kwargs)
+
+    comp_stars = comp.Component(**stars_kwargs)
+    return comp_stars
+
+# ------------------------------------------------------------------------------
+# End of load_satellites()
+# ------------------------------------------------------------------------------
+
+def load_centrals_rmax(r_max, f_gas, prms=p.prms, bar2dmo=True, f_comp='cen'):
     '''
     Return delta profiles with fstars_500c = f_obs
 
@@ -981,14 +1084,15 @@ def load_stars_5r500c(f_gas, prms=p.prms, bar2dmo=True):
     r200m = prms.r200m
 
     r_min = prms.r_range_lin[:,0]
-    r_max = (5 * r500c)
     r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
     k_range = prms.k_range_lin
 
     # stellar fraction
-    f_stars = d.f_stars(m200m)
+    f_stars = d.f_stars(m200m, comp='all')
+    # f_cen = d.f_stars(m200m, comp='all')
+    f_cen = d.f_stars(m200m, comp=f_comp)
 
     prof_stars = np.zeros_like(r_range)
     prof_stars_f = np.zeros(m200m.shape + k_range.shape)
@@ -1022,21 +1126,21 @@ def load_stars_5r500c(f_gas, prms=p.prms, bar2dmo=True):
     # --------------------------------------------------------------------------
     # additional kwargs for comp.Component
     if bar2dmo == False:
-        comp_stars_kwargs = {'name': 'stars',
+        comp_stars_kwargs = {'name': 'cen',
                              'r200m': r200m,
                              'm200m': m200m,
                              'p_lin': prms.p_lin,
                              'dndm': prms.dndm,
-                             'f_comp': f_stars}
+                             'f_comp': f_cen}
     else:
         prms_dmo = deepcopy(prms)
         prms_dmo.m200m = m_dmo
-        comp_stars_kwargs = {'name': 'stars',
+        comp_stars_kwargs = {'name': 'cen',
                              'r200m': r200m,
                              'm200m': m200m,
                              'p_lin': prms.p_lin,
                              'dndm': prms_dmo.dndm,
-                             'f_comp': f_stars}
+                             'f_comp': f_cen}
 
     stars_kwargs = tools.merge_dicts(prof_stars_kwargs, comp_stars_kwargs)
 
@@ -1044,334 +1148,283 @@ def load_stars_5r500c(f_gas, prms=p.prms, bar2dmo=True):
     return comp_stars
 
 # ------------------------------------------------------------------------------
-# End of load_stars_5r500c()
+# End of load_stars_rmax()
 # ------------------------------------------------------------------------------
 
-def load_models(prms=p.prms, q_f=50, q_rc=50, q_beta=50, bar2dmo=True):
+def load_satellites_rmax(r_max, f_gas, f_c=0.86, prms=p.prms, bar2dmo=True):
+    '''
+    Return NFW profiles with fstars_500c = f_obs
+
+    Parameters
+    ----------
+    f_c : float
+      ratio between c_sat(m) and c_dm(m) used in iHOD
+    prms : p.Parameters object
+      contains relevant model info
+    bar2dmo : bool
+      specifies whether to carry out hmf conversion for missing m200m
+    '''
+    # halo model parameters
+    # ! WATCH OUT ! These are the SPH equivalent masses and do thus not
+    # correspond to the DMO case, unless f_gas,200m + f_stars,200m = f_b
+    m200m = prms.m200m
+    m500c = prms.m500c
+    r500c = prms.r500c
+    r200m = prms.r200m
+
+    r_min = prms.r_range_lin[:,0]
+    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
+                        for i,rm in enumerate(r_max)])
+    rx = r_range / r500c.reshape(-1,1)
+    k_range = prms.k_range_lin
+
+    # stellar fraction
+    f_sat = d.f_stars(m200m, comp='sat')
+    f_stars = d.f_stars(m200m, comp='all')
+    c = f_c * prms.c_correa
+    r_x = r200m
+
+    # relative position of virial radius
+    x200m = r200m / r500c
+
+    prof_stars = np.zeros_like(rx)
+    for idx, prof in enumerate(prof_stars):
+        sl = (rx[idx] <= x200m[idx])
+        prof_stars[idx][sl] = profs.profile_NFW(r_range[idx][sl].reshape(1,-1),
+                                                m200m[idx].reshape(1,1),
+                                                c[idx], r_x[idx],
+                                                prms.rho_m).reshape(-1)
+
+    # Can give the profile all of the halo model parameters, since it is
+    # a fit to observations, only the power spectrum calculation needs
+    # to convert these values to the DMO equivalent cases
+    profile_kwargs = {'r_range': r_range,
+                      'm_bar': m200m,
+                      'k_range': prms.k_range_lin,
+                      'n': 80,
+                      'taylor_err': 1.e-50}
+
+    # --------------------------------------------------------------------------
+    stars_extra = {'profile': prof_stars}
+    prof_stars_kwargs = tools.merge_dicts(profile_kwargs, stars_extra)
+
+    # Now we can determine the equivalent DMO masses from the f_gas - m relation
+    m_dmo = d.m200b_to_m200dmo(m200m, f_gas + f_stars, prms)
+    r_dmo = tools.mass_to_radius(m_dmo, 200 * prms.rho_m)
+
+    # # renormalize radial range
+    # r_range_dmo = r_range * r_dmo.reshape(-1,1) / r200m.reshape(-1,1)
+    # # ! This is not necessary, since the radial range is not required
+    # # ! in the halo model, except for the density profiles which are fit
+    # # ! in the observations and thus do not need to be renormalized
+
+    # --------------------------------------------------------------------------
+    # additional kwargs for comp.Component
+    if bar2dmo == False:
+        comp_stars_kwargs = {'name': 'sat',
+                             'r200m': r200m,
+                             'm200m': m200m,
+                             'p_lin': prms.p_lin,
+                             'dndm': prms.dndm,
+                             'f_comp': f_sat}
+    else:
+        prms_dmo = deepcopy(prms)
+        prms_dmo.m200m = m_dmo
+        comp_stars_kwargs = {'name': 'sat',
+                             'r200m': r200m,
+                             'm200m': m200m,
+                             'p_lin': prms.p_lin,
+                             'dndm': prms_dmo.dndm,
+                             'f_comp': f_sat}
+
+    stars_kwargs = tools.merge_dicts(prof_stars_kwargs, comp_stars_kwargs)
+
+    comp_stars = comp.Component(**stars_kwargs)
+    return comp_stars
+
+# ------------------------------------------------------------------------------
+# End of load_satellites_rmax()
+# ------------------------------------------------------------------------------
+
+
+def load_models(prms=p.prms, q_f=50, q_rc=50, q_beta=50, bar2dmo=True,
+                delta=False):
+    # load these variables to have optimal order for mass calculations
+    m200c = prms.m200c
+    m500c = prms.m500c
+    c_correa = prms.c_correa
+
     f_stars = d.f_stars(prms.m200m)
     # load dmo power spectrum
     dm_dmo = load_dm_dmo(prms)
     pow_dm_dmo = power.Power([dm_dmo], name='dmo')
 
-    dm_dmo_5r500c = load_dm_dmo_5r500c(prms)
+    dm_dmo_5r500c = load_dm_dmo_rmax(5*prms.r500c, prms)
+    dm_dmo_1p5r200m = load_dm_dmo_rmax(1.5*prms.r200m, prms)
     pow_dm_dmo_5r500c = power.Power([dm_dmo_5r500c], name='dmo_5r500c')
+    pow_dm_dmo_1p5r200m = power.Power([dm_dmo_1p5r200m], name='dmo_1p5r200m')
 
     # load dm models
     dm = load_dm(m_dmo=prms.m200m, prms=prms, bar2dmo=False)
-    dm_5r500c = load_dm_5r500c(m_dmo=prms.m200m, prms=prms, bar2dmo=False)
+    dm_5r500c = load_dm_rmax(r_max=5*prms.r500c,m_dmo=prms.m200m,
+                               prms=prms, bar2dmo=False)
+    dm_1p5r200m = load_dm_rmax(r_max=1.5*prms.r200m, m_dmo=prms.m200m,
+                               prms=prms, bar2dmo=False)
 
+    # --------------------------------------------------------------------------
+    # MODEL 1
+    # --------------------------------------------------------------------------
     # load gas_obs
     gas = load_gas(f_stars, prms, q_f, q_rc, q_beta, bar2dmo=bar2dmo)
     # load stars
-    stars = load_stars(gas.f_comp, prms, bar2dmo=bar2dmo)
+    if not delta:
+        cen = load_centrals(gas.f_comp, prms, bar2dmo=bar2dmo)
+        sat = load_satellites(gas.f_comp, 0.86, prms, bar2dmo=bar2dmo)
+        stars = cen + sat
+    else:
+        stars = load_centrals(gas.f_comp, prms, bar2dmo=bar2dmo, f_comp='all')
+    stars.name = 'stars'
+
     m_dmo_gas = d.m200b_to_m200dmo(gas.m200m, gas.f_comp + f_stars, prms)
     dm_gas = load_dm(m_dmo=m_dmo_gas, prms=prms, bar2dmo=bar2dmo)
+    # pow_gas = power.Power([dm_gas, gas, cen], name='model1')
     pow_gas = power.Power([dm_gas, gas, stars], name='model1')
 
+    # --------------------------------------------------------------------------
+    # MODEL 2
+    # --------------------------------------------------------------------------
     # load gas_smooth_r500c_r200m
     gas_beta = load_gas_obs(prms, q_f, q_rc, q_beta)
-    # load stars
-    stars_beta = load_stars(prms.f_b - f_stars, prms, bar2dmo=bar2dmo)
+    # load stars -> this model has f_gas,200m = f_b - f_stars
+    if not delta:
+        cen_beta = load_centrals(prms.f_b - f_stars, prms, bar2dmo=bar2dmo)
+        sat_beta = load_satellites(prms.f_b - f_stars, 0.86, prms, bar2dmo=bar2dmo)
+        stars_beta = cen_beta + sat_beta
+    else:
+        stars_beta = load_centrals(prms.f_b - f_stars, prms, bar2dmo=bar2dmo, f_comp='all')
+    stars_beta.name = 'stars'
+
     gas_smooth = load_gas_smooth_r500c_r200m(prms, gas_beta.f_comp, f_stars)
     # does not need new dm since fgas_200m = f_b
-    pow_gas_smooth_r500c_r200m = power.Power([dm, gas_beta, gas_smooth, stars_beta],
+    # pow_gas_smooth_r500c_r200m = power.Power([dm, gas_beta, gas_smooth,
+    #                                           cen_beta],
+    #                                          name='model2')
+    pow_gas_smooth_r500c_r200m = power.Power([dm, gas_beta, gas_smooth,
+                                              stars_beta],
                                              name='model2')
 
-    # load gas_smooth_r200m_5r500c
-    gas_5r500c = load_gas_5r500c(f_stars, prms, q_f, q_rc, q_beta, bar2dmo=bar2dmo)
-    # load stars
-    stars_5r500c = load_stars_5r500c(gas_5r500c.f_comp, prms, bar2dmo=bar2dmo)
-    m_dmo_5r500c = d.m200b_to_m200dmo(gas_5r500c.m200m, gas_5r500c.f_comp + f_stars, prms)
-    gas_smooth_r200m_5r500c = load_gas_smooth_r200m_5r500c(m_dmo_5r500c, prms,
-                                                           gas_5r500c.f_comp,
-                                                           f_stars,
-                                                           bar2dmo=bar2dmo)
-    dm_r200m_5r500c = load_dm_5r500c(m_dmo_5r500c, prms, bar2dmo=bar2dmo)
-    pow_gas_smooth_r200m_5r500c = power.Power([dm_r200m_5r500c, gas_5r500c,
-                                               gas_smooth_r200m_5r500c,
-                                               stars_5r500c],
-                                              name='model4')
-
+    # --------------------------------------------------------------------------
+    # MODEL 3
+    # --------------------------------------------------------------------------
     # load_gas_smooth_r500c_5r500c
-    gas_r500c_5r500c = load_gas_r500c_r200m_5r500c(f_stars, prms, q_f, q_rc, q_beta,
-                                                   bar2dmo=bar2dmo)
+    gas_r500c_5r500c = load_gas_r500c_r200m_rmax(5*prms.r500c,f_stars, prms,
+                                                 q_f, q_rc, q_beta,
+                                                 bar2dmo=bar2dmo)
     # load stars
-    stars_r500c_5r500c = load_stars_5r500c(gas_r500c_5r500c.f_comp, prms, bar2dmo=bar2dmo)
+    if not delta:
+        cen_r500c_5r500c = load_centrals_rmax(5*prms.r500c, gas_r500c_5r500c.f_comp,
+                                              prms, bar2dmo=bar2dmo)
+        sat_r500c_5r500c = load_satellites_rmax(5*prms.r500c, gas_r500c_5r500c.f_comp,
+                                                0.86, prms, bar2dmo=bar2dmo)
+        stars_r500c_5r500c = cen_r500c_5r500c + sat_r500c_5r500c
+    else:
+        stars_r500c_5r500c = load_centrals_rmax(5*prms.r500c, gas_r500c_5r500c.f_comp,
+                                                prms, bar2dmo=bar2dmo, f_comp='all')
+    stars_r500c_5r500c.name = 'stars'
+
     m_dmo_r500c_5r500c = d.m200b_to_m200dmo(gas_r500c_5r500c.m200m,
                                             gas_r500c_5r500c.f_comp + f_stars, prms)
-    gas_smooth_r200m_5r500c = load_gas_smooth_r200m_5r500c(m_dmo_r500c_5r500c,
-                                                           prms,
-                                                           gas_r500c_5r500c.f_comp,
-                                                           f_stars,
-                                                           bar2dmo=bar2dmo)
-    dm_r500c_5r500c = load_dm_5r500c(m_dmo_r500c_5r500c, prms, bar2dmo=bar2dmo)
+    gas_smooth_r200m_5r500c = load_gas_smooth_r200m_rmax(5*prms.r500c,
+                                                         m_dmo_r500c_5r500c,
+                                                         prms,
+                                                         gas_r500c_5r500c.f_comp,
+                                                         f_stars,
+                                                         bar2dmo=bar2dmo)
+    dm_r500c_5r500c = load_dm_rmax(5*prms.r500c, m_dmo_r500c_5r500c,
+                                   prms, bar2dmo=bar2dmo)
+    # pow_gas_smooth_r500c_5r500c = power.Power([dm_r500c_5r500c,
+    #                                            gas_r500c_5r500c,
+    #                                            gas_smooth_r200m_5r500c,
+    #                                            cen_r500c_5r500c],
+    #                                           name='model3')
     pow_gas_smooth_r500c_5r500c = power.Power([dm_r500c_5r500c,
                                                gas_r500c_5r500c,
                                                gas_smooth_r200m_5r500c,
                                                stars_r500c_5r500c],
                                               name='model3')
 
+    # --------------------------------------------------------------------------
+    # MODEL 4
+    # --------------------------------------------------------------------------
+    # load gas_smooth_r200m_5r500c
+    gas_5r500c = load_gas_rmax(5*prms.r500c, f_stars, prms, q_f, q_rc, q_beta,
+                               bar2dmo=bar2dmo)
+    # load stars
+    if not delta:
+        cen_5r500c = load_centrals_rmax(5*prms.r500c,gas_5r500c.f_comp, prms,
+                                        bar2dmo=bar2dmo)
+        sat_5r500c = load_satellites_rmax(5*prms.r500c,gas_5r500c.f_comp, 0.86,
+                                          prms, bar2dmo=bar2dmo)
+        stars_5r500c = cen_5r500c + sat_5r500c
+    else:
+        stars_5r500c = load_centrals_rmax(5*prms.r500c,gas_5r500c.f_comp, prms,
+                                          bar2dmo=bar2dmo, f_comp='all')
+
+    stars_5r500c.name = 'stars'
+    m_dmo_5r500c = d.m200b_to_m200dmo(gas_5r500c.m200m, gas_5r500c.f_comp + f_stars,
+                                      prms)
+    gas_smooth_r200m_5r500c = load_gas_smooth_r200m_rmax(5*prms.r500c, m_dmo_5r500c,
+                                                         prms,
+                                                         gas_5r500c.f_comp,
+                                                         f_stars,
+                                                         bar2dmo=bar2dmo)
+    dm_r200m_5r500c = load_dm_rmax(5*prms.r500c, m_dmo_5r500c, prms,
+                                   bar2dmo=bar2dmo)
+    # pow_gas_smooth_r200m_5r500c = power.Power([dm_r200m_5r500c, gas_5r500c,
+    #                                            gas_smooth_r200m_5r500c,
+    #                                            cen_5r500c],
+    #                                           name='model4')
+    pow_gas_smooth_r200m_5r500c = power.Power([dm_r200m_5r500c, gas_5r500c,
+                                               gas_smooth_r200m_5r500c,
+                                               stars_5r500c],
+                                              name='model4')
+
+    # # --------------------------------------------------------------------------
+    # # MODEL 5
+    # # --------------------------------------------------------------------------
+    # # load gas_smooth_r200m_1p5r200m
+    # gas_1p5r200m = load_gas_rmax(1.5*prms.r200m, f_stars, prms, q_f, q_rc, q_beta,
+    #                              bar2dmo=bar2dmo)
+    # # load stars
+    # cen_1p5r200m = load_centrals_rmax(1.5*prms.r200m, gas_1p5r200m.f_comp, prms,
+    #                                   bar2dmo=bar2dmo)
+    # sat_1p5r200m = load_satellites_rmax(1.5*prms.r200m, gas_1p5r200m.f_comp, 0.86, prms,
+    #                                     bar2dmo=bar2dmo)
+    # m_dmo_1p5r200m = d.m200b_to_m200dmo(gas_1p5r200m.m200m,
+    #                                     gas_1p5r200m.f_comp + f_stars, prms)
+    # gas_smooth_r200m_1p5r200m = load_gas_smooth_r200m_rmax(1.5*prms.r200m,
+    #                                                        m_dmo_1p5r200m, prms,
+    #                                                        gas_1p5r200m.f_comp,
+    #                                                        f_stars,
+    #                                                        bar2dmo=bar2dmo)
+    # dm_r200m_1p5r200m = load_dm_rmax(1.5*prms.r200m, m_dmo_1p5r200m,
+    #                                  prms, bar2dmo=bar2dmo)
+    # pow_gas_smooth_r200m_1p5r200m = power.Power([dm_r200m_1p5r200m, gas_1p5r200m,
+    #                                              gas_smooth_r200m_1p5r200m,
+    #                                              cen_1p5r200m, sat_1p5r200m],
+    #                                             name='model5')
+
     results = {'dm_dmo': pow_dm_dmo,
                'dm_dmo_5r500c': pow_dm_dmo_5r500c,
+               'dm_dmo_1p5r200m': pow_dm_dmo_1p5r200m,
                'gas': pow_gas,
                'smooth_r500c_r200m': pow_gas_smooth_r500c_r200m,
                'smooth_r200m_5r500c': pow_gas_smooth_r200m_5r500c,
+               # 'smooth_r200m_1p5r200m': pow_gas_smooth_r200m_1p5r200m,
                'smooth_r500c_5r500c': pow_gas_smooth_r500c_5r500c}
 
     return results
 
 # ------------------------------------------------------------------------------
 # End of load_models()
-# ------------------------------------------------------------------------------
-
-def plot_profiles_gas_paper(comp_gas, comp_gas_r500c_r200m,
-                            comp_gas_r500c_5r500c,
-                            comp_gas_r200m_5r500c, prms=p.prms):
-    '''
-    Plot the density for our different gas profiles in one plot
-    '''
-    fig = plt.figure(figsize=(18,8))
-    ax1 = fig.add_axes([0.1,0.1,0.266,0.8])
-    ax2 = fig.add_axes([0.366,0.1,0.266,0.8])
-    ax3 = fig.add_axes([0.632,0.1,0.266,0.8])
-
-    idx_1 = 0
-    idx_2 = 50
-    idx_3 = -1
-    r200m = prms.r200m
-    norm = prms.rho_crit
-
-    # pl.set_style('line')
-
-    # Plot idx_1
-    # ax1.plot(comp_gas_dmo.r_range[idx_1] / r200m[idx_1],
-    #          comp_gas_dmo.rho_r[idx_1] * comp_gas_dmo.f_comp[idx_1] / norm,
-    #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
-    ax1.plot(comp_gas.r_range[idx_1] / r200m[idx_1],
-             comp_gas.rho_r[idx_1] * comp_gas.f_comp[idx_1]/norm,
-             lw=3, label=r'model 1')
-    ax1.plot(comp_gas_r500c_r200m.r_range[idx_1] / r200m[idx_1],
-             (comp_gas_r500c_r200m.rho_r[idx_1] *
-              comp_gas_r500c_r200m.f_comp[idx_1] / norm),
-             lw=2, label=r'model 2')
-    ax1.plot(comp_gas_r500c_5r500c.r_range[idx_1] / r200m[idx_1],
-             (comp_gas_r500c_5r500c.rho_r[idx_1] *
-              comp_gas_r500c_5r500c.f_comp[idx_1] / norm), lw=1,
-             label=r'model 3')
-    ax1.plot(comp_gas_r200m_5r500c.r_range[idx_1] / r200m[idx_1],
-             (comp_gas_r200m_5r500c.rho_r[idx_1] *
-              comp_gas_r200m_5r500c.f_comp[idx_1] / norm),
-             lw=1, ls='--', label=r'model 4')
-
-    ax1.axvline(x=prms.r500c[idx_1] / prms.r200m[idx_1], ls='--', c='k')
-    ax1.text(x=prms.r500c[idx_1] / prms.r200m[idx_1] * 2, y=1e2, s=r'$r_\mathrm{500c}$',
-             ha='center', va='center')
-
-    # Plot idx_2
-    # ax2.plot(comp_gas_dmo.r_range[idx_2] / r200m[idx_2],
-    #          comp_gas_dmo.rho_r[idx_2] * comp_gas_dmo.f_comp[idx_2] / norm,
-    #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
-    ax2.plot(comp_gas.r_range[idx_2] / r200m[idx_2],
-             comp_gas.rho_r[idx_2] * comp_gas.f_comp[idx_2]/norm,
-             lw=3, label=r'model 1')
-    ax2.plot(comp_gas_r500c_r200m.r_range[idx_2] / r200m[idx_2],
-             (comp_gas_r500c_r200m.rho_r[idx_2] *
-              comp_gas_r500c_r200m.f_comp[idx_2] / norm),
-             lw=2, label=r'model 2')
-    ax2.plot(comp_gas_r500c_5r500c.r_range[idx_2] / r200m[idx_2],
-             (comp_gas_r500c_5r500c.rho_r[idx_2] *
-              comp_gas_r500c_5r500c.f_comp[idx_2] / norm), lw=1,
-             label=r'model 3')
-    ax2.plot(comp_gas_r200m_5r500c.r_range[idx_2] / r200m[idx_2],
-             (comp_gas_r200m_5r500c.rho_r[idx_2] *
-              comp_gas_r200m_5r500c.f_comp[idx_2] / norm),
-             lw=1, ls='--', label=r'model 4')
-
-    ax2.axvline(x=prms.r500c[idx_2] / prms.r200m[idx_2], ls='--', c='k')
-    ax2.text(x=prms.r500c[idx_2] / prms.r200m[idx_2] * 2, y=1e2, s=r'$r_\mathrm{500c}$',
-             ha='center', va='center')
-
-    # Plot idx_3
-    # ax3.plot(comp_gas_dmo.r_range[idx_3] / r200m[idx_3],
-    #          comp_gas_dmo.rho_r[idx_3] * comp_gas_dmo.f_comp[idx_3] / norm,
-    #          label=r'$f_\mathrm{gas,500c}=f_\mathrm{gas,200m}=f_\mathrm{b}$')
-    ax3.plot(comp_gas.r_range[idx_3] / r200m[idx_3],
-             comp_gas.rho_r[idx_3] * comp_gas.f_comp[idx_3]/norm,
-             lw=3, label=r'model 1')
-    ax3.plot(comp_gas_r500c_r200m.r_range[idx_3] / r200m[idx_3],
-             (comp_gas_r500c_r200m.rho_r[idx_3] *
-              comp_gas_r500c_r200m.f_comp[idx_3] / norm),
-             lw=2, label=r'model 2')
-    ax3.plot(comp_gas_r500c_5r500c.r_range[idx_3] / r200m[idx_3],
-             (comp_gas_r500c_5r500c.rho_r[idx_3] *
-              comp_gas_r500c_5r500c.f_comp[idx_3] / norm), lw=1,
-             label=r'model 3')
-    ax3.plot(comp_gas_r200m_5r500c.r_range[idx_3] / r200m[idx_3],
-             (comp_gas_r200m_5r500c.rho_r[idx_3] *
-              comp_gas_r200m_5r500c.f_comp[idx_3] / norm),
-             lw=1, ls='--', label=r'model 4')
-
-    ax3.axvline(x=prms.r500c[idx_3] / prms.r200m[idx_3], ls='--', c='k')
-    ax3.text(x=prms.r500c[idx_3] / prms.r200m[idx_3] * 2, y=1e2, s=r'$r_\mathrm{500c}$',
-             ha='center', va='center')
-
-    ax1.set_xlim(1e-3, 3)
-    ax1.set_ylim(1e-1, 1e3)
-    ax2.set_xlim(1e-3, 3)
-    ax2.set_ylim(1e-1, 1e3)
-    ax3.set_xlim(1e-3, 3)
-    ax3.set_ylim(1e-1, 1e3)
-
-    ax1.set_xscale('log')
-    ax1.set_yscale('log')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax3.set_xscale('log')
-    ax3.set_yscale('log')
-
-    ax1.tick_params(axis='x', which='major', pad=6)
-    ax2.tick_params(axis='x', which='major', pad=6)
-    ax3.tick_params(axis='x', which='major', pad=6)
-
-    ax2.set_xlabel(r'$r/r_\mathrm{200m}$', labelpad=-2)
-    ax1.set_ylabel(r'$\rho(r)/\rho_\mathrm{c}$')
-    ax2.set_yticklabels([])
-    ax3.set_yticklabels([])
-    # ticks2 = ax2.get_xticklabels()
-    # ticks2[-6].set_visible(False)
-    # ticks3 = ax3.get_xticklabels()
-    # ticks3[-6].set_visible(False)
-
-    ax1.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_1]), y=1.015, fontsize=28)
-    ax2.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_2]), y=1.015, fontsize=28)
-    ax3.set_title(r'$m_{\mathrm{200m}} = 10^{%.1f} \, \mathrm{M_\odot}/h$'%np.log10(prms.m200m[idx_3]), y=1.015, fontsize=28)
-
-    ax3.legend(loc='best')
-    plt.savefig('obs_rho_extrapolated.pdf', transparent=True)
-
-# ------------------------------------------------------------------------------
-# End of plot_profiles_gas_paper()
-# ------------------------------------------------------------------------------
-
-def plot_fgas200m_paper(comp_gas, comp_gas_r500c_5r500c, prms=p.prms):
-    '''
-    Plot gas mass fractions at r200m for our different models
-    '''
-    fig = plt.figure(figsize=(10,9))
-    ax = fig.add_subplot(111)
-
-    f_b = 1 - prms.f_dm
-
-    pl.set_style('line')
-    ax.plot(comp_gas.m200m, comp_gas.f_comp, label='model 1')
-    ax.plot(comp_gas_r500c_5r500c.m200m, comp_gas_r500c_5r500c.f_comp,
-            label='model 3')
-    ax.axhline(y=f_b, c='k', ls='--')
-
-    ax.tick_params(axis='x', which='major', pad=6)
-    text_props = ax.get_xticklabels()[0].get_font_properties()
-
-    # add annotation to f_bar
-    ax.annotate(r'$f_{\mathrm{b}}$',
-                 # xy=(1e14, 0.16), xycoords='data',
-                 # xytext=(1e14, 0.15), textcoords='data',
-                 xy=(10**(11), f_b), xycoords='data',
-                 xytext=(1.2 * 10**(11),
-                         f_b * 0.95), textcoords='data',
-                 fontproperties=text_props)
-
-    ax.set_xscale('log')
-    ax.set_xlabel('$m_\mathrm{200m} \, [\mathrm{M_\odot}/h]$')
-    ax.set_ylabel('$f_\mathrm{gas,200m}$')
-    ax.legend(loc=4)
-    plt.savefig('obs_fgas_extrapolated.pdf', transparent=True)
-
-# ------------------------------------------------------------------------------
-# End of plot_fgas200m_paper()
-# ------------------------------------------------------------------------------
-
-def plot_power_ratio_paper(comp, comp_dmo, comp_gas_dmo, prms=p.prms):
-    '''
-    Plot the power ratio of comp with respect to the dmo and gas_dmo cases
-    '''
-    fig = plt.figure(figsize=(10,9))
-    ax = fig.add_subplot(111)
-
-
-    pl.set_style('line')
-    # ax.plot(prms.k_range, comp.delta_tot / comp_dmo.delta_tot,
-    #         label='gas/dmo')
-    # ax.plot(prms.k_range, comp.delta_tot / comp_gas_dmo.delta_tot,
-    #         label='gas/gas_dmo')
-    ax.plot(prms.k_range_lin, comp / comp_dmo,
-            label='gas/dmo')
-    ax.plot(prms.k_range_lin, comp / comp_gas_dmo,
-            label='gas/gas_dmo')
-
-    ax.set_xscale('log')
-    ax.set_xlabel('$k \, [h / \mathrm{Mpc}]$')
-    ax.set_ylabel('$P_\mathrm{gas}(k)/P_\mathrm{i}(k)$')
-    ax.legend()
-    plt.savefig('obs_power_ratio.pdf', transparent=True)
-
-# ------------------------------------------------------------------------------
-# End of plot_power_ratio_paper()
-# ------------------------------------------------------------------------------
-
-def plot_power_comps_paper(comp1, comp2):
-    '''
-    Compare the power in comp1 to comp2
-    '''
-    pl.set_style('line')
-    plt.clf()
-    fig = plt.figure(figsize=(11, 8))
-    ax_P = fig.add_axes([0.1, 0.35, 0.8, 0.55])
-    ax_r = fig.add_axes([0.1, 0.1, 0.8, 0.25])
-
-    ax_P.plot(comp1.k_range, comp1.delta_tot, label=r'$n(m_\mathrm{dmo}(n_\mathrm{bar}))$')
-    ax_P.plot(comp2.k_range, comp2.delta_tot, label=r'$n(m_\mathrm{dmo})$')
-
-    axd = ax_P.twiny()
-    l = 2 * np.pi / comp1.k_range
-    axd.plot(l, comp1.delta_tot)
-    axd.set_xlim(axd.get_xlim()[::-1])
-    axd.cla()
-    axd.set_xscale('log')
-    axd.set_xlabel(r'$\lambda \, [\mathrm{Mpc}/h]$', labelpad=10)
-    axd.tick_params(axis='x', pad=5)
-
-    # yticklabs = ax_P.get_yticklabels()
-    # yticklabs[0] = ""
-    # ax_P.set_yticklabels(yticklabs)
-    ax_P.set_ylim(ymin=2e-3)
-    ax_P.set_xlim([1e-2,1e2])
-    ax_P.axes.set_xscale('log')
-    ax_P.axes.set_yscale('log')
-    ax_P.set_ylabel(r'$\Delta^2(k)$')
-    # ax_P.set_title(r'Power spectra for BAHAMAS')
-    ax_P.set_xticklabels([])
-    ax_P.legend(loc='best')
-
-    ax_r.plot(comp1.k_range, comp1.delta_tot / comp2.delta_tot)
-    ax_r.axhline(y=1, c='k', ls='--')
-    ax_r.grid()
-    ax_r.set_xlim([1e-2,1e2])
-    # ax_r.set_ylim([1e-3,1])
-    ax_r.set_ylim([0.75,1.1])
-    ax_r.axes.set_xscale('log')
-    # ax_r.axes.set_yscale('log')
-    ax_r.minorticks_on()
-    ax_r.tick_params(axis='x',which='minor',bottom='off')
-
-    ax_r.legend(loc='best')
-    ax_r.set_xlabel(r'$k \, [h/\mathrm{Mpc}]$')
-    # ax_r.set_ylabel(r'$\frac{P_{\mathrm{AGN}} - P_{\mathrm{DM}}}{P_{\mathrm{DM}}}$',
-    #                 labelpad=-2)
-    ax_r.set_ylabel(r'$P_\mathrm{bar}/P_\mathrm{dmo}$')
-
-    plt.savefig('ratio_sim_obs.pdf', dpi=900, transparent=True)
-    # plt.close(fig)
-
-# ------------------------------------------------------------------------------
-# End of plot_power_comps_paper()
 # ------------------------------------------------------------------------------

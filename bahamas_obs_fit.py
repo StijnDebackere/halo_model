@@ -257,43 +257,6 @@ def prof_beta(r, rc, beta, m200):
     prof *= m200 / norm
     return prof
 
-def load_gas_dmo(prms=p.prms):
-    '''
-    Gas component in beta profile with fgas_500c = fgas_200m = f_b
-    '''
-    f_gas = (1 - prms.f_dm) * np.ones_like(prms.m200m)
-    beta, rc, m500c, r, prof_h = d.beta_mass(f_gas, f_gas, prms)
-    # print beta / 3.
-    # print rc
-
-    # general profile kwargs to be used for all components
-    profile_kwargs = {'r_range': prms.r_range_lin,
-                      'm_bar': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-    # --------------------------------------------------------------------------
-    # specific gas extra kwargs -> need to renormalize f_gas to halo mass
-    gas_extra = {'profile': prof_h / f_gas.reshape(-1,1),}
-    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-    # --------------------------------------------------------------------------
-    # additional kwargs for comp.Component
-    comp_gas_kwargs = {'name': 'gas',
-                       'r200m': prms.r200m,
-                       'm200m': prms.m200m,
-                       'p_lin': prms.p_lin,
-                       'dndm': prms.dndm,
-                       'f_comp': f_gas,}
-
-    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
-
-    comp_gas = comp.Component(**gas_kwargs)
-    return comp_gas
-
-# ------------------------------------------------------------------------------
-# End of load_gas_dmo()
-# ------------------------------------------------------------------------------
-
 def prof_gas_hot(x, sl, a, b, m_sl, r500):
     '''beta profile'''
     profile = (1 + (x/a)**2)**(-b/2)
@@ -1028,64 +991,6 @@ def load_dm_sim_5r500c(m_dmo, prms=p.prms, bar2dmo=True):
 
 # ------------------------------------------------------------------------------
 # End of load_dm_sim_5r500c()
-# ------------------------------------------------------------------------------
-
-def load_gas_dmo_5r500c(prms=p.prms):
-    '''
-    Return beta profiles with fgas_500c = fgas_200m = f_b = fgas_5r500c
-    '''
-    # halo model parameters
-    m200m = prms.m200m
-    m500c = prms.m500c
-    r500c = prms.r500c
-    r200m = prms.r200m
-
-    r_min = prms.r_range_lin[:,0]
-    r_max = (5 * r500c)
-    r_range = np.array([np.logspace(np.log10(r_min[i]), np.log10(rm), prms.r_bins)
-                        for i,rm in enumerate(r_max)])
-    rx = r_range / r500c.reshape(-1,1)
-
-    # relative position of virial radius
-    x200m = r200m / r500c
-
-    f_gas = (1 - prms.f_dm) * np.ones_like(prms.m200m)
-    beta, rc, m500c, r, prof_h = d.beta_mass(f_gas, f_gas, prms)
-
-    prof_gas = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_gas):
-        sl = (rx[idx] <= x200m[idx])
-        prof_gas[idx][sl] = prof_gas_hot(rx[idx][sl], sl[sl], rc[idx], beta[idx],
-                                         f_gas[idx] * m200m[idx],
-                                         r500c[idx])
-
-    # profile now runs between 0 and 5r500c
-    profile_kwargs = {'r_range': r_range,
-                      'm_bar': prms.m200m,
-                      'k_range': prms.k_range_lin,
-                      'n': 80,
-                      'taylor_err': 1.e-50}
-    # --------------------------------------------------------------------------
-    # specific gas extra kwargs -> need f_gas
-    gas_extra = {'profile': prof_gas / f_gas.reshape(-1,1)}
-    prof_gas_kwargs = tools.merge_dicts(profile_kwargs, gas_extra)
-    # --------------------------------------------------------------------------
-    # additional kwargs for comp.Component
-    comp_gas_kwargs = {'name': 'gas',
-                       'r200m': r200m,
-                       'm200m': m200m,
-                       'p_lin': prms.p_lin,
-                       'dndm': prms.dndm,
-                       'f_comp': f_gas,}
-
-    gas_kwargs = tools.merge_dicts(prof_gas_kwargs, comp_gas_kwargs)
-
-    comp_gas = comp.Component(**gas_kwargs)
-
-    return comp_gas
-
-# ------------------------------------------------------------------------------
-# End of load_gas_dmo_5r500c()
 # ------------------------------------------------------------------------------
 
 def load_gas_smooth_r200m_5r500c(m_dmo, prms, fgas_200, bar2dmo=True):

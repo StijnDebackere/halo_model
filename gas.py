@@ -344,7 +344,7 @@ def fit_beta_bahamas():
 # End of fit_beta_bahamas()
 # ------------------------------------------------------------------------------
 
-def f_gas(M_halo, M_trans, a, f_0):
+def f_gas(M_halo, M_trans, a, f_0, prms=p.prms):
     '''
     Returns parametrization for gas fraction.
 
@@ -355,7 +355,7 @@ def f_gas(M_halo, M_trans, a, f_0):
     M_halo : array
       Halo mass in terms of M_500
     M_trans : float
-      Mass of transition in units of M_500
+      Mass of transition in units of M_500 / h_70
     a : float
       power law slope of sigmoid
     f_0 : float
@@ -363,7 +363,7 @@ def f_gas(M_halo, M_trans, a, f_0):
 
     Returns
     -------
-    f_gas : array
+    f_gas : array in units of h_70^(-3/2)
       Gas fraction for halo of mass M_halo
     '''
     # baryon fraction
@@ -374,13 +374,19 @@ def f_gas(M_halo, M_trans, a, f_0):
 # End of f_gas()
 # ------------------------------------------------------------------------------
 
-def f_gas_fit(m_range=p.prms.m200m, n_bins=10):
+def f_gas_fit(n_bins=10, prms=p.prms):
     '''
     Fit the f_gas-M_500 relation
     '''
+    # all of these are not in Hubble units!!
     m500, f = np.loadtxt(ddir + 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
                          unpack=True)
-    f_b = p.prms.omegab / p.prms.omegam
+    f_b = prms.omegab / prms.omegam
+
+    # gas fractions assumed h=0.7
+    # f = fgas_500c h_70^(-3/2)
+    # m500 = m500c h_70^(-1)
+
     # bin f_gas
     f_med, edges, bin_idx = stats.binned_statistic(x=m500, values=f,
                                                    statistic='median',
@@ -388,12 +394,8 @@ def f_gas_fit(m_range=p.prms.m200m, n_bins=10):
     f_std, edges, bin_idx = stats.binned_statistic(x=m500, values=f,
                                                    statistic=np.std,
                                                    bins=n_bins)
-    m500 = np.power(10, m500)
-    # c_x = tools.c_correa(m_range, z_range=0).reshape(-1)
-    # m500_model = m_range * tools.Mx_to_My(1., 200, 500, c_x, p.prms.rho_m * 0.7**2)
-
-    # m_idx = np.argmin(np.abs(m500.reshape(-1,1) - m500_model.reshape(1,-1)),
-    #                   axis=-1)
+    # need to convert to Hubble units
+    m500 = np.power(10, m500) * prms.h
 
     centers = np.power(10, 0.5*(edges[1:] + edges[:-1]))
     popt, pcov = opt.curve_fit(f_gas, centers, f_med, sigma=f_std,
@@ -403,16 +405,6 @@ def f_gas_fit(m_range=p.prms.m200m, n_bins=10):
                 'a' : popt[1],
                 'f_0' : popt[2]}
     fit = f_gas(centers, **fit_prms)
-
-    # plt.plot(m500, f, label=r'data', lw=0, marker='o')
-    # plt.plot(centers, f_med, label=r'median')
-    # plt.plot(centers, fit, label=r'fit')
-    # plt.axhline(y=f_b, c='k')
-    # plt.xscale('log')
-    # plt.xlabel(r'$\log_{10} M/M_\odot$')
-    # plt.ylabel(r'$f_{\mathrm{gas}}$')
-    # plt.legend(loc='best')
-    # plt.show()
 
     return fit_prms
 
