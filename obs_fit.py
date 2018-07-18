@@ -321,25 +321,38 @@ def load_gas(f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50, bar2dmo=True):
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
 
-    # these were fit to rho h^(1/2) profiles
-    # we need to rescale our profiles later
+    # ---------------------------------------------------------------- #
+    # Our halo model assumes simulation variables with Hubble units    #
+    # The observations have assumed h=0.7 and get different h scalings #
+    # than the theoretical model                                       #
+    # ---------------------------------------------------------------- #
+    # FOR THE FITS WE NEED TO CONVERT ALL OF OUR HALO MODEL RESULTS TO
+    # h=0.7!!!
+    # Since r_c and beta are the same for all halo masses, it doesn't
+    # matter here
     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
+
     # gas fractions
+    # h=0.7 needs to be converted here
     f_prms = d.f_gas_prms(prms, q=q_f)
-    f_gas500 = d.f_gas(m500c, prms=prms, **f_prms)
+    f_gas500 = d.f_gas(m500c / 0.7, prms=prms, **f_prms)
 
     # determine the radius at which the beta profile mass exceeds the
     # baryon fraction
-    r_cut = tools.r_where_m_beta((prms.f_b - f_stars) * m200m, beta, rc,
+    # h=0.7 needs to be converted here
+    r_cut = tools.r_where_m_beta((prms.f_b - f_stars) * m200m,
+                                 beta, rc,
                                  f_gas500 * m500c, r500c)
 
     prof_gas = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
         sl_500 = (rx[idx] <= 1.)
         sl_fb = (rx[idx] >= r_cut[idx] / r500c[idx])
+        # this profile corresponds to the physically measured one
+        # assuming h=0.7, but our theoretical rho ~ h^2
         prof_gas[idx] = prof_beta(rx[idx], sl_500, rc, beta,
-                                     f_gas500[idx] * m500c[idx],
-                                     r500c[idx])
+                                  f_gas500[idx] * m500c[idx] / 0.7,
+                                  r500c[idx] / 0.7) * (0.7)**(-2.)
         prof_gas[idx][sl_fb] = 0.
 
     mgas200 = tools.m_h(prof_gas, prms.r_range_lin)
@@ -413,9 +426,9 @@ def load_gas_obs(prms=p.prms, q_f=50, q_rc=50, q_beta=50):
     q_beta : float
       percentile for beta-m500 relation fit
     '''
-    rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
-
     # halo model parameters
+    # ! WATCH OUT ! These are the SPH equivalent masses and do thus not
+    # correspond to the DMO case, unless f_gas,200m = f_b
     m200m = prms.m200m
     r200m = prms.r200m
     m500c = prms.m500c
@@ -425,16 +438,31 @@ def load_gas_obs(prms=p.prms, q_f=50, q_rc=50, q_beta=50):
     r_range = prms.r_range_lin
     rx = r_range / r500c.reshape(-1,1)
 
+    # ---------------------------------------------------------------- #
+    # Our halo model assumes simulation variables with Hubble units    #
+    # The observations have assumed h=0.7 and get different h scalings #
+    # than the theoretical model                                       #
+    # ---------------------------------------------------------------- #
+    # FOR THE FITS WE NEED TO CONVERT ALL OF OUR HALO MODEL RESULTS TO
+    # h=0.7!!!
+    # Since r_c and beta are the same for all halo masses, it doesn't
+    # matter here
+    rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
+
     # gas fractions
+    # h=0.7 needs to be converted here
     f_prms = d.f_gas_prms(prms, q=q_f)
-    f_gas500 = d.f_gas(m500c, prms=prms, **f_prms)
+    f_gas500 = d.f_gas(m500c / 0.7, prms=prms, **f_prms)
 
     prof_gas = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
-        sl = (rx[idx] <= 1.)
-        prof_gas[idx][sl] = prof_beta(rx[idx][sl], sl[sl], rc, beta,
-                                         f_gas500[idx] * m500c[idx],
-                                         r500c[idx])
+        sl_500 = (rx[idx] <= 1.)
+        # this profile corresponds to the physically measured one
+        # assuming h=0.7, but our theoretical rho ~ h^2
+        prof_gas[idx][sl_500] = prof_beta(rx[idx][sl_500], sl_500[sl_500],
+                                          rc, beta,
+                                          f_gas500[idx] * m500c[idx] / 0.7,
+                                          r500c[idx] / 0.7) * (0.7)**(-2.)
 
     mgas200 = tools.m_h(prof_gas, prms.r_range_lin)
     f_gas = mgas200 / m200m
@@ -571,14 +599,27 @@ def load_gas_rmax(r_max, f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
+    # ---------------------------------------------------------------- #
+    # Our halo model assumes simulation variables with Hubble units    #
+    # The observations have assumed h=0.7 and get different h scalings #
+    # than the theoretical model                                       #
+    # ---------------------------------------------------------------- #
+    # FOR THE FITS WE NEED TO CONVERT ALL OF OUR HALO MODEL RESULTS TO
+    # h=0.7!!!
+    # Since r_c and beta are the same for all halo masses, it doesn't
+    # matter here
     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
+
     # gas fractions
+    # h=0.7 needs to be converted here
     f_prms = d.f_gas_prms(prms, q=q_f)
-    f_gas500 = d.f_gas(m500c, prms=prms, **f_prms)
+    f_gas500 = d.f_gas(m500c / 0.7, prms=prms, **f_prms)
 
     # determine the radius at which the beta profile mass exceeds the
     # baryon fraction
-    r_cut = tools.r_where_m_beta((prms.f_b - f_stars) * m200m, beta, rc,
+    # h=0.7 needs to be converted here
+    r_cut = tools.r_where_m_beta((prms.f_b - f_stars) * m200m,
+                                 beta, rc,
                                  f_gas500 * m500c, r500c)
 
     # relative position of virial radius
@@ -589,9 +630,11 @@ def load_gas_rmax(r_max, f_stars, prms=p.prms, q_f=50, q_rc=50, q_beta=50,
         sl = (rx[idx] <= x200m[idx])
         sl_500 = (rx[idx] <= 1.)
         sl_fb = (rx[idx] >= r_cut[idx] / r500c[idx])
+        # this profile corresponds to the physically measured one
+        # assuming h=0.7, but our theoretical rho ~ h^2
         prof_gas[idx][sl] = prof_beta(rx[idx], sl_500, rc, beta,
-                                         f_gas500[idx] * m500c[idx],
-                                         r500c[idx])[sl]
+                                      f_gas500[idx] * m500c[idx] / 0.7,
+                                      r500c[idx] / 0.7)[sl] * (0.7)**(-2.)
         prof_gas[idx][sl_fb] = 0.
 
     # can integrate entire profile, since it's zero for r>r200m
@@ -684,18 +727,27 @@ def load_gas_r500c_r200m_rmax(r_max, f_stars, prms=p.prms, q_f=50, q_rc=50, q_be
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
-    # # will need to fill exact r500c values in r_range for uniform profile to match
-    # r500_in_range = np.zeros_like(m200m)
-
+    # ---------------------------------------------------------------- #
+    # Our halo model assumes simulation variables with Hubble units    #
+    # The observations have assumed h=0.7 and get different h scalings #
+    # than the theoretical model                                       #
+    # ---------------------------------------------------------------- #
+    # FOR THE FITS WE NEED TO CONVERT ALL OF OUR HALO MODEL RESULTS TO
+    # h=0.7!!!
+    # Since r_c and beta are the same for all halo masses, it doesn't
+    # matter here
     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
+
     # gas fractions
+    # h=0.7 needs to be converted here
     f_prms = d.f_gas_prms(prms, q=q_f)
-    f_gas500 = d.f_gas(m500c, prms=prms, **f_prms)
-    f_b = 1 - prms.f_dm
+    f_gas500 = d.f_gas(m500c / 0.7, prms=prms, **f_prms)
 
     # determine the radius at which the beta profile mass exceeds the
     # baryon fraction
-    r_cut = tools.r_where_m_beta((prms.f_b - f_stars) * m200m, beta, rc,
+    # h=0.7 needs to be converted here
+    r_cut = tools.r_where_m_beta((prms.f_b - f_stars) * m200m,
+                                 beta, rc,
                                  f_gas500 * m500c, r500c)
 
     # relative position of virial radius
@@ -709,22 +761,28 @@ def load_gas_r500c_r200m_rmax(r_max, f_stars, prms=p.prms, q_f=50, q_rc=50, q_be
         sl_gt500 = (rx[idx] >= 1.)
         # radial range up to r500c
         sl_500 = (rx[idx] <= 1.)
-
-        # # fill exact value
-        # r500_in_range[idx] = r_range[idx][sl_gt500.nonzero()[0][0]]
+        sl_fb = (rx[idx] >= r_cut[idx] / r500c[idx])
 
         # use beta profile up to r500c
-        prof_gas[idx][sl_500] = prof_beta(rx[idx], sl_500, rc, beta,
-                                             f_gas500[idx] * m500c[idx],
-                                             r500c[idx])[sl_500]
+
+        # this profile corresponds to the physically measured one
+        # assuming h=0.7, but our theoretical rho ~ h^2
+        prof_gas[idx][sl_500] = prof_beta(rx[idx][sl_500], sl_500[sl_500],
+                                          rc, beta,
+                                          f_gas500[idx] * m500c[idx] / 0.7,
+                                          r500c[idx] / 0.7) * (0.7)**(-2.)
 
         m_gas500 = tools.m_h(prof_gas[idx], r_range[idx])
+
         # put remaining mass in smooth component outside r500c up to r200m
         prof_gas[idx][sl_gt500] = 1.
         mass_gt500 = tools.m_h(prof_gas[idx][sl_gt500], r_range[idx][sl_gt500])
-        prof_gas[idx][sl_gt500] *= ((f_b - f_stars[idx] - m_gas500 / m200m[idx]) *
+
+        prof_gas[idx][sl_gt500] *= ((prms.f_b - f_stars[idx] - m_gas500 / m200m[idx]) *
                                     m200m[idx] / mass_gt500)
+
         prof_gas[idx][sl_gt200] = 0.
+        prof_gas[idx][sl_fb] = 0.
 
     # can integrate entire profile, since it's zero for r>r200m
     mgas = tools.m_h(prof_gas, r_range)
@@ -1004,8 +1062,8 @@ def load_satellites(f_gas, f_c=0.86, prms=p.prms, bar2dmo=True):
     k_range = prms.k_range_lin
 
     # stellar fraction
-    f_sat = d.f_stars(m200m, comp='sat')
-    f_stars = d.f_stars(m200m, comp='all')
+    f_sat = d.f_stars(m200m / 0.7, comp='sat')
+    f_stars = d.f_stars(m200m / 0.7, comp='all')
     c = f_c * prms.c_correa
 
     # Can give the profile all of the halo model parameters, since it is
@@ -1256,7 +1314,10 @@ def load_models(prms=p.prms, q_f=50, q_rc=50, q_beta=50, bar2dmo=True,
     m500c = prms.m500c
     c_correa = prms.c_correa
 
-    f_stars = d.f_stars(prms.m200m)
+    # the data assumed h=0.7, but resulting f_star is independent of h in our
+    # model
+    f_stars = d.f_stars(prms.m200m / 0.7)
+
     # load dmo power spectrum
     dm_dmo = load_dm_dmo(prms)
     pow_dm_dmo = power.Power([dm_dmo], name='dmo')
