@@ -1,296 +1,183 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import halo.parameters as p
+import halo.hmf as hmf
+import halo.tools as tools
 from halo.tools import Integrate
-import halo.model.component as comp
-from halo.model._cache import Cache, cached_property, parameter
-
+import halo.model._cache as cache
+import halo.model.density as density
 import pdb
 
-class Power(Cache):
+class Power(cache.Cache):
     '''
     Object containing info on the total matter power spectrum of all matter
     components. Components should have same range properties.
 
     Parameters
     ----------
-    components : list
-      list of components
-    name : str
-      name for this Power instance
+    prof : density.Profile()
+      a density profile to compute the power spectrum for
+    hmf_prms : dict
+      a dictionary with the parameters for the hmf.Massfunction class
 
     Methods
     -------
 
     '''
-    def __init__(self, components, name):
+    def __init__(self, prof=density.Profile(),
+                 hmf_prms={'transfer_fit': 'FromFile',
+                           'transfer_options': {'fname': 'camb/wmap9_transfer_out.dat'},
+                           'mf_fit': 'Tinker10',
+                           'cut_fit': False,
+                           'delta_h': 200.,
+                           'delta_wrt': 'mean',
+                           'delta_c': 1.686},
+                 bar2dmo=True):
         super(Power, self).__init__()
-        self.name = name
-        self.comps = {}
-        self.r_range = components[0].r_range
-        self.r200m = components[0].r200m
-        self.m200m = components[0].m200m
-        self.k_range = components[0].k_range
-        self.dndm = components[0].dndm
-        self.p_lin = components[0].p_lin
-        for comp in components:
-            self.comps[comp.name] = comp
-            r_range = comp.r_range
-            r200m = comp.r200m
-            m200m = comp.m200m
-            k_range = comp.k_range
-            dndm = comp.dndm
-            p_lin = comp.p_lin
-            if not (np.allclose(r_range, self.r_range) or
-                    np.allclose(r200m, self.r200m) or
-                    np.allclose(m200m, self.m200m) or
-                    np.allclose(k_range, self.k_range) or
-                    np.allclose(dndm, self.dndm) or
-                    np.allclose(p_lin, self.p_lin)):
-                raise AttributeError('m200m/r200m/r_range/k_range/p_lin/dndm need to be equal')
+        self.profile = prof
+        self.rho_k = prof.rho_k
+        self.m_h = prof.m_h
+        self.m200m_obs = prof.m200m_obs
+        self.f200m_obs = prof.f200m_obs
+        self.k_range = prof.k_range
+        self.z = prof.z
+        self.cosmo = prof.cosmo
+        self.bar2dmo = bar2dmo
 
+        self.hmf_prms = tools.merge_dicts(prof.cosmo.cosmo_dict, hmf_prms)
+        self.hmf_prms['lnk_min'] = np.log(np.min(prof.k_range))
+        self.hmf_prms['lnk_max'] = np.log(np.max(prof.k_range))
+        self.hmf_prms['dlnk'] = (np.log(prof.k_range[1]) - np.log(prof.k_range[0]))
+        self.hmf_prms['z'] = prof.z
+        # m_range needs to be m200m_dmo
+        # self.hmf_prms['m_range'] = prof.m200m
 
     #===========================================================================
     # Parameters
     #===========================================================================
-    @parameter
-    def name(self, val):
+    @cache.parameter
+    def profile(self, val):
         return val
 
-    @parameter
-    def comps(self, val):
+    @cache.parameter
+    def cosmo(self, val):
         return val
 
-    @parameter
-    def r_range(self, val):
+    @cache.parameter
+    def bar2dmo(self, val):
         return val
 
-    @parameter
-    def r200m(self, val):
+    @cache.parameter
+    def m_h(self, val):
         return val
 
-    @parameter
-    def m200m(self, val):
+    @cache.parameter
+    def m200m_obs(self, val):
         return val
 
-    @parameter
+    @cache.parameter
+    def f200m_obs(self, val):
+        return val
+
+    @cache.parameter
     def k_range(self, val):
         return val
 
-    @parameter
-    def dndm(self, val):
+    @cache.parameter
+    def rho_k(self, val):
         return val
 
-    @parameter
-    def p_lin(self, val):
+    @cache.parameter
+    def z(self, val):
+        return val
+
+    @cache.parameter
+    def hmf_prms(self, val):
         return val
 
     #===========================================================================
     # Methods
     #===========================================================================
-    @staticmethod
-    def _cross_1halo(comp_1, comp_2):
+    @cache.cached_property('m_fn')
+    def rho_m(self):
+        return self.m_fn.rho_m
+
+    @cache.cached_property('m200m_obs', 'f200m_obs')
+    def m200m_dmo(self):
         '''
-        Compute the 1-halo cross-correlation between comp_1 and comp_2
+        Return the dark matter only equivalent halo mass for the input profile.
+        The missing mass fraction from dark matter + baryons determines the
+        deficit between the observed mass and the dark matter only equivalent.
+
+        Returns
+        '''
+        return self.m200m_obs / (1 - (1. - self.f200m_obs))
+
+    @cache.cached_property('m200m_dmo', 'hmf_prms', 'cosmo', 'bar2dmo')
+    def m_fn(self):
+        hmf_prms = self.hmf_prms
+        if bar2dmo:
+            hmf_prms['m_range'] = self.m200m_dmo
+        else:
+            hmf_prms['m_range'] = self.m200m_obs
+
+        m_fn = hmf.MassFunction(**hmf_prms)
+        return m_fn
+
+    @cache.cached_property('m_fn')
+    def p_lin(self):
+        '''
+        Return linear power spectrum
+        '''
+        return np.exp(self.m_fn.power)
+
+    @cache.cached_property('p_lin', 'k_range')
+    def delta_lin(self):
+        '''
+        Return linear dimensionless power spectrum
+        '''
+        return 0.5 / np.pi**2 * self.k_range**3 * self.p_lin
+
+    @cache.cached_property('m_fn', 'm200m_dmo')
+    def dndm(self):
+        return self.m_fn.dndm
+
+    @cache.cached_property('dndm', 'rho_m', 'm_h', 'rho_k')
+    def p_1h(self):
+        '''
+        Return the 1h power spectrum P_1h(k)
+
+        P_1h = int_m_h (m_h/rho_m)^2 n(m_dmo(m_h)) |rho(k|m)|^2 dm_h
         '''
         # define shapes for readability
-        m = comp_1.m200m.shape[0]
-        k = comp_1.k_range.shape[0]
+        m_s = self.m_h.shape[0]
 
-        r200m = comp_1.r200m.reshape(m,1)
-        m200m = comp_1.m200m.reshape(m,1)
-        dndm = comp_1.dndm.reshape(m,1)
+        m_h = self.m_h.reshape(m_s,1)
+        dndm = self.dndm.reshape(m_s,1)
 
-        f_comp_1 = comp_1.f_comp.reshape(m,1)
-        f_comp_2 = comp_2.f_comp.reshape(m,1)
-
-        prefactor = (4./3 * np.pi * 200)**2
-        result = Integrate(y=dndm * f_comp_1 * comp_1.rho_k *
-                           f_comp_2 * comp_2.rho_k * r200m**6,
-                           x=m200m,
-                           axis=0)
-
-        result *= prefactor
+        result = tools.Integrate(y=(1. / self.rho_m)**2 * dndm * np.abs(self.rho_k)**2,
+                                 x=m_h, axis=0)
 
         return result
 
-    # @staticmethod
-    # def _cross_2halo(comp_1, comp_2):
-    #     '''
-    #     Compute the 2-halo cross-correlation between components comp_1 and
-    #     comp_2
-    #     '''
-    #     # define shapes for readability
-    #     m = comp_1.m200m.shape[0]
-    #     k = comp_1.k_range.shape[0]
-
-    #     # dndlnm = comp_1.m_fn.dndlnm.reshape(m,1)
-    #     nu = comp_1.nu.reshape(m,1)
-    #     fnu = comp_1.fnu.reshape(m,1)
-
-    #     f_comp_1 = comp_1.f_comp.reshape(m,1)
-    #     f_comp_2 = comp_2.f_comp.reshape(m,1)
-    #     bias_1 = comp_1.bias.reshape(m,1)
-    #     bias_2 = comp_2.bias.reshape(m,1)
-
-    #     prefactor = comp_1.p_lin
-    #     result = (Integrate(y=fnu * f_comp_1 * comp_1.rho_k * bias_1,
-    #                         x=nu,
-    #                         axis=0) *
-    #               Integrate(y=fnu * f_comp_2 * comp_2.rho_k * bias_2,
-    #                         x=nu,
-    #                         axis=0))
-    #     result *= prefactor
-
-    #     return result
-
-    # @staticmethod
-    # def _cross_power_2h(comp_1, comp_2):
-    #     '''
-    #     Compute the 2h cross-correlation between comp_1 and comp_2.
-    #     '''
-    #     # p_2h = Power._cross_2halo(comp_1, comp_2)
-
-    #     return p_2h
-
-    @staticmethod
-    def _cross_power_1h(comp_1, comp_2):
-        '''
-        Compute the 1h cross-correlation between comp_1 and comp_2.
-        '''
-        p_1h = Power._cross_1halo(comp_1, comp_2)
-
-        return p_1h
-
-    @staticmethod
-    def _cross_power(comp_1, comp_2):
-        '''
-        Compute the 1h cross-correlation between comp_1 and comp_2.
-        '''
-        # p_2h = Power._cross_2halo(comp_1, comp_2)
-        p_1h = Power._cross_1halo(comp_1, comp_2)
-
-        p_tot = p_1h # + p_2h
-
-        return p_tot
-
-    @cached_property('comps')
-    def cross_p(self):
-        '''
-        Compute all cross-correlation terms between different components.
-        '''
-        cross = {}
-        keys = list(self.comps.keys())
-        for idx, key_1 in enumerate(keys):
-            comp_1 = self.comps[key_1]
-
-            for key_2 in keys[idx+1:]:
-                comp_2 = self.comps[key_2]
-
-                cross_name = '{:s}-{:s}'.format(comp_1.name, comp_2.name)
-                cross[cross_name] = Power._cross_power(comp_1, comp_2)
-
-        return cross
-
-    @cached_property('cross_p')
-    def cross_delta(self):
-        '''
-        Compute dimensionless power spectrum
-        '''
-        k_range = self.comps[list(self.comps.keys())[0]].k_range
-        cross_d = {}
-        for key, item in self.cross_p.items():
-            cross_d[key] = 1./(2*np.pi**2) * k_range**3 * item
-
-        return cross_d
-
-    @cached_property('p_lin', 'comps')
-    def delta_lin(self):
-        '''
-        Return linear delta
-        '''
-        k_range = list(self.comps.values())[0].k_range
-
-        return 0.5 / np.pi**2 * k_range**3 * self.p_lin
-
-    @cached_property('comps')
-    def p_1h(self):
-        '''
-        Return 1h power including correlations
-        '''
-        rho = p.prms.rho_m
-        p_1h = 0
-
-        for key, comp in self.comps.items():
-            k_range = comp.k_range
-
-            p_1h += comp.p_1h
-
-        cross_1h = {}
-        keys = list(self.comps.keys())
-        for idx, key_1 in enumerate(keys):
-            comp_1 = self.comps[key_1]
-
-            for key_2 in keys[idx+1:]:
-                comp_2 = self.comps[key_2]
-                cross_name = '{:s}-{:s}'.format(comp_1.name, comp_2.name)
-                cross_1h[cross_name] = Power._cross_power_1h(comp_1, comp_2)
-
-        for key, cross_comp in cross_1h.items():
-            p_1h += 2 * cross_comp
-
-        return p_1h
-
-    @cached_property('p_1h', 'comps')
+    @cache.cached_property('p_1h', 'k_range')
     def delta_1h(self):
         '''
         Return 1h dimensionless power
         '''
-        k_range = list(self.comps.values())[0].k_range
-
-        return 0.5 / np.pi**2 * k_range**3 * self.p_1h
+        return 0.5 / np.pi**2 * self.k_range**3 * self.p_1h
 
 
-    @cached_property('cross_p', 'comps', 'p_lin')
+    @cache.cached_property('p_1h', 'p_lin')
     def p_tot(self):
         '''
-        Return total power including correlations
+        Return total power spectrum
         '''
-        rho = p.prms.rho_m
-        p_tot = self.p_lin
-        for key, comp in self.comps.items():
-            k_range = comp.k_range
+        return self.p_lin + self.p_1h
 
-            p_tot += comp.p_1h
-
-        for key, cross_comp in self.cross_p.items():
-            c1, c2 = key.split('-')
-
-            k_range = self.comps[c1].k_range
-
-            p_cross = 2 * cross_comp
-            p_tot += p_cross
-
-        return p_tot
-
-    @cached_property('cross_delta', 'comps', 'p_lin')
+    @cache.cached_property('p_tot', 'k_range')
     def delta_tot(self):
         '''
-        Return total dimensionless power including correlations
+        Return total dimensionless power spectrum
         '''
-        d_tot = 0.
-        for key, comp in self.comps.items():
-            k_range = comp.k_range
-            d_tot += comp.delta_1h
-
-        for key, cross_comp in self.cross_delta.items():
-            c1, c2 = key.split('-')
-
-            d_cross = 2 * cross_comp
-            d_tot += d_cross
-
-        d_lin = 0.5 / np.pi**2 * k_range**3 * self.p_lin
-        d_tot += d_lin
-
-        return d_tot
+        return 0.5 / np.pi**2 * self.k_range**3 * self.p_tot

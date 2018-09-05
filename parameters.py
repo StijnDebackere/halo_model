@@ -21,7 +21,7 @@ class Parameters(Cache):
 
     Parameters
     ----------
-    m_range : float
+    m_range : (m,) array
       Halo mass range [units Msun h^-1]
     r_min : float
       Minimum log radius [units h^-1 Mpc]
@@ -77,15 +77,21 @@ class Parameters(Cache):
     def __init__(self, m200m,
                  r_min=-4.0, r_bins=1000,
                  k_min=-1.8, k_max=2., k_bins=1000,
-                 sigma_8=0.821, H0=70.0, omegab=0.0463, omegac=0.233,
-                 omegav=0.7207, n=0.972,
-                 transfer_fit='FromFile',
-                 transfer_options={'fname': 'camb/wmap9_transfer_out.dat'},
-                 z=0.,
-                 delta_h=200.,
-                 mf_fit='Tinker10', cut_fit=False,
-                 delta_wrt='mean', delta_c=1.686,
-                 rho_crit=2.7763458 * (10.0**11.0)):
+                 cosmo=hmf.cosmo.Cosmology(**{'sigma_8': 0.821,
+                                              'H0': 70.0,
+                                              'omegab': 0.0463,
+                                              'omegac': 0.233,
+                                              'omegam': 0.0463 + 0.233,
+                                              'omegav': 0.7207,
+                                              'n': 0.972}),
+                 hmf_prms={'transfer_fit': 'FromFile',
+                           'transfer_options': {'fname': 'camb/wmap9_transfer_out.dat'},
+                           'mf_fit': 'Tinker10',
+                           'cut_fit': False,
+                           'delta_h': 200.,
+                           'delta_wrt': 'mean',
+                           'delta_c': 1.686},
+                 z=0.):
         super(Parameters, self).__init__()
         self.m200m = m200m
         self.r_min = r_min
@@ -93,21 +99,13 @@ class Parameters(Cache):
         self.k_min = k_min
         self.k_max = k_max
         self.k_bins = k_bins
-        self.sigma_8 = sigma_8
-        self.H0 = H0
-        self.omegab = omegab
-        self.omegac = omegac
-        self.omegav = omegav
-        self.n = n
-        self.transfer_fit = transfer_fit
-        self.transfer_options = transfer_options
+        self.cosmo = cosmo
         self.z = z
-        self.mf_fit = mf_fit
-        self.cut_fit = cut_fit
-        self.delta_h = delta_h
-        self.delta_wrt = delta_wrt
-        self.delta_c = delta_c
-        self.rho_crit = rho_crit
+        self.hmf_prms = tools.merge_dicts(cosmo.cosmo_dict, hmf_prms)
+        self.hmf_prms['lnk_min'] = np.log(10**k_min)
+        self.hmf_prms['lnk_max'] = np.log(10**k_max)
+        # self.hmf_prms['dlnk'] = (np.log(prof.k_range[1]) - np.log(prof.k_range[0]))
+        self.hmf_prms['z'] = z
 
     #===========================================================================
     # Parameters
@@ -137,35 +135,11 @@ class Parameters(Cache):
         return val
 
     @parameter
-    def sigma_8(self, val):
+    def cosmo(self, val):
         return val
 
     @parameter
-    def H0(self, val):
-        return val
-
-    @parameter
-    def omegab(self, val):
-        return val
-
-    @parameter
-    def omegac(self, val):
-        return val
-
-    @parameter
-    def omegav(self, val):
-        return val
-
-    @parameter
-    def n(self, val):
-        return val
-
-    @parameter
-    def transfer_fit(self, val):
-        return val
-
-    @parameter
-    def transfer_options(self, val):
+    def hmf_prms(self, val):
         return val
 
     @parameter
@@ -175,70 +149,43 @@ class Parameters(Cache):
         else:
             raise ValueError('z needs to be >= 0')
 
-    @parameter
-    def mf_fit(self, val):
-        return val
-
-    @parameter
-    def cut_fit(self, val):
-        return val
-
-    @parameter
-    def delta_h(self, val):
-        return val
-
-    @parameter
-    def delta_wrt(self, val):
-        return val
-
-    @parameter
-    def delta_c(self, val):
-        return val
-
-    @parameter
-    def rho_crit(self, val):
-        if val > 0:
-            return val
-        else:
-            raise ValueError('rho_crit needs to be > 0')
-
     #===========================================================================
     # Methods
     #===========================================================================
-    @cached_property('m200m', 'rho_m')
+    @cached_property('m200m', 'cosmo')
     def r200m(self):
-        return tools.mass_to_radius(self.m200m, self.rho_m * 200)
+        return tools.mass_to_radius(self.m200m, self.cosmo.rho_m * 200)
 
-    @cached_property('m200m', 'rho_crit', 'rho_m')
+    @cached_property('m200m', 'cosmo')
     def m200c(self):
-        return np.array([tools.m200m_to_m200c(m, self.rho_crit, self.rho_m, prms.h)
+        return np.array([tools.m200m_to_m200c(m, self.cosmo.rho_crit,
+                                              self.cosmo.rho_m,
+                                              self.cosmo.h)
                          for m in self.m200m])
 
-    @cached_property('m200c', 'rho_crit')
+    @cached_property('m200c', 'cosmo')
     def r200c(self):
-        return tools.mass_to_radius(self.m200c, 200 * self.rho_crit)
+        return tools.mass_to_radius(self.m200c, 200 * self.cosmo.rho_crit)
 
-    @cached_property('m200m', 'rho_crit', 'rho_m', 'm200c')
+    @cached_property('m200m', 'cosmo', 'm200c')
     def m500c(self):
-        return np.array([tools.m200m_to_m500c(mm, self.rho_crit, self.rho_m, prms.h, mc)
+        return np.array([tools.m200m_to_m500c(mm, self.cosmo.rho_crit,
+                                              self.cosmo.rho_m,
+                                              self.cosmo.h, mc)
                          for mm, mc in zip(self.m200m, self.m200c)])
 
-    @cached_property('m500c', 'rho_crit')
+    @cached_property('m500c', 'cosmo')
     def r500c(self):
-        return tools.mass_to_radius(self.m500c, 500 * self.rho_crit)
+        return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
-    @cached_property('m200c', 'h', 'r200c', 'r200m')
+    @cached_property('m200c', 'cosmo', 'r200c', 'r200m')
     def c_correa(self):
         '''
         The density profiles always assume cosmology dependent variables
         '''
-        return (np.array([tools.c_correa(m, h=self.h)
+        return (np.array([tools.c_correa(m, h=self.cosmo.h)
                          for m in self.m200c]).reshape(-1)
                 * self.r200m / self.r200c)
-
-    @cached_property('omegab', 'omegac')
-    def omegam(self):
-        return self.omegab + self.omegac
 
     @cached_property('k_min', 'k_max', 'k_bins')
     def dlnk(self):
@@ -326,7 +273,7 @@ class Parameters(Cache):
     def rho_dm(self):
         return self.f_dm * self.rho_m
 
-    @cached_property('r_min', 'r200m', 'r_bins')
+    @cached_property('r_min', 'r_max', 'r_bins')
     def r_range_lin(self):
         return np.array([np.logspace(self.r_min, np.log10(r_max), self.r_bins)
                          for r_max in self.r200m])

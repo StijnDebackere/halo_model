@@ -11,16 +11,31 @@ example.
 import numpy as np
 import scipy.special
 import scipy.optimize as opt
+import pyfftw
 
 import matplotlib.pyplot as plt
 
 import halo.tools as tools
 import halo.sersic as sersic
-import halo.model.density as dens
 
 import pdb
 
-def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
+# def profile_f(profile, k_range, m_range):
+#     '''
+#     Return the Fourier transform of profile along the final axis
+
+#     Parameters
+#     ----------
+#     profile : (m,r) array
+#       array containing the density profile for each mass
+#     k_range : (k,) array
+#       array specifying the k_range
+#     m_range : (m,) array
+
+#     '''
+
+
+def profile_NFW(r_range, m_x, c_x, r_x, z_range=0):
     '''
     Returns an NFW profile for m_range along axis 0 and r_range along
     axis 1 (with optional z_range along axis 2).
@@ -29,18 +44,14 @@ def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     ----------
     r_range : (m,r) array
       array containing r_range for each m
-    m_range : (m,) array
-      array containing masses to compute NFW profile for (mass at z=0)
+    m_x : (m,) array
+      array containing mass inside r_x
     c_x : (m,) or (m,z) array
       array containing mass-concentration relation
     r_x : (m,) or (m,z) array
       array containing r_x to evaluate r_s from r_s = r_x/c_x
-    rho_mean : float
-      mean dark matter density
     z_range : float/array (default=0)
       redshift range
-    Delta : float (default=200.)
-      critical overdensity for collapse
 
     Returns
     -------
@@ -50,7 +61,7 @@ def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     profile : (m,r,z)
       array containing NFW profile
     '''
-    m = m_range.shape[0]
+    m = m_x.shape[0]
     r = r_range.shape[-1]
     # want an empty array for scalar z so we can easily construct shapes
     # later on
@@ -58,7 +69,7 @@ def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 
     # (m,z) array
     r_s = r_x.reshape([m] + list(z))/c_x.reshape([m] + list(z))
-    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    rho_s = m_x / (4. * np.pi * r_x**3) * c_x**3 / (np.log(1+c_x) - c_x/(1+c_x))
 
     # (m,r,z) array
     x = r_range.reshape([m,r] + list(z/z)) / r_s.reshape([m,1] + list(z))
@@ -71,28 +82,24 @@ def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
 # End of profile_NFW()
 # ------------------------------------------------------------------------------
 
-def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
+def profile_NFW_f(k_range, m_x, c_x, r_x, z_range=0):
     '''
-    Returns the analytic normalized Fourier transform of the NFW
-    profile for m_range along axis 0 and k_range along axis 1 (and
-    optional z_range along axis 2).
+    Returns the analytic Fourier transform of the NFW profile for
+    m_range along axis 0 and k_range along axis 1 (and optional
+    z_range along axis 2).
 
     Parameters
     ----------
     k_range : (k,) array
       array containing k_range for profile
-    m_range : (m,) array
-      array containing each M for which we compute profile
+    m_x : (m,) array
+      array containing mass inside r_x
     c_x : (m,z) array
       array containing mass-concentration relation
     r_x : (m,z) array
       array containing r_x to evaluate r_s from r_s = r_x/c_x
-    rho_mean : float
-      mean dark matter density
     z_range : float/array (default=0)
       redshift to evaluate mass-concentration relation at
-    Delta : float (default=200.)
-      critical overdensity for collapse
 
     Returns
     -------
@@ -103,7 +110,7 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
       array containing Fourier transform of NFW profile
 
     '''
-    m = m_range.shape[0]
+    m = m_x.shape[0]
     k = k_range.shape[0]
     # want an empty array for scalar z so we can easily construct shapes
     # later on
@@ -117,11 +124,12 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     r_s = r_s.reshape([m,1] + list(z))
     # rho_s = rho_s.reshape([m,1] + list(z))
     c_x = c_x.reshape([m,1] + list(z))
+    m_x = m_x.reshape([m,1] + list(z))
     # (m,1,z) array
     new_shape = [m,1] + list(z/z)
 
     # prefactor = 4 * np.pi * rho_s * r_s**3 / m_range.reshape(new_shape)
-    prefactor = 1./(np.log(1+c_x) - c_x/(1+c_x))
+    prefactor = m_x / (np.log(1+c_x) - c_x/(1+c_x))
     # (1,k,1) array
     k_range = k_range.reshape([1,k] + list(z/z))
     K = k_range * r_s
@@ -138,10 +146,6 @@ def profile_NFW_f(k_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     profile_f = prefactor * (np.sin(K) * gamma_s + np.cos(K) * gamma_c -
                              np.sin(c_x*K) / (K * (1+c_x)))
 
-    # normalize spectrum so that u[k=0] = 1, otherwise we get a small
-    # systematic offset, while we know that theoretically u[k=0] = 1
-    # profile_f = profile_f / profile_f[:,0].reshape(m,1)
-
     return profile_f
 
 # ------------------------------------------------------------------------------
@@ -156,22 +160,22 @@ def profile_uniform(r_range, m_range, r_x, r_y):
 
     Parameters
     ----------
-    r_range : (m,r) array
+    r_range : (r,) array
       array containing r_range for each m
-    m_range : (m,) array
-      array containing masses inside the profile
-    r_x : (m,) array
-      array containing inner radius for each m
-    r_x : (m,) array
-      array containing outer radius for each m
+    m_range : float
+      mass inside the profile
+    r_x : float
+      inner radius
+    r_x : float
+      outer radius
 
     Returns
     -------
     profile : (m,r)
       array containing profile
     '''
-    idx_x = np.where(r_range >= r_x)[0][0]
-    idx_y = np.where(r_range >= r_y)[0][0]
+    idx_x = np.where(tools.gte(r_range, r_x))[0][0]
+    idx_y = np.where(tools.lte(r_range, r_y))[0][-1]
 
     r_x = r_range[idx_x]
     r_y = r_range[idx_y]
@@ -188,9 +192,9 @@ def profile_uniform(r_range, m_range, r_x, r_y):
 # End of profile_uniform()
 # ------------------------------------------------------------------------------
 
-def profile_uniform_f(k_range, r_x, r_y):
+def profile_uniform_f(k_range, m_range, r_x, r_y):
     '''
-    Return the normalized FT of a uniform, spherically symmetric
+    Return the FT of a uniform, spherically symmetric
     profile between r_x and r_y
 
     !!! NOTE -> currently not adjusted for array values of r_x & r_y
@@ -199,6 +203,8 @@ def profile_uniform_f(k_range, r_x, r_y):
     ----------
     k_range : (k,) array
       array containing the k_range
+    m_range : (m,) array
+      array containing the mass range
     r_x : (m,) array
       array containing inner radius for each m
     r_x : (m,) array
@@ -206,14 +212,20 @@ def profile_uniform_f(k_range, r_x, r_y):
 
     Returns
     -------
-    profile_f : (k,)
+    profile_f : (m,k)
       array containing profile_f
 
     '''
-    kx = k_range * r_x
-    ky = k_range * r_y
+    m = m_range.shape[0]
+    k = k_range.shape[0]
 
-    prefactor = 3. / (ky**3 - kx**3)
+    m_range = m_range.reshape(m,1)
+    k_range = k_range.reshape(1,k)
+
+    kx = k_range * r_x.reshape(m,1)
+    ky = k_range * r_y.reshape(m,1)
+
+    prefactor = 3. * m_range / (ky**3 - kx**3)
     profile_f = (np.sin(ky) - np.sin(kx) + kx * np.cos(kx) - ky * np.cos(ky))
     profile_f = prefactor * profile_f
 
@@ -610,8 +622,12 @@ def profile_delta(r_range, m_range):
     '''
     profile = np.zeros_like(r_range, dtype=float)
 
+    simps_factor = (6. / (4 * np.pi * np.sum(r_range, axis=1)) *
+                    (r_range[:,1] - r_range[:,0]) /
+                    (3 * r_range[:,1] - 2 * r_range[:,0] - r_range[:,2]))
+
     profile[...,0] = 1.
-    profile *= m_range.reshape(-1,1)
+    profile *= m_range.reshape(-1,1) * simps_factor.reshape(-1,1)
 
     return profile
 
@@ -636,7 +652,8 @@ def profile_delta_f(k_range, m_range):
     profile_f : (m,k) array
       array containing Fourier transform of delta profile
     '''
-    profile = np.ones(m_range.shape + k_range.shape, dtype=float)
+    m = m_range.shape[0]
+    profile = m_range.reshape(m,1) * np.ones(m_range.shape + k_range.shape, dtype=float)
 
     return profile
 

@@ -1,5 +1,3 @@
-
-
 import numpy as np
 import halo.hmf as hmf
 import scipy.special as spec
@@ -7,7 +5,7 @@ import halo.density_profiles as profs
 import halo.parameters as p
 from halo.tools import Integrate
 import halo.model.density as dens
-from halo.model._cache import Cache, cached_property, parameter
+from halo.model._cache import cached_property, parameter
 
 import pdb
 
@@ -19,10 +17,10 @@ class Component(dens.Profile):
     ----------
     name : str
       name of the component
-    r200m : (m,) array
-      dark matter only equivalent virial radii
-    m200m : (m,) array
-      dark matter only equivalent halo masses
+    rho_m : float
+      mean matter density of the universe
+    m : (m,) array
+      halo masses
     p_lin : (k,) array
       linear power spectrum
     dndm : (m,) array
@@ -53,13 +51,13 @@ class Component(dens.Profile):
     delta_tot: (k,) array
       dimensionless power spectrum
     '''
-    def __init__(self, name, r200m, m200m, p_lin, dndm, f_comp,
+    def __init__(self, name, rho_m, m, p_lin, dndm, f_comp,
                  # bias_fn, bias_fn_args,
                  **profile_kwargs):
         super(Component, self).__init__(**profile_kwargs)
         self.name = name
-        self.r200m = r200m
-        self.m200m = m200m
+        self.rho_m = rho_m
+        self.m = m
         self.p_lin = p_lin
         self.f_comp = f_comp
         self.dndm = dndm
@@ -71,11 +69,10 @@ class Component(dens.Profile):
                 np.allclose(self.p_lin, other.p_lin)):
             raise AttributeError('dndm/p_lin need to be the same')
         if not (np.allclose(self.r_range, other.r_range) or
-                np.allclose(self.m_bar, other.m_bar) or
-                np.allclose(self.r200m, other.r200m) or
-                np.allclose(self.m200m, other.m200m) or
+                np.allclose(self.rho_m, other.rho_m) or
+                np.allclose(self.m, other.m) or
                 np.allclose(self.k_range, other.k_range)):
-            raise AttributeError('r_range/m_bar/r200m/m200m/k_range need to be the same')
+            raise AttributeError('r_range/rho_m/m/k_range need to be the same')
 
         prof1 = self.rho_r
         prof2 = other.rho_r
@@ -95,12 +92,12 @@ class Component(dens.Profile):
                                                  f_comp2.reshape(-1,1) * prof2_f)
 
         profile_kwargs = {"r_range": self.r_range,
-                          "m_bar": self.m_bar,
+                          "m_tot": self.m_tot,
                           "k_range": self.k_range,
                           "profile": prof_new,
                           "f_comp": f_new,
                           "profile_f": prof_f_new}
-        return Component(self.name, self.r200m, self.m200m, self.p_lin,
+        return Component(self.name, self.rho_m, self.m, self.p_lin,
                          self.dndm,
                          #self.bias_fn,
                          # self.bias_fn_args,
@@ -114,11 +111,11 @@ class Component(dens.Profile):
         return val
 
     @parameter
-    def r200m(self, val):
+    def rho_m(self, val):
         return val
 
     @parameter
-    def m200m(self, val):
+    def m(self, val):
         return val
 
     @parameter
@@ -140,11 +137,15 @@ class Component(dens.Profile):
     #===========================================================================
     # Methods
     #===========================================================================
+    @cached_property('m', 'f_comp')
+    def m200m(self):
+        return self.m * self.f_comp
+
     @cached_property('k_range', 'p_lin')
     def delta_lin(self):
         return 0.5/np.pi**2 * self.k_range**3 * self.p_lin
 
-    @cached_property('f_comp', 'm200m', 'dndm')
+    @cached_property('f_comp', 'm', 'dndm')
     def rho_comp(self):
         '''
         Compute the average density of the component as a fraction of rho_m
@@ -152,17 +153,17 @@ class Component(dens.Profile):
             rho_comp(z) = int_m m n(m,z) f_comp(m,z)
             rho_comp(z) / rho_m = int_nu f(nu, z) f_comp(nu, z)
         '''
-        norm = Integrate(y=self.m200m * self.dndm, x=self.m200m, axis=0)
-        result = Integrate(y=self.m200m * self.dndm * self.f_comp,
+        norm = Integrate(y=self.m * self.dndm, x=self.m, axis=0)
+        result = Integrate(y=self.m * self.dndm * self.f_comp,
                            x=self.dndm,
                            axis=0) / norm
 
         return result
 
-    # @cached_property('bias_fn', 'bias_fn_args', 'm200m', 'nu', 'fnu')
+    # @cached_property('bias_fn', 'bias_fn_args', 'm', 'nu', 'fnu')
     # def bias(self):
     #     if hasattr(self.bias_fn,'__call__'):
-    #         b = self.bias_fn(self.m200m,
+    #         b = self.bias_fn(self.m,
     #                          **self.bias_fn_args)
     #     else:
     #         b = self.bias_fn
@@ -218,48 +219,48 @@ class Component(dens.Profile):
         m_h : (m,) array
           array containing halo mass for each profile
         '''
-        m = self.m200m.shape[0]
+        m_s = self.m.shape[0]
 
-        f_comp = self.f_comp.reshape(m,1)
+        f_comp = self.f_comp.reshape(m_s,1)
         return 4*np.pi * Integrate(self.rho_r * f_comp * self.r_range**2,
                                    self.r_range,
                                    axis=1)
 
-    @cached_property('r200m', 'm200m', 'k_range', 'rho_k', 'f_comp', 'dndm')
+    @cached_property('rho_m', 'm', 'k_range', 'rho_k', 'f_comp', 'dndm')
     def p_1h(self):
         '''
         Compute the 1-halo term of the power spectrum.
 
-        P_1h = int_m (200 * 4 pi/3 r200m(m)^3)^2 n(m_dmo(m)) |u(k|m)|^2 dm
+        P_1h = int_m (m/rho_m)^2 n(m_dmo(m)) f(m)^2 |u(k|m)|^2 dm
         '''
         # define shapes for readability
-        m = self.m200m.shape[0]
+        m_s = self.m.shape[0]
 
-        r200m = self.r200m.reshape(m,1)
-        m200m = self.m200m.reshape(m,1)
-        f_comp = self.f_comp.reshape(m,1)
+        rho_m = self.rho_m
+        m = self.m.reshape(m_s,1)
+        f_comp = self.f_comp.reshape(m_s,1)
 
-        dndm = self.dndm.reshape(m,1)
+        dndm = self.dndm.reshape(m_s,1)
 
-        prefactor = (4./3 * np.pi * 200)**2
-        result = Integrate(y=r200m**6 * dndm * f_comp**2 * np.abs(self.rho_k)**2,
-                           x=m200m,
+        prefactor = rho_m**(-2)
+        result = Integrate(y=m**2 * dndm * f_comp**2 * np.abs(self.rho_k)**2,
+                           x=m,
                            axis=0)
         result *= prefactor
 
         return result
 
-    @cached_property('m200m', 'k_range', 'p_lin')
+    @cached_property('m', 'k_range', 'p_lin')
     def p_2h(self):
         '''
         Compute the 2-halo term of the power spectrum.
         '''
         # define shapes for readability
-        m = self.m200m.shape[0]
-        k = self.k_range.shape[0]
+        m_s = self.m.shape[0]
+        k_s = self.k_range.shape[0]
 
-        m200m = self.m200m.reshape(m,1)
-        f_comp = self.f_comp.reshape(m,1)
+        m = self.m.reshape(m_s,1)
+        f_comp = self.f_comp.reshape(m_s,1)
 
         prefactor = self.p_lin
         # result = (Integrate(y=fnu * f_comp * self.rho_k * bias,
@@ -279,7 +280,7 @@ class Component(dens.Profile):
         '''
         Return the dimensionless power spectrum for 1-halo term of component
 
-               Delta[k] = 1/(2*pi^2) * k^3 P(k)
+               delta_1h[k] = 1/(2*pi^2) * k^3 p_1h(k)
         '''
         return 1./(2*np.pi**2) * self.k_range**3 * self.p_1h
 
@@ -288,7 +289,7 @@ class Component(dens.Profile):
         '''
         Return the dimensionless power spectrum for 2-halo term of component
 
-               Delta[k] = 1/(2*pi^2) * k^3 P(k)
+               delta_2h[k] = 1/(2*pi^2) * k^3 p_2h(k)
         '''
         return 1./(2*np.pi**2) * self.k_range**3 * self.p_2h
 

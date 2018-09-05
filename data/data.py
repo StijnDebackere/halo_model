@@ -751,7 +751,7 @@ def plot_parameters(mean=False):
 # End of plot_parameters()
 # ------------------------------------------------------------------------------
 
-def f_gas(m, log10mc, a, prms):
+def f_gas(m, log10mc, a, cosmo):
     '''
     Return the f_gas(m500c) relation for m. The relation cannot exceed f_b
 
@@ -765,7 +765,7 @@ def f_gas(m, log10mc, a, prms):
       the turnover mass for the relation in log10([M_sun/h_70])
     a : float
       the strength of the transition
-    prms : Parameters object
+    cosmo : hmf.cosmo.Cosmology object
       relevant cosmological parameters
 
     Returns
@@ -774,13 +774,13 @@ def f_gas(m, log10mc, a, prms):
       gas fraction at r500c for m
     '''
     x = np.log10(m) - log10mc
-    return (prms.omegab/prms.omegam) * (0.5 * (1 + np.tanh(x / a)))
+    return (cosmo.omegab/cosmo.omegam) * (0.5 * (1 + np.tanh(x / a)))
 
 # ------------------------------------------------------------------------------
 # End of f_gas()
 # ------------------------------------------------------------------------------
 
-def f_gas_prms(prms, q=50):
+def f_gas_prms(cosmo, q=50):
     '''
     Compute best fit parameters to the f_gas(m500c) relation with both f_gas and
     m500c assuming h=0.7
@@ -800,7 +800,7 @@ def f_gas_prms(prms, q=50):
     f_q = np.array([np.percentile(f_obs[m_bin_idx == m_bin], q)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
+    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, cosmo),
                                  m[m>1e14], f_q[m>1e14],
                                  bounds=([10, 0],
                                          [15, 10]))
@@ -814,14 +814,14 @@ def f_gas_prms(prms, q=50):
 # End of f_gas_prms()
 # ------------------------------------------------------------------------------
 
-def f_gas_prms_debiased(prms):
+def f_gas_prms_debiased(cosmo):
     m500_obs, f_obs = np.loadtxt(ddir +
                                  'data_mccarthy/gas/M500_fgas_bias_corrected.dat',
                                  unpack=True)
 
     m500 = m500_obs
 
-    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, prms),
+    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, cosmo),
                                  m500, f_obs,
                                  bounds=([10, 0],
                                          [15, 10]))

@@ -38,6 +38,54 @@ def _check_iterable(prms):
 # End of _check_iterable()
 # ------------------------------------------------------------------------------
 
+def lte(a, b, precision=1e-16):
+    '''
+    Compare a and b with precision set to 1e-16, since we get some roundoff
+    errors with float precision
+
+    Parameters
+    ----------
+    a : array
+    b : array
+    precision : float
+      precision to which we want to compare
+
+    Returns
+    -------
+    c : array
+      index array where a <= b within 1e-16
+    '''
+    # these are all the elements that are strictly smaller or equal
+    return ((a - b) <= precision)
+
+# ------------------------------------------------------------------------------
+# End of lte()
+# ------------------------------------------------------------------------------
+
+def gte(a, b, precision=1e-16):
+    '''
+    Compare a and b with precision set to 1e-16, since we get some roundoff
+    errors with float precision
+
+    Parameters
+    ----------
+    a : array
+    b : array
+    precision : float
+      precision to which we want to compare
+
+    Returns
+    -------
+    c : array
+      index array where a >= b within 1e-16
+    '''
+    # these are all the elements that are strictly smaller or equal
+    return ((a - b) >= -precision)
+
+# ------------------------------------------------------------------------------
+# End of lte()
+# ------------------------------------------------------------------------------
+
 def merge_dicts(*dict_args):
     '''
     Given any number of dicts, shallow copy and merge into a new dict,
@@ -63,6 +111,7 @@ def Integrate(y, x, axis=-1): # Simpson integration on fixed spaced data!
 
     '''
 	y_new = np.nan_to_num(y)
+        # the last interval is computed with trapz
 	result = scipy.integrate.simps(y=y_new, x=x, axis=axis, even='first')
 	# result = np.trapz(y=y_new, x=x, axis=axis)
 
@@ -170,14 +219,14 @@ def median_slices(data, medians, bins):
 # # End of running_mean()
 # # ------------------------------------------------------------------------------
 
-def c_correa(m_range, z_range=0, h=0.7, cosmology='WMAP9'):
+def c_correa(m200c, z_range=0, h=0.7, cosmology='WMAP9'):
     '''
     Returns the mass-concentration relation from Correa et al (2015c)
     through the commah code.
 
     Parameters
     ----------
-    m_range : (m,) array
+    m200c : (m,) array
       array containing masses to compute NFW profile for (mass at z=0)
     z_range : (z,) array
       redshift to evaluate mass-concentration relation at
@@ -190,7 +239,7 @@ def c_correa(m_range, z_range=0, h=0.7, cosmology='WMAP9'):
       array containing concentration for each (m,z)
     '''
     # (z,m) array
-    c = commah.run(cosmology=cosmology, Mi=m_range/h, z=z_range, mah=False)['c'].T
+    c = commah.run(cosmology=cosmology, Mi=m200c/h, z=z_range, mah=False)['c'].T
     return c
 
 # ------------------------------------------------------------------------------
@@ -511,7 +560,7 @@ def mass_to_radius(m, mean_dens):
     The units of r don't matter as long as they are consistent with
     mean_dens.
     '''
-    return (3.*m / (4.*np.pi * mean_dens)) ** (1. / 3.)
+    return np.power((3.*m / (4.*np.pi * mean_dens)), 1./3, dtype=float)
 
 # ------------------------------------------------------------------------------
 # End of mass_to_radius()
