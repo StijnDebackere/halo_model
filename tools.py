@@ -38,9 +38,9 @@ def _check_iterable(prms):
 # End of _check_iterable()
 # ------------------------------------------------------------------------------
 
-def lte(a, b, precision=1e-16):
+def lte(a, b, precision=1e-15):
     '''
-    Compare a and b with precision set to 1e-16, since we get some roundoff
+    Compare a and b with precision set to 1e-15, since we get some roundoff
     errors with float precision
 
     Parameters
@@ -62,9 +62,9 @@ def lte(a, b, precision=1e-16):
 # End of lte()
 # ------------------------------------------------------------------------------
 
-def gte(a, b, precision=1e-16):
+def gte(a, b, precision=1e-15):
     '''
-    Compare a and b with precision set to 1e-16, since we get some roundoff
+    Compare a and b with precision set to 1e-15, since we get some roundoff
     errors with float precision
 
     Parameters

@@ -622,9 +622,15 @@ def profile_delta(r_range, m_range):
     '''
     profile = np.zeros_like(r_range, dtype=float)
 
-    simps_factor = (6. / (4 * np.pi * np.sum(r_range, axis=1)) *
-                    (r_range[:,1] - r_range[:,0]) /
-                    (3 * r_range[:,1] - 2 * r_range[:,0] - r_range[:,2]))
+    # mass is computed using Simpson integration, we need to take out this factor
+    h = np.diff(r_range)
+    h0 = h[:,0]
+    h1 = h[:,1]
+    hsum = h0 + h1
+    h0divh1 = h0 / h1
+
+    simps_factor = (6. / (hsum * (2 - 1.0 / h0divh1)) *
+                    1./(4 * np.pi * r_range[:,0]**2))
 
     profile[...,0] = 1.
     profile *= m_range.reshape(-1,1) * simps_factor.reshape(-1,1)

@@ -192,7 +192,7 @@ def prof_beta(x, sl, rc, beta, m_sl, r500):
     profile : (r,) array
       beta profile with m_sl inside sl
     '''
-    profile = (1 + (x/a)**2)**(-3*b/2)
+    profile = (1 + (x/rc)**2)**(-3*beta/2)
     mass = tools.m_h(profile[sl], x[sl] * r500)
     profile *= m_sl/mass
 
@@ -268,7 +268,7 @@ def load_gas(f_stars, q_f=50, q_rc=50, q_beta=50, r_min=-4., r_bins=1000):
 # End of load_gas()
 # ------------------------------------------------------------------------------
 
-def load_gas_obs(q_f=50, q_rc=50, q_beta=50):
+def load_gas_obs(q_f=50, q_rc=50, q_beta=50, r_min=-4., r_bins=1000):
     '''
     Return beta profiles with fgas_500c = f_obs which only reach up until r500c
 
@@ -357,7 +357,6 @@ def load_gas_smooth_r500c_r200m(fgas_200, f_stars, r_min=-4., r_bins=1000):
     x200m = r200m / r500c
 
     prof_gas = np.zeros_like(rx)
-    prof_gas_f = np.zeros_like(rx)
     for idx, prof in enumerate(prof_gas):
         sl = (rx[idx] >= 1.)
         r500_in_range[idx] = r_range[idx][sl.nonzero()[0][0]]
@@ -366,9 +365,9 @@ def load_gas_smooth_r500c_r200m(fgas_200, f_stars, r_min=-4., r_bins=1000):
                                               m200m[idx],
                                               r500_in_range[idx],
                                               r200m[idx])
-        prof_gas_f[idx] = profs.profile_uniform_f(k_range,
-                                                  r500_in_range[idx],
-                                                  r200m[idx])
+    prof_gas_f = profs.profile_uniform_f(k_range, ((f_b - fgas_200 - f_stars) *
+                                                   m200m),
+                                         r500_in_range, r200m)
 
     gas_kwargs = {'cosmo': cosmo,
                   'r_h': r200m,
@@ -488,7 +487,7 @@ def load_gas_r500c_r200m_rmax(r_max, f_stars, q_f=50, q_rc=50, q_beta=50,
       specifies whether to carry out hmf conversion for missing m200m
     '''
     # radius in terms of r500c
-    r_range = np.array([np.logspace(np.log10(r_min), np.log10(rm), r_bins)
+    r_range = np.array([np.logspace(r_min, np.log10(rm), r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
@@ -583,7 +582,7 @@ def load_gas_smooth_r200m_rmax(r_max, fgas_200, f_stars, r_min=-4., r_bins=1000)
       specifies whether to carry out hmf conversion for missing m200m
     '''
     # radius in terms of r500c
-    r_range = np.array([np.logspace(np.log10(r_min), np.log10(rm), r_bins)
+    r_range = np.array([np.logspace(r_min, np.log10(rm), r_bins)
                         for i,rm in enumerate(r_max)])
     rx = r_range / r500c.reshape(-1,1)
 
@@ -600,7 +599,10 @@ def load_gas_smooth_r200m_rmax(r_max, fgas_200, f_stars, r_min=-4., r_bins=1000)
                                               (f_b - fgas_200[idx] - f_stars[idx]) *
                                               m200m[idx],
                                               r200m[idx], r_max[idx])
-        prof_gas_f[idx] = profs.profile_uniform_f(k_range, r200m[idx], r_max[idx])
+
+    prof_gas_f = profs.profile_uniform_f(k_range, ((f_b - fgas_200 - f_stars) *
+                                                   m200m),
+                                         r200m, r_max)
 
     gas_kwargs = {'cosmo': cosmo,
                   'r_h': r_max,
@@ -614,7 +616,7 @@ def load_gas_smooth_r200m_rmax(r_max, fgas_200, f_stars, r_min=-4., r_bins=1000)
     return dens_gas
 
 # ------------------------------------------------------------------------------
-# End of load_gas_smooth_r200m_5r500c()
+# End of load_gas_smooth_r200m_rmax()
 # ------------------------------------------------------------------------------
 
 def load_centrals(f_comp='cen'):
@@ -741,7 +743,7 @@ def load_satellites_rmax(r_max=5*r500c, f_c=0.86, r_min=-4, r_bins=1000):
         prof_stars[idx][sl] = profs.profile_NFW(r_range[idx][sl].reshape(1,-1),
                                                 (f_sat[idx] * m200m[idx]).reshape(1),
                                                 c[idx].reshape(1),
-                                                r_x[idx].reshape(1)).reshape(-1)
+                                                r200m[idx].reshape(1)).reshape(-1)
 
     sat_kwargs = {'cosmo': cosmo,
                   'r_h': r_max,
@@ -782,7 +784,6 @@ def load_models(r_max=5*r500c, q_f=50, q_rc=50, q_beta=50,
     if not delta:
         cen = load_centrals(f_comp='cen')
         sat = load_satellites(f_c=0.86)
-        pdb.set_trace()
         stars = cen + sat
 
         cen_rmax = load_centrals_rmax(r_max, f_comp='cen')
@@ -827,6 +828,7 @@ def load_models(r_max=5*r500c, q_f=50, q_rc=50, q_beta=50,
     # MODEL 4
     # --------------------------------------------------------------------------
     # load gas_smooth_r200m_rmax
+
     gas_rmax = load_gas_rmax(r_max, f_stars, q_f, q_rc, q_beta)
     gas_smooth_r200m_rmax = load_gas_smooth_r200m_rmax(r_max,
                                                        gas_rmax.f200m_obs,
