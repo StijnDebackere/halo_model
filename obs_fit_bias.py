@@ -13,15 +13,11 @@ import plot as pl
 
 import halo.tools as tools
 import halo.density_profiles as profs
-import halo.stars as stars
-import halo.gas as gas
-import halo.bias as bias
 import halo.parameters as p
 import halo.tools as tools
 import halo.model.density as dens
 import halo.model.component as comp
 import halo.model.power as power
-import halo.data.bahamas as b
 import halo.data.data as d
 
 import numpy as np

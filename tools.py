@@ -515,6 +515,7 @@ def m_beta(r, beta, r_c, mgas_500c, r500c):
 # ------------------------------------------------------------------------------
 # End of m_beta()
 # ------------------------------------------------------------------------------
+
 @np.vectorize
 def r_where_m_beta(m, beta, r_c, mgas_500c, r500c):
     '''
@@ -818,25 +819,25 @@ def m500c_to_m200c(m500c, rhoc, rhom, h, z=0):
 # End of m500c_to_m200c()
 # ------------------------------------------------------------------------------
 
-def find_bounds(f, y, start=1.):
+def find_bounds(f, y, start=1., **f_prms):
     x = start
-    while f(x) < y:
+    while f(x, **f_prms) < y:
         x = x * 2
     lo = 0 if (x == 1) else x/2.
     return lo, x
 
-def binary_search(f, y, lo, hi, delta):
+def binary_search(f, y, lo, hi, delta, **f_prms):
     while lo <= hi:
         x = (lo + hi) / 2.
-        if f(x) < y:
+        if f(x, **f_prms) < y:
             lo = x + delta
-        elif f(x) > y:
+        elif f(x, **f_prms) > y:
             hi = x - delta
         else:
             return x;
-    return hi if (f(hi) - y < y - f(lo)) else lo
+    return hi if (f(hi, **f_prms) - y < y - f(lo, **f_prms)) else lo
 
-def inverse(f, delta=1/1024., start=1.):
+def inverse(f, delta=1/1024., start=1., **f_prms):
     ''''
     Returns the inverse of the monotonic function f, to a precision of delta.
 
@@ -852,9 +853,9 @@ def inverse(f, delta=1/1024., start=1.):
     f_1 : function
       inverse of f
     '''
-    def f_1(y):
-        lo, hi = find_bounds(f, y, start)
-        return binary_search(f, y, lo, hi, delta)
+    def f_1(y, **f_prms):
+        lo, hi = find_bounds(f, y, start, **f_prms)
+        return binary_search(f, y, lo, hi, delta, **f_prms)
     return f_1
 
 # ------------------------------------------------------------------------------

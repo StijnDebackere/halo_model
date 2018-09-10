@@ -21,7 +21,6 @@ import plot as pl
 
 import halo.parameters as p
 import halo.tools as tools
-import halo.gas as gas
 
 import pdb
 
@@ -506,8 +505,8 @@ def convert_hm(r200m=True):
     m500e = tools.radius_to_mass(r500e, 500 * p.prms.rho_crit * 0.7**2)
 
     # Get 500crit values
-    m500cc = gas.mgas_to_m500c(mgc)
-    m500ce = gas.mgas_to_m500c(mge)
+    m500cc = mgas_to_m500c(mgc)
+    m500ce = mgas_to_m500c(mge)
 
     # we thus need to convert our critical density as well
     r500cc = tools.mass_to_radius(m500cc, 500 * p.prms.rho_crit * 0.7**2)
@@ -778,6 +777,28 @@ def f_gas(m, log10mc, a, cosmo):
 
 # ------------------------------------------------------------------------------
 # End of f_gas()
+# ------------------------------------------------------------------------------
+
+def logmgas(logm500c, cosmo, q=50):
+    return np.log10(np.power(10, logm500c) * f_gas(np.power(10, logm500c),
+                                                   cosmo=cosmo,
+                                                   **f_gas_prms(cosmo, q)))
+
+def mgas_to_m500c(mgas500, cosmo, q=50):
+    '''
+    Invert f_gas relation to find m500c belonging to mgas
+    '''
+    logmgas_prms = {'cosmo': cosmo, 'q': q}
+    f1 = tools.inverse(logmgas, start=1., **logmgas_prms)
+    m500c = np.ones_like(mgas500)
+    # do everything logarithmically for speed, results in errors at .01% level
+    for idx, m in enumerate(mgas500):
+        m500c[idx] = np.power(10, f1(np.log10(m), **logmgas_prms))
+
+    return m500c
+
+# ------------------------------------------------------------------------------
+# End of mgas_to_m500c()
 # ------------------------------------------------------------------------------
 
 def f_gas_prms(cosmo, q=50):

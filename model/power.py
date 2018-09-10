@@ -47,7 +47,7 @@ class Power(cache.Cache):
         self.hmf_prms = tools.merge_dicts(prof.cosmo.cosmo_dict, hmf_prms)
         self.hmf_prms['lnk_min'] = np.log(np.min(prof.k_range))
         self.hmf_prms['lnk_max'] = np.log(np.max(prof.k_range))
-        self.hmf_prms['dlnk'] = (np.log(prof.k_range[1]) - np.log(prof.k_range[0]))
+        self.hmf_prms['k_bins'] = prof.k_range.shape[0]
         self.hmf_prms['z'] = prof.z
         # m_range needs to be m200m_dmo
         # self.hmf_prms['m_range'] = prof.m200m
@@ -116,7 +116,7 @@ class Power(cache.Cache):
     @cache.cached_property('m200m_dmo', 'hmf_prms', 'cosmo', 'bar2dmo')
     def m_fn(self):
         hmf_prms = self.hmf_prms
-        if bar2dmo:
+        if self.bar2dmo:
             hmf_prms['m_range'] = self.m200m_dmo
         else:
             hmf_prms['m_range'] = self.m200m_obs
@@ -142,7 +142,7 @@ class Power(cache.Cache):
     def dndm(self):
         return self.m_fn.dndm
 
-    @cache.cached_property('dndm', 'rho_m', 'm_h', 'rho_k')
+    @cache.cached_property('dndm', 'rho_m', 'm_h', 'rho_k', 'f200m_obs')
     def p_1h(self):
         '''
         Return the 1h power spectrum P_1h(k)
@@ -155,8 +155,12 @@ class Power(cache.Cache):
         m_h = self.m_h.reshape(m_s,1)
         dndm = self.dndm.reshape(m_s,1)
 
-        result = tools.Integrate(y=(1. / self.rho_m)**2 * dndm * np.abs(self.rho_k)**2,
+        prefactor = (1. / self.rho_m)**2
+        result = tools.Integrate(y=dndm * np.abs(self.rho_k)**2 *
+                                 (self.f200m_obs**2).reshape(-1,1),
                                  x=m_h, axis=0)
+
+        result *= prefactor
 
         return result
 

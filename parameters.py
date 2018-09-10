@@ -84,13 +84,6 @@ class Parameters(Cache):
                                               'omegam': 0.0463 + 0.233,
                                               'omegav': 0.7207,
                                               'n': 0.972}),
-                 hmf_prms={'transfer_fit': 'FromFile',
-                           'transfer_options': {'fname': 'camb/wmap9_transfer_out.dat'},
-                           'mf_fit': 'Tinker10',
-                           'cut_fit': False,
-                           'delta_h': 200.,
-                           'delta_wrt': 'mean',
-                           'delta_c': 1.686},
                  z=0.):
         super(Parameters, self).__init__()
         self.m200m = m200m
@@ -101,11 +94,6 @@ class Parameters(Cache):
         self.k_bins = k_bins
         self.cosmo = cosmo
         self.z = z
-        self.hmf_prms = tools.merge_dicts(cosmo.cosmo_dict, hmf_prms)
-        self.hmf_prms['lnk_min'] = np.log(10**k_min)
-        self.hmf_prms['lnk_max'] = np.log(10**k_max)
-        # self.hmf_prms['dlnk'] = (np.log(prof.k_range[1]) - np.log(prof.k_range[0]))
-        self.hmf_prms['z'] = z
 
     #===========================================================================
     # Parameters
@@ -136,10 +124,6 @@ class Parameters(Cache):
 
     @parameter
     def cosmo(self, val):
-        return val
-
-    @parameter
-    def hmf_prms(self, val):
         return val
 
     @parameter
@@ -179,7 +163,7 @@ class Parameters(Cache):
         return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
     @cached_property('m200c', 'cosmo', 'r200c', 'r200m')
-    def c_correa(self):
+    def c200m(self):
         '''
         The density profiles always assume cosmology dependent variables
         '''
@@ -192,7 +176,7 @@ class Parameters(Cache):
         return np.log(10) * (self.k_max - self.k_min)/np.float(self.k_bins)
 
     @cached_property('k_min', 'k_max', 'k_bins')
-    def k_range_lin(self):
+    def k_range(self):
         return np.logspace(self.k_min, self.k_max, self.k_bins)
 
     @cached_property('sigma_8', 'H0', 'omegab', 'omegac', 'omegav', 'n')
@@ -205,82 +189,58 @@ class Parameters(Cache):
             "omegav": self.omegav,
             "n": self.n}
 
-    @cached_property('k_min', 'k_max', 'dlnk', 'z', 'transfer_fit',
-                     'transfer_options', 'cosmo_prms')
-    def trans_prms(self):
-        trans = {
-            "lnk_min": np.log(10) * self.k_min,
-            "lnk_max": np.log(10) * self.k_max,
-            "dlnk": self.dlnk,
-            "transfer_fit": self.transfer_fit,
-            "transfer_options": self.transfer_options,
-            "z": self.z}
-        trans = tools.merge_dicts(self.cosmo_prms, trans)
+    # @cached_property('k_min', 'k_max', 'dlnk', 'z', 'transfer_fit',
+    #                  'transfer_options', 'cosmo_prms')
+    # def trans_prms(self):
+    #     trans = {
+    #         "lnk_min": np.log(10) * self.k_min,
+    #         "lnk_max": np.log(10) * self.k_max,
+    #         "dlnk": self.dlnk,
+    #         "transfer_fit": self.transfer_fit,
+    #         "transfer_options": self.transfer_options,
+    #         "z": self.z}
+    #     trans = tools.merge_dicts(self.cosmo_prms, trans)
 
-        return trans
+    #     return trans
 
-    @cached_property('m200m', 'mf_fit', 'delta_h', 'cut_fit',
-                     'delta_wrt', 'delta_c', 'trans_prms')
-    def m_fn_prms(self):
-        massf = {
-            "m_range": self.m200m,
-            "mf_fit": self.mf_fit,
-            "cut_fit": self.cut_fit,
-            "delta_h": self.delta_h,
-            "delta_wrt": self.delta_wrt,
-            "delta_c": self.delta_c}
-        massf = tools.merge_dicts(massf, self.trans_prms)
+    # @cached_property('m200m', 'mf_fit', 'delta_h', 'cut_fit',
+    #                  'delta_wrt', 'delta_c', 'trans_prms')
+    # def m_fn_prms(self):
+    #     massf = {
+    #         "m_range": self.m200m,
+    #         "mf_fit": self.mf_fit,
+    #         "cut_fit": self.cut_fit,
+    #         "delta_h": self.delta_h,
+    #         "delta_wrt": self.delta_wrt,
+    #         "delta_c": self.delta_c}
+    #     massf = tools.merge_dicts(massf, self.trans_prms)
 
-        return massf
+    #     return massf
 
-    @cached_property('m_fn_prms')
-    def m_fn(self):
-        return hmf.MassFunction(**self.m_fn_prms)
+    # @cached_property('m_fn_prms')
+    # def m_fn(self):
+    #     return hmf.MassFunction(**self.m_fn_prms)
 
-    @cached_property('k_range_lin', 'm_fn')
-    def p_lin(self):
-        plin = np.exp(self.m_fn.power)
+    # @cached_property('k_range', 'm_fn')
+    # def p_lin(self):
+    #     plin = np.exp(self.m_fn.power)
 
-        return plin
+    #     return plin
 
-    @cached_property('k_range_lin', 'm_fn', 'p_lin')
-    def delta_lin(self):
-        delta_lin = 1. / (2 * np.pi**2) * self.k_range_lin**3 * self.p_lin
+    # @cached_property('k_range', 'm_fn', 'p_lin')
+    # def delta_lin(self):
+    #     delta_lin = 1. / (2 * np.pi**2) * self.k_range**3 * self.p_lin
 
-        return delta_lin
+    #     return delta_lin
 
-    @cached_property('m_fn', 'm200m')
-    def dndm(self):
-        return self.m_fn.dndm
-
-    @cached_property('omegab', 'omegac', 'rho_crit', 'h')
-    def rho_m(self):
-        return (self.omegab + self.omegac) * self.rho_crit
-
-    @cached_property('m200m', 'dndm')
-    def rho_hm(self):
-        return tools.Integrate(y=self.m200m * self.dndm, x=self.m200m)
-
-    @cached_property('omegab', 'omegam')
-    def f_dm(self):
-        return 1 - self.omegab/self.omegam
-
-    @cached_property('omegab', 'omegam')
-    def f_b(self):
-        return self.omegab / self.omegam
-
-    @cached_property('f_dm', 'rho_m')
-    def rho_dm(self):
-        return self.f_dm * self.rho_m
+    # @cached_property('m_fn', 'm200m')
+    # def dndm(self):
+    #     return self.m_fn.dndm
 
     @cached_property('r_min', 'r_max', 'r_bins')
     def r_range_lin(self):
         return np.array([np.logspace(self.r_min, np.log10(r_max), self.r_bins)
                          for r_max in self.r200m])
-
-    @cached_property('H0')
-    def h(self):
-        return self.H0 / 100.
 
 # ------------------------------------------------------------------------------
 # End of Parameters()
@@ -289,9 +249,9 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m200m=np.logspace(11,12,101), k_min=-1)
-prms2 = Parameters(m200m=np.logspace(12,13,101), k_min=-1)
-prms3 = Parameters(m200m=np.logspace(13,14,101), k_min=-1)
-prms4 = Parameters(m200m=np.logspace(14,15,101), k_min=-1)
+prms1 = Parameters(m200m=np.logspace(11,12,101), k_min=-1.)
+prms2 = Parameters(m200m=np.logspace(12,13,101), k_min=-1.)
+prms3 = Parameters(m200m=np.logspace(13,14,101), k_min=-1.)
+prms4 = Parameters(m200m=np.logspace(14,15,101), k_min=-1.)
 
-prms = Parameters(m200m=np.logspace(11,15,101), k_min=-1)
+prms = Parameters(m200m=np.logspace(11,15,101), k_min=-1.)
