@@ -109,7 +109,7 @@ class Power(cache.Cache):
         The missing mass fraction from dark matter + baryons determines the
         deficit between the observed mass and the dark matter only equivalent.
 
-        Returns
+        In our case, this should always correpsond to m200m_inf
         '''
         return self.m200m_obs / (1 - (1. - self.f200m_obs))
 
@@ -156,8 +156,7 @@ class Power(cache.Cache):
         dndm = self.dndm.reshape(m_s,1)
 
         prefactor = (1. / self.rho_m)**2
-        result = tools.Integrate(y=dndm * np.abs(self.rho_k)**2 *
-                                 (self.f200m_obs**2).reshape(-1,1),
+        result = tools.Integrate(y=dndm * np.abs(self.rho_k)**2,
                                  x=m_h, axis=0)
 
         result *= prefactor

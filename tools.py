@@ -1,10 +1,11 @@
 import time
 import inspect
+import multiprocessing
 
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.integrate
-from scipy.special import hyp2f1
+from scipy.special import hyp2f1, factorial
 import scipy.optimize as opt
 from . import commah
 
@@ -159,65 +160,183 @@ def median_slices(data, medians, bins):
 # End of median_slices()
 # ------------------------------------------------------------------------------
 
-# def mean_slices(data, means, bins):
-#     '''
-#     Return slices for data such that the mean of each slice returns means
+def _taylor_expansion_multi(n, r_range, profile, cpus):
+    '''
+    Computes Taylor expansion of the density profile in parallel.
 
-#     Parameters
-#     ----------
-#     data : (n,) array
-#       array to slice
-#     means : (m,) array
-#       means to match
-#     bins : (m,2) array
-#       maximum allowed bin around mean
+    Parameters
+    ----------
+    n : int
+      number of Taylor coefficients to compute
+    r_range : (m,r) array
+      radius range to integrate over
+    profile : array
+      density profile with M along axis 0 and r along axis 1
+    cpus : int
+      number of cpus to use
 
-#     Returns
-#     -------
-#     slices : (m,2) array
-#       array containing slices for each mean
-#     '''
-#     data_sorted = np.sort(data, axis=0)
+    Returns
+    -------
+    taylor_coefs : (m,k,n) array
+      array containing Taylor coefficients of Fourier expansion
+    '''
+    def _taylor_expansion(procn, n_range, r, profile, out_q):
+        '''
+        Computes the Taylor coefficients for the profile expansion for n_range.
 
-#     # index of elements matching means
-#     idx_mean = np.argmin(np.abs(data_sorted.reshape(-1,1) - means.reshape(1,-1)),
-#                         axis=0)
+            F_n = 1 / (2n+1)! int_r r^(2n+2) * profile[M,r]
 
-#     # find matching bin indeces
-#     idx_bin = np.argmin(np.abs(data_sorted.reshape(-1,1,1) - bins.reshape(1,-1,2)),
-#                         axis=0)
-#     # get minimum distance from bins to mean -> this will be our slice
-#     min_dist = np.min(np.abs(idx_med.reshape(-1,1) - idx_bin), axis=1)
-#     slices = np.concatenate([(idx_med - min_dist).reshape(-1,1),
-#                              (idx_med + min_dist).reshape(-1,1)],
-#                             axis=1)
+        Parameters
+        ----------
+        procn : int
+          process id
+        n_range : array
+          array containing the index of the Taylor coefficients
+        r : array
+          radius range to integrate over
+        profile : array
+          density profile with M along axis 0 and r along axis 1
+        out_q : queue
+          queue to output results
 
-#     for idx, sl in enumerate(slices):
-#         print means[idx]
-#         print data[sl[0]:sl[1]].mean()
-#         print '---------'
+        '''
+        # (m,n) array
+        F_n = np.empty((profile.shape[0],) + n_range.shape,dtype=np.longdouble)
+        r = np.longdouble(r)
 
-#     return slices
+        for idx,n in enumerate(n_range):
+            prefactor = 1./factorial(2*n+1, exact=True)
+            result = prefactor * Integrate(y=np.power(r, (2.0*n+2)) *
+                                           profile,
+                                           x=r,
+                                           axis=1)
 
-# # ------------------------------------------------------------------------------
-# # End of mean_slices()
-# # ------------------------------------------------------------------------------
+            F_n[:,idx] = result
 
-# def running_mean(x, N):
-#     cumsum = np.cumsum(np.insert(x, 0, 0))
-#     return (cumsum[N:] - cumsum[:-N]) / N
+        results = [procn,F_n]
+        out_q.put(results)
 
-# # ------------------------------------------------------------------------------
-# # End of running_mean()
-# # ------------------------------------------------------------------------------
+        return
 
-# def running_std(x, N):
-#     cumsum = np.cumsum(np.insert(x, 0, 0)**2)
-#     return np.sqrt((cumsum[N:] - cumsum[:-N]) / N)
+    # ----------------------------------------------------------------------
+    # End of taylor_expansion()
+    # ----------------------------------------------------------------------
+    manager = multiprocessing.Manager()
+    out_q = manager.Queue()
 
-# # ------------------------------------------------------------------------------
-# # End of running_mean()
-# # ------------------------------------------------------------------------------
+    taylor = np.arange(0,n+1)
+    # Split array in number of CPUs
+    taylor_split = np.array_split(taylor,cpus)
+
+    # Start the different processes
+    procs = []
+
+    for i in range(cpus):
+        process = multiprocessing.Process(target=_taylor_expansion,
+                                          args=(i, taylor_split[i],
+                                                r_range,
+                                                profile,
+                                                out_q))
+        procs.append(process)
+        process.start()
+
+    # Collect all results
+    result = []
+    for i in range(cpus):
+        result.append(out_q.get())
+
+    result.sort()
+    taylor_coefs = np.concatenate([item[1] for item in result],
+                                  axis=-1)
+
+    # Wait for all worker processes to finish
+    for p in procs:
+        p.join()
+
+    return taylor_coefs
+
+# ----------------------------------------------------------------------
+# End of _taylor_expansion_multi()
+# ----------------------------------------------------------------------
+
+def _F_n(r_range, rho_r, m_h, n=84, cpus=4):
+    '''
+    Computes the Taylor coefficients in the Fourier expansion:
+
+        F_n[M] = 4 * pi * 1 / (2n+1)! int_r r^(2n+2) * profile[M,r] dr
+
+    Returns
+    -------
+    F_n : (m,n+1) array
+      Taylor coefficients of Fourier expansion
+    '''
+    # define shapes for readability
+    m_s = m_h.shape[0]
+    # Prefactor only changes along axis 0 (Mass)
+    prefactor = (4.0 * np.pi)
+
+    # F_n is (m,n+1) array
+    F_n = _taylor_expansion_multi(n=n, r_range=r_range,
+                                  profile=rho_r,
+                                  cpus=cpus)
+    F_n *= prefactor
+
+    return F_n
+
+def FTT(k_range, m_h, r_range, rho_r, n=84, cpus=4, taylor_err=1e-50):
+    '''
+    Computes the Fourier transform of the density profile, using a Taylor
+    expansion of the sin(kr)/(kr) term. We have
+            u[M,k] = sum_n (-1)^n F_n[M] k^(2n)
+
+    Returns
+    -------
+    u : (m,k) array
+        Fourier transform of density profile
+    '''
+    # define shapes for readability
+    n_s = n
+    m_s = m_h.shape[0]
+    k_s = k_range.shape[0]
+
+    Fn = _F_n(r_range, rho_r, m_h, n, cpus)
+    # need (1,n+1) array to match F_n
+    n_arr = np.arange(0,n_s+1,dtype=np.longdouble).reshape(1,n_s+1)
+    # -> (m,n) array
+    c_n = np.power(-1,n_arr) * Fn
+
+    # need (k,n+1) array for exponent
+    k_range_resh = np.longdouble(k_range).reshape(k_s,1)
+    k_n = np.power(np.tile(k_range_resh, (1,n_s+1)), (2 * n_arr))
+
+    # need to match n terms and sum over them
+    # result is (k,m) array -> transpose
+    T_n = c_n.reshape(1,m_s,n_s+1) * k_n.reshape(k_s,1,n_s+1)
+    u = np.sum(T_n,axis=-1).T
+
+    # k-values which do not converge anymore will have coefficients
+    # that do not converge to zero. Convergence to zero is determined
+    # by taylor_err.
+    indices = np.argmax((T_n[:,:,-1] > taylor_err), axis=0)
+    indices[indices == 0] = k_s
+    for idx, idx_max in enumerate(indices):
+        u[idx,idx_max:] = np.nan
+        if idx_max != k_s:
+            u[idx] = extrapolate_plaw(k_range, u[idx])
+
+    # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
+    # # systematic offset, while we know that theoretically u[k=0] = 1
+    # if (np.abs(u[:,0]) - 1. > 1.e-2).any():
+    #     print('-------------------------------------------------',
+    #           '! Density profile mass does not match halo mass !',
+    #           '-------------------------------------------------',
+    #           sep='\n')
+
+    # nonnil = (u[:,0] != 0)
+    # u[nonnil] = u[nonnil] / u[nonnil,0].reshape(-1,1)
+
+    return u
+
 
 def c_correa(m200c, z_range=0, h=0.7, cosmology='WMAP9'):
     '''
@@ -334,11 +453,12 @@ def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
     c : (m,z) array
       array containing concentration for each (m,z)
     '''
+    m_range, z_range = _check_iterable([m_range, z_range])
     m = m_range.shape[0]
-    z = np.array(np.array(z_range).shape)
+    z = z_range.shape[0]
 
-    m_range = m_range.reshape([m] + list(z/z))
-    z_range = np.array(z_range).reshape([1] + list(z))
+    m_range = m_range.reshape([m,1])
+    z_range = np.array(z_range).reshape([1,z])
 
     c = A * (m_range/m_pivot)**B * (1+z_range)**C
     return c
@@ -438,6 +558,34 @@ def m_h(rho, r_range, r_0=None, r_1=None, axis=-1):
 # End of m_h()
 # ------------------------------------------------------------------------------
 
+def cum_m(rho_r, r_range):
+    '''
+    Returns the cumulative mass profile
+
+    Parameters
+    ----------
+    rho_r : (...,r) array
+      density profile
+    r_range : (...,r) array
+      radial range
+
+    Returns
+    -------
+    cum_m : (...,r-1) array
+      cumulative mass profile
+    '''
+    r = r_range.shape[-1]
+
+    cum_m = np.array([tools.m_h(rho_r[...,:idx],
+                                r_range[...,:idx], axis=-1)
+                      for idx in np.arange(1, r+1)])
+
+    return cum_m
+
+# ----------------------------------------------------------------------
+# End of cum_m()
+# ----------------------------------------------------------------------
+
 def m_NFW(r, c_x, r_x, rho_mean, Delta=200):
     '''
     Calculate the mass of the NFW profile with c_x and r_x, relative to
@@ -487,7 +635,7 @@ def m_beta(r, beta, r_c, mgas_500c, r500c):
     beta : float or (m,) array
       beta slope of the profile
     r_c : float or (m,) array
-      core radius r_c of the profile
+      !!!physical!!! core radius r_c of the profile
     mgas_500c : float or (m,) array
       gas mass at r500c
     r500c : float or (m,) array
@@ -528,7 +676,7 @@ def r_where_m_beta(m, beta, r_c, mgas_500c, r500c):
     beta : float or (m,) array
       beta slope of the profile
     r_c : float or (m,) array
-      core radius r_c of the profile
+      !!!physical!!! core radius r_c of the profile
     mgas_500c : float or (m,) array
       gas mass at r500c
     r500c : float or (m,) array
@@ -594,7 +742,7 @@ def radius_to_mass(r, mean_dens):
 # End of radius_to_mass()
 # ------------------------------------------------------------------------------
 
-def massdiff_2m5c(m200m, m500c, rhoc, rhom, h, z):
+def massdiff_2m5c_correa(m200m, m500c, rhoc, rhom, h, z):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
@@ -614,7 +762,7 @@ def massdiff_2m5c(m200m, m500c, rhoc, rhom, h, z):
     return mass - m500c
 
 @np.vectorize
-def m500c_to_m200m(m500c, rhoc, rhom, h, z=0):
+def m500c_to_m200m_correa(m500c, rhoc, rhom, h, z=0):
     '''
     Give the virial mass for the halo corresponding to m500c
 
@@ -629,16 +777,16 @@ def m500c_to_m200m(m500c, rhoc, rhom, h, z=0):
       corresponding halo model halo virial mass
     '''
     # these bounds should be reasonable for m200m < 1e18
-    m200m = opt.brentq(massdiff_2m5c, m500c, 3. * m500c,
+    m200m = opt.brentq(massdiff_2m5c_correa, m500c, 3. * m500c,
                        args=(m500c, rhoc, rhom, h, z))
 
     return m200m
 
 # ------------------------------------------------------------------------------
-# End of m500c_to_m200m()
+# End of m500c_to_m200m_correa()
 # ------------------------------------------------------------------------------
 
-def massdiff_5c2m(m500c, m200m, m200c, rhoc, rhom, h, z):
+def massdiff_5c2m_correa(m500c, m200m, m200c, rhoc, rhom, h, z):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
@@ -657,7 +805,7 @@ def massdiff_5c2m(m500c, m200m, m200c, rhoc, rhom, h, z):
     return mass - m500c
 
 @np.vectorize
-def m200m_to_m500c(m200m, rhoc, rhom, h, m200c=None, z=0):
+def m200m_to_m500c_correa(m200m, rhoc, rhom, h, m200c=None, z=0):
     '''
     Give m500c for the an m200m virial mass halo
 
@@ -673,19 +821,19 @@ def m200m_to_m500c(m200m, rhoc, rhom, h, m200c=None, z=0):
     '''
     # 1e19 Msun is ~maximum for c_correa
     if m200c == None:
-        m200c = m200m_to_m200c(m200m, rhoc, rhom, h, z)
+        m200c = m200m_to_m200c_correa(m200m, rhoc, rhom, h, z)
 
     # these bounds should be reasonable for m200m < 1e18
-    m500c = opt.brentq(massdiff_5c2m, m200m/3., m200m,
+    m500c = opt.brentq(massdiff_5c2m_correa, m200m/3., m200m,
                        args=(m200m, m200c, rhoc, rhom, h, z))
 
     return m500c
 
 # ------------------------------------------------------------------------------
-# End of m200m_to_m500c()
+# End of m200m_to_m500c_correa()
 # ------------------------------------------------------------------------------
 
-def massdiff_2m2c(m200m, m200c, rhoc, rhom, h, z):
+def massdiff_2m2c_correa(m200m, m200c, rhoc, rhom, h, z):
     '''
     Integrate an NFW halo with m200m up to r200c and return the mass difference
     between the integral and m200c
@@ -703,7 +851,7 @@ def massdiff_2m2c(m200m, m200c, rhoc, rhom, h, z):
     return mass - m200c
 
 @np.vectorize
-def m200c_to_m200m(m200c, rhoc, rhom, h, z=0):
+def m200c_to_m200m_correa(m200c, rhoc, rhom, h, z=0):
     '''
     Give the virial mass for the halo corresponding to m200c
 
@@ -719,16 +867,16 @@ def m200c_to_m200m(m200c, rhoc, rhom, h, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m200m = opt.brentq(massdiff_2m2c, m200c, 2. * m200c,
+    m200m = opt.brentq(massdiff_2m2c_correa, m200c, 2. * m200c,
                        args=(m200c, rhoc, rhom, h, z))
 
     return m200m
 
 # ------------------------------------------------------------------------------
-# End of m200c_to_m200m()
+# End of m200c_to_m200m_correa()
 # ------------------------------------------------------------------------------
 
-def massdiff_2c2m(m200c, m200m, rhoc, rhom, h, z):
+def massdiff_2c2m_correa(m200c, m200m, rhoc, rhom, h, z):
     '''
     Integrate an NFW halo with m200m up to r200c and return the mass difference
     between the integral and m200c
@@ -746,7 +894,7 @@ def massdiff_2c2m(m200c, m200m, rhoc, rhom, h, z):
     return mass - m200c
 
 @np.vectorize
-def m200m_to_m200c(m200m, rhoc, rhom, h, z=0):
+def m200m_to_m200c_correa(m200m, rhoc, rhom, h, z=0):
     '''
     Give m200c for the an m200m virial mass halo
 
@@ -762,16 +910,16 @@ def m200m_to_m200c(m200m, rhoc, rhom, h, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c2m, m200m / 2., m200m,
+    m200c = opt.brentq(massdiff_2c2m_correa, m200m / 2., m200m,
                        args=(m200m, rhoc, rhom, h, z))
 
     return m200c
 
 # ------------------------------------------------------------------------------
-# End of m200m_to_m200c()
+# End of m200m_to_m200c_correa()
 # ------------------------------------------------------------------------------
 
-def massdiff_2c5c(m200c, m500c, rhoc, rhom, h, z):
+def massdiff_2c5c_correa(m200c, m500c, rhoc, rhom, h, z):
     '''
     Integrate an NFW halo with m200c up to r500c and return the mass difference
     between the integral and m500c
@@ -779,9 +927,6 @@ def massdiff_2c5c(m200c, m500c, rhoc, rhom, h, z):
     # compute radii
     r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
     r200c = mass_to_radius(m200c, 200 * rhoc)
-
-    m200m = m200c_to_m200m(m200c, rhoc, rhom, h)
-    r200m = mass_to_radius(m200m, 200 * rhom)
 
     # compute concentration
     c200c = c_correa(m200c, z, h).reshape(-1)
@@ -794,7 +939,7 @@ def massdiff_2c5c(m200c, m500c, rhoc, rhom, h, z):
     return mass_int - m500c
 
 @np.vectorize
-def m500c_to_m200c(m500c, rhoc, rhom, h, z=0):
+def m500c_to_m200c_correa(m500c, rhoc, rhom, h, z=0):
     '''
     Give m200c for the an m500c virial mass halo
 
@@ -810,13 +955,230 @@ def m500c_to_m200c(m500c, rhoc, rhom, h, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c5c, m500c, 2. * m500c,
+    m200c = opt.brentq(massdiff_2c5c_correa, m500c, 2. * m500c,
                        args=(m500c, rhoc, rhom, h, z))
 
     return m200c
 
 # ------------------------------------------------------------------------------
-# End of m500c_to_m200c()
+# End of m500c_to_m200c_correa()
+# ------------------------------------------------------------------------------
+
+def massdiff_2m5c_duffy(m200m, m500c, rhoc, rhom, z):
+    '''
+    Integrate an NFW halo with m200m up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    # compute radii
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    c200m = c_duffy(m200m, z).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200.)
+
+    return mass - m500c
+
+@np.vectorize
+def m500c_to_m200m_duffy(m500c, rhoc, rhom, z=0):
+    '''
+    Give the virial mass for the halo corresponding to m500c
+
+    Parameters
+    ----------
+    m500c : float
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
+    '''
+    # these bounds should be reasonable for m200m < 1e18
+    m200m = opt.brentq(massdiff_2m5c_duffy, m500c, 3. * m500c,
+                       args=(m500c, rhoc, rhom, z))
+
+    return m200m
+
+# ------------------------------------------------------------------------------
+# End of m500c_to_m200m_duffy()
+# ------------------------------------------------------------------------------
+
+def massdiff_5c2m_duffy(m500c, m200m, rhoc, rhom, z):
+    '''
+    Integrate an NFW halo with m200m up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    # compute radii
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    # compute concentration
+    c200m = c_duffy(m200m, z).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200)
+
+    return mass - m500c
+
+@np.vectorize
+def m200m_to_m500c_duffy(m200m, rhoc, rhom, z=0):
+    '''
+    Give m500c for the an m200m virial mass halo
+
+    Parameters
+    ----------
+    m200m : float
+      halo virial mass
+
+    Returns
+    -------
+    m500c : float
+      halo mass at 500 times the universe critical density
+    '''
+    # these bounds should be reasonable for m200m < 1e18
+    m500c = opt.brentq(massdiff_5c2m_duffy, m200m/3., m200m,
+                       args=(m200m, rhoc, rhom, z))
+
+    return m500c
+
+# ------------------------------------------------------------------------------
+# End of m200m_to_m500c_duffy()
+# ------------------------------------------------------------------------------
+
+def massdiff_2m2c_duffy(m200m, m200c, rhoc, rhom, z):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    # compute radii
+    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    # compute concentration
+    c200m = c_duffy(m200m, z).reshape(-1)
+
+    # now compute analytic mass
+    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
+
+    return mass - m200c
+
+@np.vectorize
+def m200c_to_m200m_duffy(m200c, rhoc, rhom, z=0):
+    '''
+    Give the virial mass for the halo corresponding to m200c
+
+    Parameters
+    ----------
+    m200c : float
+      halo mass at 200 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
+    '''
+    # these bounds should be reasonable for m200m < 1e18
+    # 1e19 Msun is ~maximum for c_duffy
+    m200m = opt.brentq(massdiff_2m2c_duffy, m200c, 2. * m200c,
+                       args=(m200c, rhoc, rhom, z))
+
+    return m200m
+
+# ------------------------------------------------------------------------------
+# End of m200c_to_m200m_duffy()
+# ------------------------------------------------------------------------------
+
+def massdiff_2c2m_duffy(m200c, m200m, rhoc, rhom, z):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    # compute radii
+    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    # compute concentration
+    c200m = c_duffy(m200m, z).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
+
+    return mass - m200c
+
+@np.vectorize
+def m200m_to_m200c_duffy(m200m, rhoc, rhom, z=0):
+    '''
+    Give m200c for the an m200m virial mass halo
+
+    Parameters
+    ----------
+    m200m : float
+      halo virial mass
+
+    Returns
+    -------
+    m200c : float
+      halo mass at 200 times the universe critical density
+    '''
+    # these bounds should be reasonable for m200m < 1e18
+    # 1e19 Msun is ~maximum for c_duffy
+    m200c = opt.brentq(massdiff_2c2m_duffy, m200m / 2., m200m,
+                       args=(m200m, rhoc, rhom, z))
+
+    return m200c
+
+# ------------------------------------------------------------------------------
+# End of m200m_to_m200c_duffy()
+# ------------------------------------------------------------------------------
+
+def massdiff_2c5c_duffy(m200c, m500c, rhoc, rhom):
+    '''
+    Integrate an NFW halo with m200c up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    # compute radii
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r200c = mass_to_radius(m200c, 200 * rhoc)
+
+    m200m = m200c_to_m200m_duffy(m200c, rhoc, rhom)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    # compute concentration
+    c200m = c_duffy(m200m, z).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200.)
+
+    mass_int = m_h(dens, r_range)
+
+    return mass_int - m500c
+
+@np.vectorize
+def m500c_to_m200c_duffy(m500c, rhoc, rhom, z=0):
+    '''
+    Give m200c for the an m500c virial mass halo
+
+    Parameters
+    ----------
+    m500c : float [M_sun / h]
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    m200c : float [M_sun / h]
+      halo mass at 200 times the universe critical density
+    '''
+    # these bounds should be reasonable for m200m < 1e18
+    # 1e19 Msun is ~maximum for c_duffy
+    m200c = opt.brentq(massdiff_2c5c_duffy, m500c, 2. * m500c,
+                       args=(m500c, rhoc, rhom, z))
+
+    return m200c
+
+# ------------------------------------------------------------------------------
+# End of m500c_to_m200c_duffy()
 # ------------------------------------------------------------------------------
 
 def find_bounds(f, y, start=1., **f_prms):

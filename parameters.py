@@ -75,7 +75,9 @@ class Parameters(Cache):
 
     '''
     def __init__(self, m200m,
-                 r_min=-4.0, r_bins=1000,
+                 # r_min needs to be low in order to get correct masses from
+                 # integration
+                 r_min=-4, r_bins=1000,
                  k_min=-1.8, k_max=2., k_bins=1000,
                  cosmo=hmf.cosmo.Cosmology(**{'sigma_8': 0.821,
                                               'H0': 70.0,
@@ -142,9 +144,8 @@ class Parameters(Cache):
 
     @cached_property('m200m', 'cosmo')
     def m200c(self):
-        return np.array([tools.m200m_to_m200c(m, self.cosmo.rho_crit,
-                                              self.cosmo.rho_m,
-                                              self.cosmo.h)
+        return np.array([tools.m200m_to_m200c_duffy(m, self.cosmo.rho_crit,
+                                                    self.cosmo.rho_m)
                          for m in self.m200m])
 
     @cached_property('m200c', 'cosmo')
@@ -153,23 +154,55 @@ class Parameters(Cache):
 
     @cached_property('m200m', 'cosmo', 'm200c')
     def m500c(self):
-        return np.array([tools.m200m_to_m500c(mm, self.cosmo.rho_crit,
-                                              self.cosmo.rho_m,
-                                              self.cosmo.h, mc)
-                         for mm, mc in zip(self.m200m, self.m200c)])
+        return np.array([tools.m200m_to_m500c_duffy(m, self.cosmo.rho_crit,
+                                                    self.cosmo.rho_m)
+                         for m in self.m200m])
 
     @cached_property('m500c', 'cosmo')
     def r500c(self):
         return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
-    @cached_property('m200c', 'cosmo', 'r200c', 'r200m')
+    @cached_property('m200m', 'cosmo', 'r200m')
     def c200m(self):
         '''
         The density profiles always assume cosmology dependent variables
         '''
-        return (np.array([tools.c_correa(m, h=self.cosmo.h)
-                         for m in self.m200c]).reshape(-1)
-                * self.r200m / self.r200c)
+        return tools.c_duffy(self.m200m).reshape(-1)
+
+    # @cached_property('m200m', 'cosmo')
+    # def r200m(self):
+    #     return tools.mass_to_radius(self.m200m, self.cosmo.rho_m * 200)
+
+    # @cached_property('m200m', 'cosmo')
+    # def m200c(self):
+    #     return np.array([tools.m200m_to_m200c_correa(m, self.cosmo.rho_crit,
+    #                                                  self.cosmo.rho_m,
+    #                                                  self.cosmo.h)
+    #                      for m in self.m200m])
+
+    # @cached_property('m200c', 'cosmo')
+    # def r200c(self):
+    #     return tools.mass_to_radius(self.m200c, 200 * self.cosmo.rho_crit)
+
+    # @cached_property('m200m', 'cosmo', 'm200c')
+    # def m500c(self):
+    #     return np.array([tools.m200m_to_m500c_correa(mm, self.cosmo.rho_crit,
+    #                                                  self.cosmo.rho_m,
+    #                                                  self.cosmo.h, mc)
+    #                      for mm, mc in zip(self.m200m, self.m200c)])
+
+    # @cached_property('m500c', 'cosmo')
+    # def r500c(self):
+    #     return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
+
+    # @cached_property('m200c', 'cosmo', 'r200c', 'r200m')
+    # def c200m(self):
+    #     '''
+    #     The density profiles always assume cosmology dependent variables
+    #     '''
+    #     return (np.array([tools.c_correa(m, h=self.cosmo.h)
+    #                      for m in self.m200c]).reshape(-1)
+    #             * self.r200m / self.r200c)
 
     @cached_property('k_min', 'k_max', 'k_bins')
     def dlnk(self):
@@ -237,8 +270,8 @@ class Parameters(Cache):
     # def dndm(self):
     #     return self.m_fn.dndm
 
-    @cached_property('r_min', 'r_max', 'r_bins')
-    def r_range_lin(self):
+    @cached_property('r_min', 'r200m', 'r_bins')
+    def r_range(self):
         return np.array([np.logspace(self.r_min, np.log10(r_max), self.r_bins)
                          for r_max in self.r200m])
 

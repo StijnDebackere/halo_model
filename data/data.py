@@ -357,7 +357,7 @@ def fit_croston():
     m500g, r500, rx, rho = read_croston()
 
     # we need to plug in the 0.7^2
-    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit * 0.7**2)
+    m500 = tools.radius_to_mass(r500, 500 * p.prms.cosmo.rho_crit * 0.7**2)
 
     pl.set_style()
     a = np.empty((0,), dtype=float)
@@ -425,7 +425,7 @@ def fit_eckert():
     # m500g, r500, rx, rho = read_eckert()
 
     # we need to plug in the 0.7^2
-    m500 = tools.radius_to_mass(r500, 500 * p.prms.rho_crit * 0.7**2)
+    m500 = tools.radius_to_mass(r500, 500 * p.prms.cosmo.rho_crit * 0.7**2)
 
     pl.set_style()
     a = np.empty((0,), dtype=float)

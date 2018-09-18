@@ -7,7 +7,7 @@ import multiprocessing
 import numpy as np
 import mpmath as mp
 from scipy.special import factorial
-import pyfftw
+import warnings
 
 import halo.hmf as hmf
 import halo.tools as tools
@@ -78,6 +78,8 @@ class Profile(cache.Cache):
       Fourier transform of density profile using Taylor expansion
     '''
     defaults = {}
+    # this will indicate indices where taylor_err is exceeded for each m_h
+    taylor_nan = []
     def __init__(self, cosmo=p.prms.cosmo,
                  r_min=p.prms.r_min,
                  r_h=p.prms.r200m,
@@ -88,11 +90,13 @@ class Profile(cache.Cache):
                  k_range=p.prms.k_range,
                  z=p.prms.z,
                  profile=profs.profile_NFW,
-                 profile_args={'c_x': tools.c_duffy(p.prms.m200m),
+                 profile_args={'m_x': p.prms.m200m,
+                               'c_x': tools.c_duffy(p.prms.m200m),
                                'r_x': p.prms.r200m},
                  profile_mass=tools.m_NFW,
                  profile_f=profs.profile_NFW_f,
-                 profile_f_args={'c_x': tools.c_duffy(p.prms.m200m),
+                 profile_f_args={'m_x': p.prms.m200m,
+                                 'c_x': tools.c_duffy(p.prms.m200m),
                                  'r_x': p.prms.r200m},
                  n=84,
                  taylor_err=1e-50,
@@ -109,7 +113,7 @@ class Profile(cache.Cache):
         self.r_bins = r_bins
         self.r200m_inf = r200m_inf
         self.m200m_inf = m200m_inf
-        # self.m200m_obs = m200m_obs
+        # self.m_in_prof = m200m_obs
         self.m_h = m_h
         if ((np.roll(np.log10(k_range), -1)[:-1] - np.log10(k_range)[:-1]) !=
             (np.log10(k_range)[1] - np.log10(k_range)[0])).all():
@@ -121,7 +125,7 @@ class Profile(cache.Cache):
         self.taylor_err = taylor_err
         self.profile = profile
         self.profile_args = profile_args
-        # self.profile_mass = profile_mass
+        self.profile_mass = profile_mass
         self.profile_f = profile_f
         self.profile_f_args = profile_f_args
 
@@ -142,14 +146,27 @@ class Profile(cache.Cache):
             raise AttributeError('Profiles need same z')
 
         m_h = self.m_h + other.m_h
+        profile_mass = self.m200m_obs + other.m200m_obs
         profile = self.rho_r + other.rho_r
         profile_f = self.rho_k + other.rho_k
 
-        return Profile(self.cosmo, self.r_min, self.r_h, self.r_bins,
-                       self.r200m_inf, self.m200m_inf, # m200m_obs,
-                       m_h, self.k_range, self.z,
-                       profile, profile_f=profile_f, n=self.n,
-                       taylor_err=self.taylor_err, cpus=self.cpus)
+        return Profile(cosmo=self.cosmo,
+                       r_min=self.r_min,
+                       r_h=self.r_h,
+                       r_bins=self.r_bins,
+                       r200m_inf=self.r200m_inf,
+                       m200m_inf=self.m200m_inf,
+                       m_h=m_h,
+                       k_range=self.k_range,
+                       z=self.z,
+                       profile=profile,
+                       profile_args=None,
+                       profile_mass=profile_mass,
+                       profile_f=profile_f,
+                       profile_f_args=None,
+                       n=self.n,
+                       taylor_err=self.taylor_err,
+                       cpus=self.cpus)
 
     #===========================================================================
     # Parameters
@@ -214,9 +231,9 @@ class Profile(cache.Cache):
     def profile_args(self, val):
         return val
 
-    # @cache.parameter
-    # def profile_mass(self, val):
-    #     return val
+    @cache.parameter
+    def profile_mass(self, val):
+        return val
 
     @cache.parameter
     def profile_f(self, val):
@@ -242,7 +259,35 @@ class Profile(cache.Cache):
         return np.array([np.logspace(self.r_min, np.log10(rm), self.r_bins)
                          for rm in self.r_h])
 
-    # @cache.cached_property('profile_mass', 'r200m_inf', 'profile_args')
+    @cache.cached_property('rho_r', 'r_range', 'r200m_inf', 'profile_mass', 'profile_args')
+    def m200m_obs(self):
+        '''
+        Computes the mass inside r200m_inf. This is done either through a given
+        analytic function via profile_mass, via a given m200m_obs, also in
+        profile_mass or by integrating rho_r (if profile_mass is None)
+
+        Returns
+        -------
+        m200m : (m,) array
+          mass inside r200m_obs
+        '''
+        if hasattr(self.profile_mass, '__call__'):
+            m200m_obs = self.profile_mass(self.r200m_inf, **self.profile_args)
+
+        elif hasattr(self.profile_mass, '__len__'):
+            m200m_obs = self.profile_mass
+
+        else:
+            m200m_obs = np.array([tools.m_h(self.rho_r[idx][tools.lte(r, self.r200m_inf[idx])],
+                                            r[tools.lte(r, self.r200m_inf[idx])])
+                                  for idx, r in enumerate(self.r_range)])
+
+        if m200m_obs.shape != self.r200m_inf.shape:
+            raise ValueError('profile_mass needs to result in same shape as m200m_inf')
+
+        return m200m_obs
+
+    # @cache.cached_property('rho_r', 'r_range', 'r200m_inf')
     # def m200m_obs(self):
     #     '''
     #     Computes the mass inside r200m_obs
@@ -252,32 +297,11 @@ class Profile(cache.Cache):
     #     m200m : (m,) array
     #       mass inside r200m_obs
     #     '''
-    #     if hasattr(self.profile_mass, '__call__'):
-    #         m200m_obs = self.profile_mass(self.r200m_inf, **self.profile_args)
-
-    #     else:
-    #         m200m_obs = self.profile_mass
-
-    #     if m200m_obs.shape != self.r200m_inf.shape:
-    #         raise ValueError('profile_mass needs to result in same shape as m200m_inf')
+    #     m200m_obs = np.array([tools.m_h(self.rho_r[idx][tools.lte(r, self.r200m_inf[idx])],
+    #                                     r[tools.lte(r, self.r200m_inf[idx])])
+    #                           for idx, r in enumerate(self.r_range)])
 
     #     return m200m_obs
-
-    @cache.cached_property('rho_r', 'r_range', 'r200m_inf')
-    def m200m_obs(self):
-        '''
-        Computes the mass inside r200m_obs
-
-        Returns
-        -------
-        m200m : (m,) array
-          mass inside r200m_obs
-        '''
-        m200m_obs = np.array([tools.m_h(self.rho_r[idx][tools.lte(r, self.r200m_inf[idx])],
-                                        r[tools.lte(r, self.r200m_inf[idx])])
-                              for idx, r in enumerate(self.r_range)])
-
-        return m200m_obs
 
     @cache.cached_property('m200m_obs', 'm200m_inf')
     def f200m_obs(self):
@@ -292,7 +316,7 @@ class Profile(cache.Cache):
 
         return self.m200m_obs / self.m200m_inf
 
-    @cache.cached_property('r_range', 'r_h', 'm_h','profile', 'profile_args')
+    @cache.cached_property('r_range', 'r_h','profile', 'profile_args')
     def rho_r(self):
         '''
         Computes the density profile either by calling the function with its args,
@@ -304,9 +328,7 @@ class Profile(cache.Cache):
           Density profile rho_r
         '''
         if hasattr(self.profile,'__call__'):
-            dens_profile = self.profile(self.r_range,
-                                        self.m_h,
-                                        **self.profile_args)
+            dens_profile = self.profile(self.r_range, **self.profile_args)
         else:
             dens_profile = self.profile
 
@@ -315,9 +337,13 @@ class Profile(cache.Cache):
         m_in_prof = np.array([tools.m_h(dens_profile[idx][tools.lte(r, self.r_h[idx])],
                                         r[tools.lte(r, self.r_h[idx])])
                               for idx, r in enumerate(self.r_range)])
+        frac_diff = np.max(np.abs(m_in_prof / self.m_h - 1))
 
-        if np.max(np.abs(m_in_prof / self.m_h - 1)) > 5e-3:
-            raise ValueError('the mass in rho_r and m_h differ at 5x10^-3 level.')
+        # only raise a warning in this case, since otherwise you have to keep
+        # tweaking r_min and r_bins. Warning is sufficient, user decides whether
+        # the level is acceptable...
+        if frac_diff > 5e-3:
+            warnings.warn('the mass in rho_r and m_h differ at 5x10^-3 level ({:.3e})'.format(frac_diff))
 
         if len(dens_profile.shape) != 2:
             raise ValueError('profile should be an (m,r) array. ')
@@ -341,7 +367,6 @@ class Profile(cache.Cache):
         '''
         if hasattr(self.profile_f,'__call__'):
             dens_profile_f = self.profile_f(self.k_range,
-                                            self.m_h,
                                             **self.profile_f_args)
 
         elif isinstance(self.profile_f, np.ndarray):
@@ -515,9 +540,10 @@ class Profile(cache.Cache):
         # k-values which do not converge anymore will have coefficients
         # that do not converge to zero. Convergence to zero is determined
         # by taylor_err.
-        indeces = np.argmax((T_n[:,:,-1] > self.taylor_err), axis=0)
-        indeces[indeces == 0] = k_s
-        for idx, idx_max in enumerate(indeces):
+        indices = np.argmax((T_n[:,:,-1] > self.taylor_err), axis=0)
+        indices[indices == 0] = k_s
+        self.taylor_nan = indices
+        for idx, idx_max in enumerate(indices):
             u[idx,idx_max:] = np.nan
             if idx_max != k_s:
                 u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
