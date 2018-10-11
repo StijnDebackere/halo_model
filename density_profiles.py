@@ -82,6 +82,38 @@ def profile_NFW(r_range, m_x, c_x, r_x, z_range=0):
 # ------------------------------------------------------------------------------
 
 @np.vectorize
+def r200m_m_NFW(m_x, r_x, c_x, cosmo, z_range=0):
+    '''
+    Calculate r200m for the NFW profile with c_x and r_x and m_x at r_x
+
+    Parameters
+    ----------
+    r : float
+      radius to compute mass for
+    m_x : float
+      mass inside r_x
+    r_x : float
+      r_x to evaluate r_s from r_s = r_x/c_x
+    c_x : float
+      concentration of halo
+
+    Returns
+    -------
+    m_h : float
+      mass
+    '''
+    def mass_diff(r):
+        m_r = m_NFW(r, m_x, r_x, c_x)
+        m200m = 4. / 3 * np.pi * 200 * cosmo.rho_m * r**3
+        return m200m - m_r
+    r = opt.brentq(mass_diff, 1e-4, 100)
+    return r
+
+# ------------------------------------------------------------------------------
+# End of r200m_m_NFW()
+# ------------------------------------------------------------------------------
+
+@np.vectorize
 def m_NFW(r, m_x, r_x, c_x, z_range=0):
     '''
     Calculate the mass of the NFW profile with c_x and r_x and m_x at r_x
@@ -113,7 +145,7 @@ def m_NFW(r, m_x, r_x, c_x, z_range=0):
     return mass
 
 # ------------------------------------------------------------------------------
-# End of m_NFW()
+# End of r_where_m_NFW()
 # ------------------------------------------------------------------------------
 
 def profile_NFW_f(k_range, m_x, r_x, c_x, z_range=0):
@@ -298,9 +330,10 @@ def m_beta(r, m_x, r_x, rc, beta):
     beta : float
       beta slope of the profile
     '''
-    norm = (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
-                                                5./2, -(r_x / rc)**2))
-    rho_0 = m_x / norm
+    # analytic enclosed mass inside r_x gives normalization rho_0
+    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
+                                                       5./2, -(r_x / rc)**2))
+
     m = 4./3 * np.pi * rho_0 * r**3 * spec.hyp2f1(3./2, 3 * beta / 2,
                                              5./2, -(r/rc)**2)
 
@@ -653,5 +686,27 @@ def profile_delta_f(k_range, m_range):
 # End of profile_delta_f()
 # ------------------------------------------------------------------------------
 
+def r200m_from_m(m_f, cosmo, **kwargs):
+    '''
+    For a given cumulative mass profile m_f that takes the radius as its first
+    argument, compute the radius where the mean enclosed density is 200 rho_m
 
+    Parameters
+    ----------
+    m_f : function
+      function to compute cumulative mass profile, radius is its first arg
+    kwargs : dict
+      arguments for m_f
 
+    Returns
+    -------
+    r200m : float
+      radius where mean enclosed density is 200 rho_m
+    '''
+    def diff_m200m(r):
+        m200m = 4. /3 * np.pi * 200 * cosmo.rho_m * r**3
+        m_diff = m_f(r, **kwargs) - m200m
+        return m_diff
+
+    r200m = opt.brentq(diff_m200m, 0, 100)
+    return r200m

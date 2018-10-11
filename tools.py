@@ -777,7 +777,7 @@ def m500c_to_m200m_correa(m500c, rhoc, rhom, h, z=0):
       corresponding halo model halo virial mass
     '''
     # these bounds should be reasonable for m200m < 1e18
-    m200m = opt.brentq(massdiff_2m5c_correa, m500c, 3. * m500c,
+    m200m = opt.brentq(massdiff_2m5c_correa, m500c, 10. * m500c,
                        args=(m500c, rhoc, rhom, h, z))
 
     return m200m
@@ -824,7 +824,7 @@ def m200m_to_m500c_correa(m200m, rhoc, rhom, h, m200c=None, z=0):
         m200c = m200m_to_m200c_correa(m200m, rhoc, rhom, h, z)
 
     # these bounds should be reasonable for m200m < 1e18
-    m500c = opt.brentq(massdiff_5c2m_correa, m200m/3., m200m,
+    m500c = opt.brentq(massdiff_5c2m_correa, m200m/10., m200m,
                        args=(m200m, m200c, rhoc, rhom, h, z))
 
     return m500c
@@ -867,7 +867,7 @@ def m200c_to_m200m_correa(m200c, rhoc, rhom, h, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m200m = opt.brentq(massdiff_2m2c_correa, m200c, 2. * m200c,
+    m200m = opt.brentq(massdiff_2m2c_correa, m200c, 10. * m200c,
                        args=(m200c, rhoc, rhom, h, z))
 
     return m200m
@@ -910,7 +910,7 @@ def m200m_to_m200c_correa(m200m, rhoc, rhom, h, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c2m_correa, m200m / 2., m200m,
+    m200c = opt.brentq(massdiff_2c2m_correa, m200m / 10., m200m,
                        args=(m200m, rhoc, rhom, h, z))
 
     return m200c
@@ -955,7 +955,7 @@ def m500c_to_m200c_correa(m500c, rhoc, rhom, h, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c5c_correa, m500c, 2. * m500c,
+    m200c = opt.brentq(massdiff_2c5c_correa, m500c, 10. * m500c,
                        args=(m500c, rhoc, rhom, h, z))
 
     return m200c
@@ -996,7 +996,7 @@ def m500c_to_m200m_duffy(m500c, rhoc, rhom, z=0):
       corresponding halo model halo virial mass
     '''
     # these bounds should be reasonable for m200m < 1e18
-    m200m = opt.brentq(massdiff_2m5c_duffy, m500c, 3. * m500c,
+    m200m = opt.brentq(massdiff_2m5c_duffy, m500c, 10. * m500c,
                        args=(m500c, rhoc, rhom, z))
 
     return m200m
@@ -1038,7 +1038,7 @@ def m200m_to_m500c_duffy(m200m, rhoc, rhom, z=0):
       halo mass at 500 times the universe critical density
     '''
     # these bounds should be reasonable for m200m < 1e18
-    m500c = opt.brentq(massdiff_5c2m_duffy, m200m/3., m200m,
+    m500c = opt.brentq(massdiff_5c2m_duffy, m200m/10., m200m,
                        args=(m200m, rhoc, rhom, z))
 
     return m500c
@@ -1081,7 +1081,7 @@ def m200c_to_m200m_duffy(m200c, rhoc, rhom, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_duffy
-    m200m = opt.brentq(massdiff_2m2c_duffy, m200c, 2. * m200c,
+    m200m = opt.brentq(massdiff_2m2c_duffy, m200c, 10. * m200c,
                        args=(m200c, rhoc, rhom, z))
 
     return m200m
@@ -1124,7 +1124,7 @@ def m200m_to_m200c_duffy(m200m, rhoc, rhom, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_duffy
-    m200c = opt.brentq(massdiff_2c2m_duffy, m200m / 2., m200m,
+    m200c = opt.brentq(massdiff_2c2m_duffy, m200m / 10., m200m,
                        args=(m200m, rhoc, rhom, z))
 
     return m200c
@@ -1172,7 +1172,7 @@ def m500c_to_m200c_duffy(m500c, rhoc, rhom, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_duffy
-    m200c = opt.brentq(massdiff_2c5c_duffy, m500c, 2. * m500c,
+    m200c = opt.brentq(massdiff_2c5c_duffy, m500c, 10. * m500c,
                        args=(m500c, rhoc, rhom, z))
 
     return m200c

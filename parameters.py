@@ -75,6 +75,7 @@ class Parameters(Cache):
 
     '''
     def __init__(self, m200m,
+                 m200m_dmo=None,
                  # r_min needs to be low in order to get correct masses from
                  # integration
                  r_min=-4, r_bins=1000,
@@ -89,6 +90,10 @@ class Parameters(Cache):
                  z=0.):
         super(Parameters, self).__init__()
         self.m200m = m200m
+        if m200m_dmo is None:
+            self.m200m_dmo = m200m
+        else:
+            self.m200m_dmo = m200m_dmo
         self.r_min = r_min
         self.r_bins = r_bins
         self.k_min = k_min
@@ -102,6 +107,10 @@ class Parameters(Cache):
     #===========================================================================
     @parameter
     def m200m(self, val):
+        return val
+
+    @parameter
+    def m200m_dmo(self, val):
         return val
 
     @parameter
@@ -141,6 +150,10 @@ class Parameters(Cache):
     @cached_property('m200m', 'cosmo')
     def r200m(self):
         return tools.mass_to_radius(self.m200m, self.cosmo.rho_m * 200)
+
+    @cached_property('m200m_dmo', 'cosmo')
+    def r200m_dmo(self):
+        return tools.mass_to_radius(self.m200m_dmo, self.cosmo.rho_m * 200)
 
     @cached_property('m200m', 'cosmo')
     def m200c(self):

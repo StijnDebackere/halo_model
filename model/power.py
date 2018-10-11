@@ -38,7 +38,7 @@ class Power(cache.Cache):
         self.rho_k = prof.rho_k
         self.m_h = prof.m_h
         self.m200m_obs = prof.m200m_obs
-        self.f200m_obs = prof.f200m_obs
+        self.m200m_dmo = prof.m200m_dmo
         self.k_range = prof.k_range
         self.z = prof.z
         self.cosmo = prof.cosmo
@@ -76,7 +76,7 @@ class Power(cache.Cache):
         return val
 
     @cache.parameter
-    def f200m_obs(self, val):
+    def m200m_dmo(self, val):
         return val
 
     @cache.parameter
@@ -102,16 +102,16 @@ class Power(cache.Cache):
     def rho_m(self):
         return self.m_fn.rho_m
 
-    @cache.cached_property('m200m_obs', 'f200m_obs')
-    def m200m_dmo(self):
-        '''
-        Return the dark matter only equivalent halo mass for the input profile.
-        The missing mass fraction from dark matter + baryons determines the
-        deficit between the observed mass and the dark matter only equivalent.
+    # @cache.cached_property('m200m_obs', 'f200m_obs')
+    # def m200m_dmo(self):
+    #     '''
+    #     Return the dark matter only equivalent halo mass for the input profile.
+    #     The missing mass fraction from dark matter + baryons determines the
+    #     deficit between the observed mass and the dark matter only equivalent.
 
-        In our case, this should always correpsond to m200m_inf
-        '''
-        return self.m200m_obs / (1 - (1. - self.f200m_obs))
+    #     In our case, this should always correpsond to m200m_inf
+    #     '''
+    #     return self.m200m_obs / (1 - (1. - self.f200m_obs))
 
     @cache.cached_property('m200m_dmo', 'hmf_prms', 'cosmo', 'bar2dmo')
     def m_fn(self):
@@ -142,7 +142,7 @@ class Power(cache.Cache):
     def dndm(self):
         return self.m_fn.dndm
 
-    @cache.cached_property('dndm', 'rho_m', 'm_h', 'rho_k', 'f200m_obs')
+    @cache.cached_property('dndm', 'rho_m', 'm_h', 'rho_k')
     def p_1h(self):
         '''
         Return the 1h power spectrum P_1h(k)

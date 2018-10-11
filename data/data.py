@@ -16,7 +16,7 @@ import sys
 import pickle
 
 # allow import of plot
-sys.path.append('/Users/stijn/Documents/Universiteit/MR/code')
+sys.path.append('/Users/stijn/Documents/MR/code')
 import plot as pl
 
 import halo.parameters as p
@@ -24,7 +24,7 @@ import halo.tools as tools
 
 import pdb
 
-ddir = '/Users/stijn/Documents/Leiden/MR/code/halo/data/'
+ddir = '/Users/stijn/Documents/MR/code/halo/data/'
 prms = p.prms
 
 
