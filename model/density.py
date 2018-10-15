@@ -84,8 +84,7 @@ class Profile(cache.Cache):
                  r_min=p.prms.r_min,
                  r_h=p.prms.r200m,
                  r_bins=p.prms.r_bins,
-                 r200m_dmo=p.prms.r200m,
-                 m200m_dmo=p.prms.m200m,
+                 r200m_obs=p.prms.r200m,
                  m_h=p.prms.m200m,
                  k_range=p.prms.k_range,
                  z=p.prms.z,
@@ -111,10 +110,11 @@ class Profile(cache.Cache):
         self.r_min = r_min
         self.r_h = r_h
         self.r_bins = r_bins
-        if (r200m_dmo > r_h).any():
-            raise ValueError('r200m_dmo needs to be <= r_h')
-        self.r200m_dmo = r200m_dmo
-        self.m200m_dmo = m200m_dmo
+        self.r200m_obs = r200m_obs
+        # if (r200m_dmo > r_h).any():
+        #     raise ValueError('r200m_dmo needs to be <= r_h')
+        # self.r200m_dmo = r200m_dmo
+        # self.m200m_dmo = m200m_dmo
         self.m_h = m_h
         if ((np.roll(np.log10(k_range), -1)[:-1] - np.log10(k_range)[:-1]) !=
             (np.log10(k_range)[1] - np.log10(k_range)[0])).all():
@@ -126,6 +126,10 @@ class Profile(cache.Cache):
         self.taylor_err = taylor_err
         self.profile = profile
         self.profile_args = profile_args
+        # WATCH OUT WITH THIS ONE! It already assumes profile_args in the
+        # function call!! Need to update profile_mass if updating profile_args!!
+        if not hasattr(profile_mass, '__call__'):
+            raise ValueError('profile_mass needs to be callable function')
         self.profile_mass = profile_mass
         self.profile_f = profile_f
         self.profile_f_args = profile_f_args
@@ -139,29 +143,35 @@ class Profile(cache.Cache):
             raise AttributeError('Profiles need same r_bins')
         if not np.allclose(self.k_range, other.k_range):
             raise AttributeError('Profiles need same k_range')
-        if not np.allclose(self.r200m_dmo, other.r200m_dmo):
-            raise AttributeError('Profiles need same r200m_dmo')
-        if not np.allclose(self.m200m_dmo, other.m200m_dmo):
-            raise AttributeError('Profiles need same m200m_dmo')
+        if not np.allclose(self.r200m_obs, other.r200m_obs):
+            raise AttributeError('Profiles need same r200m_obs')
+        # if not np.allclose(self.r200m_dmo, other.r200m_dmo):
+        #     raise AttributeError('Profiles need same r200m_dmo')
+        # if not np.allclose(self.m200m_dmo, other.m200m_dmo):
+        #     raise AttributeError('Profiles need same m200m_dmo')
         if not np.allclose(self.z, other.z):
             raise AttributeError('Profiles need same z')
 
         m_h = self.m_h + other.m_h
-        profile_mass = self.m200m_obs + other.m200m_obs
+        profile_mass = (lambda r:
+                        self.profile_mass(r) +
+                        other.profile_mass(r))
         profile = self.rho_r + other.rho_r
+        profile_args = tools.merge_dicts(self.profile_args, other.profile_args)
         profile_f = self.rho_k + other.rho_k
 
         return Profile(cosmo=self.cosmo,
                        r_min=self.r_min,
                        r_h=self.r_h,
                        r_bins=self.r_bins,
-                       r200m_dmo=self.r200m_dmo,
-                       m200m_dmo=self.m200m_dmo,
+                       r200m_obs=self.r200m_obs,
+                       # r200m_dmo=self.r200m_dmo,
+                       # m200m_dmo=self.m200m_dmo,
                        m_h=m_h,
                        k_range=self.k_range,
                        z=self.z,
                        profile=profile,
-                       profile_args=None,
+                       profile_args=profile_args,
                        profile_mass=profile_mass,
                        profile_f=profile_f,
                        profile_f_args=None,
@@ -189,12 +199,16 @@ class Profile(cache.Cache):
         return val
 
     @cache.parameter
-    def r200m_dmo(self, val):
+    def r200m_obs(self, val):
         return val
 
-    @cache.parameter
-    def m200m_dmo(self, val):
-        return val
+    # @cache.parameter
+    # def r200m_dmo(self, val):
+    #     return val
+
+    # @cache.parameter
+    # def m200m_dmo(self, val):
+    #     return val
 
     @cache.parameter
     def m_h(self, val):
@@ -247,6 +261,12 @@ class Profile(cache.Cache):
     #===========================================================================
     # Methods
     #===========================================================================
+    def m_r(self, r):
+        '''
+        Return the total mass inside r
+        '''
+        return self.profile_mass(r)
+
     @cache.cached_property('r_min', 'r_h', 'r_bins')
     def r_range(self):
         '''
@@ -260,7 +280,35 @@ class Profile(cache.Cache):
         return np.array([np.logspace(self.r_min, np.log10(rm), self.r_bins)
                          for rm in self.r_h])
 
-    @cache.cached_property('rho_r', 'r_range', 'r200m_dmo', 'profile_mass', 'profile_args')
+    # @cache.cached_property('rho_r', 'r_range', 'r200m_dmo', 'profile_mass', 'profile_args')
+    # def m200m_obs(self):
+    #     '''
+    #     Computes the mass inside r200m_dmo. This is done either through a given
+    #     analytic function via profile_mass, via a given m200m_obs, also in
+    #     profile_mass or by integrating rho_r (if profile_mass is None)
+
+    #     Returns
+    #     -------
+    #     m200m : (m,) array
+    #       mass inside r200m_obs
+    #     '''
+    #     if hasattr(self.profile_mass, '__call__'):
+    #         m200m_obs = self.profile_mass(self.r200m_dmo, **self.profile_args)
+
+    #     elif hasattr(self.profile_mass, '__len__'):
+    #         m200m_obs = self.profile_mass
+
+    #     else:
+    #         m200m_obs = np.array([tools.m_h(self.rho_r[idx][tools.lte(r, self.r200m_dmo[idx])],
+    #                                         r[tools.lte(r, self.r200m_dmo[idx])])
+    #                               for idx, r in enumerate(self.r_range)])
+
+    #     if m200m_obs.shape != self.r200m_dmo.shape:
+    #         raise ValueError('profile_mass needs to result in same shape as m200m_dmo')
+
+    #     return m200m_obs
+
+    @cache.cached_property('r200m_obs', 'profile_mass', 'profile_args', 'cosmo', 'r_range')
     def m200m_obs(self):
         '''
         Computes the mass inside r200m_dmo. This is done either through a given
@@ -272,21 +320,7 @@ class Profile(cache.Cache):
         m200m : (m,) array
           mass inside r200m_obs
         '''
-        if hasattr(self.profile_mass, '__call__'):
-            m200m_obs = self.profile_mass(self.r200m_dmo, **self.profile_args)
-
-        elif hasattr(self.profile_mass, '__len__'):
-            m200m_obs = self.profile_mass
-
-        else:
-            m200m_obs = np.array([tools.m_h(self.rho_r[idx][tools.lte(r, self.r200m_dmo[idx])],
-                                            r[tools.lte(r, self.r200m_dmo[idx])])
-                                  for idx, r in enumerate(self.r_range)])
-
-        if m200m_obs.shape != self.r200m_dmo.shape:
-            raise ValueError('profile_mass needs to result in same shape as m200m_dmo')
-
-        return m200m_obs
+        return self.m_r(self.r200m_obs)
 
     # @cache.cached_property('rho_r', 'r_range', 'r200m_dmo')
     # def m200m_obs(self):
@@ -338,6 +372,10 @@ class Profile(cache.Cache):
         m_in_prof = np.array([tools.m_h(dens_profile[idx][tools.lte(r, self.r_h[idx])],
                                         r[tools.lte(r, self.r_h[idx])])
                               for idx, r in enumerate(self.r_range)])
+
+        # m_in_prof1 = self.m_r(self.r_h)
+        # print m_in_prof / m_in_prof1
+
         frac_diff = np.max(np.abs(m_in_prof / self.m_h - 1))
 
         # only raise a warning in this case, since otherwise you have to keep

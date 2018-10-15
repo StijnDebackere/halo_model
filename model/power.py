@@ -38,7 +38,7 @@ class Power(cache.Cache):
         self.rho_k = prof.rho_k
         self.m_h = prof.m_h
         self.m200m_obs = prof.m200m_obs
-        self.m200m_dmo = prof.m200m_dmo
+        # self.m200m_dmo = prof.m200m_dmo
         self.k_range = prof.k_range
         self.z = prof.z
         self.cosmo = prof.cosmo
@@ -75,9 +75,9 @@ class Power(cache.Cache):
     def m200m_obs(self, val):
         return val
 
-    @cache.parameter
-    def m200m_dmo(self, val):
-        return val
+    # @cache.parameter
+    # def m200m_dmo(self, val):
+    #     return val
 
     @cache.parameter
     def k_range(self, val):
@@ -113,13 +113,21 @@ class Power(cache.Cache):
     #     '''
     #     return self.m200m_obs / (1 - (1. - self.f200m_obs))
 
-    @cache.cached_property('m200m_dmo', 'hmf_prms', 'cosmo', 'bar2dmo')
+    # @cache.cached_property('m200m_dmo', 'hmf_prms', 'cosmo', 'bar2dmo')
+    # def m_fn(self):
+    #     hmf_prms = self.hmf_prms
+    #     if self.bar2dmo:
+    #         hmf_prms['m_range'] = self.m200m_dmo
+    #     else:
+    #         hmf_prms['m_range'] = self.m200m_obs
+
+    #     m_fn = hmf.MassFunction(**hmf_prms)
+    #     return m_fn
+
+    @cache.cached_property('hmf_prms', 'cosmo')
     def m_fn(self):
         hmf_prms = self.hmf_prms
-        if self.bar2dmo:
-            hmf_prms['m_range'] = self.m200m_dmo
-        else:
-            hmf_prms['m_range'] = self.m200m_obs
+        hmf_prms['m_range'] = self.m200m_dmo
 
         m_fn = hmf.MassFunction(**hmf_prms)
         return m_fn
@@ -138,7 +146,11 @@ class Power(cache.Cache):
         '''
         return 0.5 / np.pi**2 * self.k_range**3 * self.p_lin
 
-    @cache.cached_property('m_fn', 'm200m_dmo')
+    # @cache.cached_property('m_fn', 'm200m_dmo')
+    # def dndm(self):
+    #     return self.m_fn.dndm
+
+    @cache.cached_property('m_fn')
     def dndm(self):
         return self.m_fn.dndm
 
