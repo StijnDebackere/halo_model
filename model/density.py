@@ -32,13 +32,6 @@ class Profile(cache.Cache):
       the halo radius in physical units
     r_bins : int
       number of bins for the radial range of the profile
-    r200m_inf: (m,) array [Mpc/h]
-      array containing the inferred halo radius for each mass
-    m200m_inf: (m,) array [M_sun/h]
-      array containing the inferred halo mass for each mass
-    m_h : (m,) array
-      array containing total mass in the profile, this does not need to equal
-      m200m_inf!!!
     k_range : (k,) array
       array containing wavevectors to compute profile for
     profile : function or array
@@ -66,8 +59,6 @@ class Profile(cache.Cache):
     -------
     r_range : (m,r) array
       array containing radial range in physical units
-    m200m_obs : (m,) array
-      mass inside r200m_inf
     rho_r : (m,r) array
       density profile
     rho_k : (m,k) array
@@ -79,24 +70,21 @@ class Profile(cache.Cache):
     '''
     defaults = {}
     # this will indicate indices where taylor_err is exceeded for each m_h
-    taylor_nan = []
     def __init__(self, cosmo=p.prms.cosmo,
                  r_min=p.prms.r_min,
-                 r_h=p.prms.r200m,
+                 r_h=p.prms.r200m_dmo,
                  r_bins=p.prms.r_bins,
-                 r200m_obs=p.prms.r200m,
-                 m_h=p.prms.m200m,
                  k_range=p.prms.k_range,
                  z=p.prms.z,
                  profile=profs.profile_NFW,
-                 profile_args={'m_x': p.prms.m200m,
-                               'c_x': tools.c_duffy(p.prms.m200m),
-                               'r_x': p.prms.r200m},
+                 profile_args={'m_x': p.prms.m200m_dmo,
+                               'c_x': tools.c_duffy(p.prms.m200m_dmo),
+                               'r_x': p.prms.r200m_dmo},
                  profile_mass=tools.m_NFW,
                  profile_f=profs.profile_NFW_f,
-                 profile_f_args={'m_x': p.prms.m200m,
-                                 'c_x': tools.c_duffy(p.prms.m200m),
-                                 'r_x': p.prms.r200m},
+                 profile_f_args={'m_x': p.prms.m200m_dmo,
+                                 'c_x': tools.c_duffy(p.prms.m200m_dmo),
+                                 'r_x': p.prms.r200m_dmo},
                  n=84,
                  taylor_err=1e-50,
                  cpus=multiprocessing.cpu_count()):
@@ -110,12 +98,6 @@ class Profile(cache.Cache):
         self.r_min = r_min
         self.r_h = r_h
         self.r_bins = r_bins
-        self.r200m_obs = r200m_obs
-        # if (r200m_dmo > r_h).any():
-        #     raise ValueError('r200m_dmo needs to be <= r_h')
-        # self.r200m_dmo = r200m_dmo
-        # self.m200m_dmo = m200m_dmo
-        self.m_h = m_h
         if ((np.roll(np.log10(k_range), -1)[:-1] - np.log10(k_range)[:-1]) !=
             (np.log10(k_range)[1] - np.log10(k_range)[0])).all():
             raise ValueError('k_range needs to be log spaced')
@@ -143,31 +125,19 @@ class Profile(cache.Cache):
             raise AttributeError('Profiles need same r_bins')
         if not np.allclose(self.k_range, other.k_range):
             raise AttributeError('Profiles need same k_range')
-        if not np.allclose(self.r200m_obs, other.r200m_obs):
-            raise AttributeError('Profiles need same r200m_obs')
-        # if not np.allclose(self.r200m_dmo, other.r200m_dmo):
-        #     raise AttributeError('Profiles need same r200m_dmo')
-        # if not np.allclose(self.m200m_dmo, other.m200m_dmo):
-        #     raise AttributeError('Profiles need same m200m_dmo')
         if not np.allclose(self.z, other.z):
             raise AttributeError('Profiles need same z')
 
-        m_h = self.m_h + other.m_h
-        profile_mass = (lambda r:
-                        self.profile_mass(r) +
-                        other.profile_mass(r))
-        profile = self.rho_r + other.rho_r
         profile_args = tools.merge_dicts(self.profile_args, other.profile_args)
+        profile_mass = (lambda r, **kwargs: self.profile_mass(r, **self.profile_args) +
+                        other.profile_mass(r, **other.profile_args))
+        profile = self.rho_r + other.rho_r
         profile_f = self.rho_k + other.rho_k
 
         return Profile(cosmo=self.cosmo,
                        r_min=self.r_min,
                        r_h=self.r_h,
                        r_bins=self.r_bins,
-                       r200m_obs=self.r200m_obs,
-                       # r200m_dmo=self.r200m_dmo,
-                       # m200m_dmo=self.m200m_dmo,
-                       m_h=m_h,
                        k_range=self.k_range,
                        z=self.z,
                        profile=profile,
@@ -196,22 +166,6 @@ class Profile(cache.Cache):
 
     @cache.parameter
     def r_bins(self, val):
-        return val
-
-    @cache.parameter
-    def r200m_obs(self, val):
-        return val
-
-    # @cache.parameter
-    # def r200m_dmo(self, val):
-    #     return val
-
-    # @cache.parameter
-    # def m200m_dmo(self, val):
-    #     return val
-
-    @cache.parameter
-    def m_h(self, val):
         return val
 
     @cache.parameter
@@ -265,7 +219,7 @@ class Profile(cache.Cache):
         '''
         Return the total mass inside r
         '''
-        return self.profile_mass(r)
+        return self.profile_mass(r, **self.profile_args)
 
     @cache.cached_property('r_min', 'r_h', 'r_bins')
     def r_range(self):
@@ -280,76 +234,12 @@ class Profile(cache.Cache):
         return np.array([np.logspace(self.r_min, np.log10(rm), self.r_bins)
                          for rm in self.r_h])
 
-    # @cache.cached_property('rho_r', 'r_range', 'r200m_dmo', 'profile_mass', 'profile_args')
-    # def m200m_obs(self):
-    #     '''
-    #     Computes the mass inside r200m_dmo. This is done either through a given
-    #     analytic function via profile_mass, via a given m200m_obs, also in
-    #     profile_mass or by integrating rho_r (if profile_mass is None)
-
-    #     Returns
-    #     -------
-    #     m200m : (m,) array
-    #       mass inside r200m_obs
-    #     '''
-    #     if hasattr(self.profile_mass, '__call__'):
-    #         m200m_obs = self.profile_mass(self.r200m_dmo, **self.profile_args)
-
-    #     elif hasattr(self.profile_mass, '__len__'):
-    #         m200m_obs = self.profile_mass
-
-    #     else:
-    #         m200m_obs = np.array([tools.m_h(self.rho_r[idx][tools.lte(r, self.r200m_dmo[idx])],
-    #                                         r[tools.lte(r, self.r200m_dmo[idx])])
-    #                               for idx, r in enumerate(self.r_range)])
-
-    #     if m200m_obs.shape != self.r200m_dmo.shape:
-    #         raise ValueError('profile_mass needs to result in same shape as m200m_dmo')
-
-    #     return m200m_obs
-
-    @cache.cached_property('r200m_obs', 'profile_mass', 'profile_args', 'cosmo', 'r_range')
-    def m200m_obs(self):
+    @cache.cached_property('r_h')
+    def m_h(self):
         '''
-        Computes the mass inside r200m_dmo. This is done either through a given
-        analytic function via profile_mass, via a given m200m_obs, also in
-        profile_mass or by integrating rho_r (if profile_mass is None)
-
-        Returns
-        -------
-        m200m : (m,) array
-          mass inside r200m_obs
+        Return total mass in the halo
         '''
-        return self.m_r(self.r200m_obs)
-
-    # @cache.cached_property('rho_r', 'r_range', 'r200m_dmo')
-    # def m200m_obs(self):
-    #     '''
-    #     Computes the mass inside r200m_obs
-
-    #     Returns
-    #     -------
-    #     m200m : (m,) array
-    #       mass inside r200m_obs
-    #     '''
-    #     m200m_obs = np.array([tools.m_h(self.rho_r[idx][tools.lte(r, self.r200m_dmo[idx])],
-    #                                     r[tools.lte(r, self.r200m_dmo[idx])])
-    #                           for idx, r in enumerate(self.r_range)])
-
-    #     return m200m_obs
-
-    # @cache.cached_property('m200m_obs', 'm200m_dmo')
-    # def f200m_obs(self):
-    #     '''
-    #     Computes the mass fraction inside r200m_dmo
-
-    #     Returns
-    #     -------
-    #     f200m : (m,) array
-    #       mass fraction inside r200m_dmo
-    #     '''
-
-    #     return self.m200m_obs / self.m200m_dmo
+        return self.m_r(self.r_h)
 
     @cache.cached_property('r_range', 'r_h','profile', 'profile_args')
     def rho_r(self):
@@ -517,7 +407,7 @@ class Profile(cache.Cache):
 
         return taylor_coefs
 
-    @cache.cached_property('rho_r', 'n', 'r_range', 'k_range', 'm_h')
+    @cache.cached_property('rho_r', 'n', 'r_range', 'k_range', 'r_h')
     def F_n(self):
         '''
         Computes the Taylor coefficients in the Fourier expansion:
@@ -530,7 +420,7 @@ class Profile(cache.Cache):
           Taylor coefficients of Fourier expansion
         '''
         # define shapes for readability
-        m_s = self.m_h.shape[0]
+        m_s = self.r_h.shape[0]
         # Prefactor only changes along axis 0 (Mass)
         prefactor = (4.0 * np.pi)
 
@@ -542,7 +432,7 @@ class Profile(cache.Cache):
 
         return F_n
 
-    @cache.cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'm_h',
+    @cache.cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'r_h',
                            'taylor_err')
     def rho_k_T(self):
         '''
@@ -558,7 +448,7 @@ class Profile(cache.Cache):
         '''
         # define shapes for readability
         n_s = self.n
-        m_s = self.m_h.shape[0]
+        m_s = self.r_h.shape[0]
         k_s = self.k_range.shape[0]
 
         Fn = self.F_n
@@ -584,8 +474,9 @@ class Profile(cache.Cache):
         self.taylor_nan = indices
         for idx, idx_max in enumerate(indices):
             u[idx,idx_max:] = np.nan
-            if idx_max != k_s:
-                u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
+            # # this extrapolation is not really very good...
+            # if idx_max != k_s:
+            #     u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
 
         # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
         # # systematic offset, while we know that theoretically u[k=0] = 1

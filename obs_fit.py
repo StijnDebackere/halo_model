@@ -26,100 +26,18 @@ import pdb
 # Definition of different matter components
 # ------------------------------------------------------------------------------
 
-def load_dm_dmo(prms):
+def load_dm_dmo_rmax(prms, r_max, m200m_dmo, r200m_dmo, c200m_dmo):
     '''
-    Dark matter profile with NFW profile and f_dm = 1
+    Return NFW profiles with up to r_max
     '''
-    f_dm = prms.cosmo.omegac / prms.cosmo.omegam
-    c200m = tools.c_duffy(prms.m200m).reshape(-1)
-    # c200m = prms.c_correa
-
-    profile_args = {'m_x': prms.m200m,
-                    'c_x': c200m,
-                    'r_x': prms.r200m}
-    dm_kwargs = {'cosmo': prms.cosmo,
-                 'r_h': prms.r200m,
-                 'r200m_obs': prms.r200m,
-                 # 'r200m_dmo': prms.r200m_dmo,
-                 # 'm200m_dmo': prms.m200m_dmo,
-                 'm_h': prms.m200m,
-                 'profile': dp.profile_NFW,
-                 'profile_args': profile_args,
-                 'profile_mass': lambda r: dp.m_NFW(r, **profile_args),
-                 'profile_f': dp.profile_NFW_f,
-                 'profile_f_args': profile_args}
-
-    dens_dm = dens.Profile(**dm_kwargs)
-    return dens_dm
-
-# ------------------------------------------------------------------------------
-# End of load_dm_dmo()
-# ------------------------------------------------------------------------------
-
-def load_dm(prms, m200m_obs=p.prms.m200m):
-    '''
-    Dark matter profile with NFW profile and f_dm = 1 - f_b
-    '''
-    f_dm = prms.cosmo.omegac / prms.cosmo.omegam
-    c200m = tools.c_duffy(m200m_obs).reshape(-1)
-    # c200m = prms.c_correa
-
-    profile_args = {'m_x': f_dm * prms.m200m,
-                    'c_x': c200m,
-                    'r_x': prms.r200m}
-    dm_kwargs = {'cosmo': prms.cosmo,
-                 'r_h': prms.r200m,
-                 'r200m_obs': prms.r200m,
-                 # 'r200m_dmo': prms.r200m,
-                 # 'm200m_dmo': prms.m200m,
-                 # only f_dm of halo mass in dm
-                 'm_h': prms.m200m * f_dm,
-                 'profile': dp.profile_NFW,
-                 'profile_args': profile_args,
-                 'profile_mass': lambda r: dp.m_NFW(r, **profile_args),
-                 'profile_f': dp.profile_NFW_f,
-                 'profile_f_args': profile_args}
-
-    dens_dm = dens.Profile(**dm_kwargs)
-    return dens_dm
-
-# ------------------------------------------------------------------------------
-# End of load_dm()
-# ------------------------------------------------------------------------------
-
-def load_dm_dmo_rmax(prms, r_max):
-    '''
-    Pure dark matter only component with NFW profile and f_dm = 1, the profile
-    goes up to 5r500c, but the NFW profile goes to 0 for r > r200m
-    '''
-    r_range = np.array([np.logspace(prms.r_min, np.log10(rm), prms.r_bins)
-                        for i,rm in enumerate(r_max)])
-    rx = r_range / prms.r200m.reshape(-1,1)
-
-    # concentration
-    c200m = tools.c_duffy(prms.m200m).reshape(-1)
-    # c200m = prms.c_correa
-
-    prof_dm = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_dm):
-        sl = (rx[idx] <= 1.)
-        prof_dm[idx][sl] = dp.profile_NFW(r_range[idx][sl].reshape(1,-1),
-                                             prms.m200m[idx].reshape(-1),
-                                             c200m[idx].reshape(-1),
-                                             prms.r200m[idx].reshape(-1)).reshape(-1)
-
-    profile_args = {'m_x': prms.m200m,
-                    'c_x': c200m,
-                    'r_x': prms.r200m}
+    profile_args = {'m_x': m200m_dmo,
+                    'c_x': c200m_dmo,
+                    'r_x': r200m_dmo}
     dm_kwargs = {'cosmo': prms.cosmo,
                  'r_h': r_max,
-                 'r200m_obs': prms.r200m,
-                 # 'r200m_dmo': prms.r200m,
-                 # 'm200m_dmo': prms.m200m,
-                 'm_h': prms.m200m,
-                 'profile': prof_dm,
+                 'profile': dp.profile_NFW,
                  'profile_args': profile_args,
-                 'profile_mass': lambda r: dp.m_NFW(np.where(r < prms.r200m, r, prms.r200m), **profile_args),
+                 'profile_mass': lambda r, **kwargs: dp.m_NFW(r, **profile_args),
                  'profile_f': dp.profile_NFW_f,
                  'profile_f_args': profile_args}
 
@@ -130,40 +48,19 @@ def load_dm_dmo_rmax(prms, r_max):
 # End of load_dm_dmo_rmax()
 # ------------------------------------------------------------------------------
 
-def load_dm_rmax(prms, r_max):
+def load_dm_rmax(prms, r_max, m500c, r500c, c500c):
     '''
-    Return NFW profiles with up to r200m and 0 up to 5r500c
+    Return NFW profiles up to r_max
     '''
-    r_range = np.array([np.logspace(prms.r_min, np.log10(rm), prms.r_bins)
-                        for i,rm in enumerate(r_max)])
-    rx = r_range / prms.r200m.reshape(-1,1)
+    profile_args = {'m_x': m500c,
+                    'c_x': c500c,
+                    'r_x': r500c}
 
-    # halo dark matter mass fraction
-    f_dm = prms.cosmo.omegac / prms.cosmo.omegam
-    c200m = tools.c_duffy(m200m_obs).reshape(-1)
-    # c200m = prms.c_correa
-
-    prof_dm = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_dm):
-        sl = (rx[idx] <= 1.)
-        prof_dm[idx][sl] = dp.profile_NFW(r_range[idx][sl].reshape(1,-1),
-                                          (f_dm * prms.m200m[idx]).reshape(-1),
-                                          c200m[idx].reshape(-1),
-                                          prms.r200m[idx].reshape(-1)).reshape(-1)
-
-    profile_args = {'m_x': f_dm * prms.m200m,
-                    'c_x': c200m,
-                    'r_x': prms.r200m}
     dm_kwargs = {'cosmo': prms.cosmo,
                  'r_h': r_max,
-                 'r200m_obs': prms.r200m,
-                 # 'r200m_dmo': prms.r200m,
-                 # 'm200m_dmo': prms.m200m,
-                 # only f_dm of halo mass in dm
-                 'm_h': f_dm * prms.m200m,
-                 'profile': prof_dm,
+                 'profile': dp.profile_NFW,
                  'profile_args': profile_args,
-                 'profile_mass': lambda r: dp.m_NFW(np.where(r < prms.r200m, r, prms.r200m), **profile_args),
+                 'profile_mass': lambda r, **kwargs: dp.m_NFW(r, **profile_args),
                  'profile_f': dp.profile_NFW_f,
                  'profile_f_args': profile_args}
 
@@ -174,84 +71,38 @@ def load_dm_rmax(prms, r_max):
 # End of load_dm_rmax()
 # ------------------------------------------------------------------------------
 
-def load_gas_plaw_r500c_rmax(prms, f_stars, rho_500c, r_max, gamma,
-                             rc=None, beta=None, f_gas500=None,
-                             q_f=50,
+def load_gas_plaw_r500c_rmax(prms, rho_500c, r_max, gamma, rc=None,
+                             beta=None, f_gas500=None, q_f=50,
                              q_rc=50, q_beta=50):
     '''
     Return a beta profile upto r500c and a power law with index gamma upto r_max,
     or wherever the baryon fraction is reached.
     '''
-    # radius in terms of r500c
     r_range = np.array([np.logspace(prms.r_min, np.log10(rm), prms.r_bins)
                         for i,rm in enumerate(r_max)])
-    rx = r_range / prms.r500c.reshape(-1,1)
 
-    # ---------------------------------------------------------------- #
-    # Our halo model assumes simulation variables with Hubble units    #
-    # The observations have assumed h=0.7 and get different h scalings #
-    # than the theoretical model                                       #
-    # ---------------------------------------------------------------- #
-    # FOR THE FITS WE NEED TO CONVERT ALL OF OUR HALO MODEL RESULTS TO
-    # h=0.7!!!
-    # Since r_c and beta are the same for all halo masses, it doesn't
-    # matter here
-    if rc is None:
-        rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
+    # the fit parameters are for the measured profile that assumed h=0.7
+    prof_gas = dp.profile_beta_plaw(r_range,
+                                    m_x=f_gas500 * prms.m500c / 0.7,
+                                    r_x=prms.r500c / 0.7,
+                                    rc=rc * prms.r500c / 0.7,
+                                    beta=np.array([beta] * prms.r500c.shape[0]),
+                                    r_y=r_max / 0.7,
+                                    gamma=np.array([gamma] * prms.r500c.shape[0]),
+                                    rho_x=rho_500c * (0.7)**2) * (0.7)**(-2.)
 
-    # gas fractions
-    # h=0.7 needs to be converted here
-    if f_gas500 is None:
-        f_prms = d.f_gas_prms(prms.cosmo, q=q_f)
-        f_gas500 = d.f_gas(prms.m500c / 0.7, cosmo=prms.cosmo, **f_prms)
-
-    # determine the radius at which the beta profile mass exceeds the
-    # baryon fraction, we take high r_y to make sure we get convergence
-    r_cut = dp.r_where_m_beta_plaw(m=((prms.cosmo.omegab/prms.cosmo.omegam - f_stars) *
-                                      prms.m200m),
-                                   m_x=f_gas500 * prms.m500c,
-                                   r_x=prms.r500c,
-                                   rc=rc * prms.r500c,
-                                   beta=beta,
-                                   r_y=1000 * r_max,
-                                   gamma=gamma,
-                                   rho_x=rho_500c)
-
-    r_cut = np.concatenate([r_max[r_cut >= r_max], r_cut[r_cut < r_max]])
-
-    # this profile corresponds to the physically measured one
-    # assuming h=0.7, but our theoretical rho ~ h^2
-    prof_gas = dp.profile_beta(r_range / 0.7, m_x=f_gas500 * prms.m500c / 0.7,
-                               r_x=prms.r500c / 0.7, rc=rc * prms.r500c / 0.7,
-                               beta=np.array([beta] * prms.r500c.shape[0])) * (0.7)**(-2.)
-
-    # now need to add the power law for r > r500c
-    # also cut off the profile for r > r_cut
-    for idx, prof in enumerate(prof_gas):
-        sl_500 = tools.lte(rx[idx], 1.)
-        sl_fb = tools.gte(rx[idx], r_cut[idx] / prms.r500c[idx])
-        prof_gas[idx][~sl_500] = (dp.profile_plaw(r_range[idx].reshape(1,-1) / 0.7,
-                                                  rho_x=rho_500c[idx].reshape(1,1) * (0.7)**2,
-                                                  r_x=prms.r500c[idx].reshape(1,1) / 0.7,
-                                                  r_y=r_max[idx].reshape(1,1) / 0.7,
-                                                  gamma=np.array([gamma])).reshape(-1))[~sl_500] * (0.7)**(-2.)
-        prof_gas[idx][sl_fb] = 0.
-
-    prof_mass = lambda r: dp.m_beta_plaw(r, beta=np.array([beta] * prms.r500c.shape[0]),
-                                         rc=rc * prms.r500c,
-                                         m_x=f_gas500 * prms.m500c,
-                                         rho_x=rho_500c,
-                                         r_x=prms.r500c,
-                                         r_y=r_cut,
-                                         gamma=np.array([gamma] * prms.r500c.shape[0]))
+    profile_args =  {'m_x': f_gas500 * prms.m500c / 0.7,
+                     'r_x': prms.r500c / 0.7,
+                     'rc': rc * prms.r500c / 0.7,
+                     'beta': np.array([beta] * prms.r500c.shape[0]),
+                     'r_y': r_max / 0.7,
+                     'gamma': np.array([gamma] * prms.r500c.shape[0]),
+                     'rho_x': rho_500c * (0.7)**2}
     gas_kwargs = {'cosmo': prms.cosmo,
                   'r_h': r_max,
-                  'r200m_obs': prms.r200m,
-                  # 'r200m_dmo': prms.r200m,
-                  # 'm200m_dmo': prms.m200m,
-                  'm_h': tools.m_h(prof_gas, r_range),
                   'profile': prof_gas,
-                  'profile_mass': prof_mass,
+                  'profile_args': profile_args,
+                  'profile_mass': lambda r, **kwargs: dp.m_beta_plaw(r, **profile_args) * (0.7)**(-2.),
                   # compute FT in dens
                   'profile_f': None}
 
@@ -262,181 +113,20 @@ def load_gas_plaw_r500c_rmax(prms, f_stars, rho_500c, r_max, gamma,
 # End of load_gas_plaw_r500c_rmax()
 # ----------------------------------------------------------------------
 
-# def load_gas_plaw_r200m_rmax(prms, f_stars, rho_200m, r_max, gamma, q_f=50,
-#                              q_rc=50, q_beta=50):
-#     '''
-#     Return a beta profile upto r500c and a power law with index gamma upto r_max,
-#     or wherever the baryon fraction is reached.
-#     '''
-#     # radius in terms of r500c
-#     r_range = np.array([np.logspace(prms.r_min, np.log10(rm), prms.r_bins)
-#                         for i,rm in enumerate(r_max)])
-#     rx = r_range / prms.r200m.reshape(-1,1)
-
-#     # ---------------------------------------------------------------- #
-#     # Our halo model assumes simulation variables with Hubble units    #
-#     # The observations have assumed h=0.7 and get different h scalings #
-#     # than the theoretical model                                       #
-#     # ---------------------------------------------------------------- #
-#     # FOR THE FITS WE NEED TO CONVERT ALL OF OUR HALO MODEL RESULTS TO
-#     # h=0.7!!!
-#     # Since r_c and beta are the same for all halo masses, it doesn't
-#     # matter here
-#     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
-
-#     # gas fractions
-#     # h=0.7 needs to be converted here
-#     f_prms = d.f_gas_prms(prms.cosmo, q=q_f)
-#     f_gas500 = d.f_gas(prms.m500c / 0.7, cosmo=prms.cosmo, **f_prms)
-
-#     # THIS CAN BE TAKEN OUTSIDE FOR SPEEDUP
-#     # get analytic normalizations for the beta profile
-#     m_gas200m_ana = dp.m_beta(prms.r200m, m_x=f_gas500 * prms.m500c,
-#                               r_x=prms.r500c, rc=rc * prms.r500c,
-#                               beta=np.array([beta]*prms.r500c.shape[0])).reshape(-1)
-
-#     # determine the radius at which the beta profile mass exceeds the
-#     # baryon fraction, we take high r_y to make sure we get convergence
-#     r_cut = dp.r_where_m_beta_plaw(m=(prms.cosmo.omegab/prms.cosmo.omegam - f_stars) *
-#                                    prms.m200m, m_x=m_gas200m_ana,
-#                                    rho_x=rho_200m, r_x=prms.r200m,
-#                                    r_y=1000 * r_max, gamma=gamma)
-
-#     r_cut = np.concatenate([r_max[r_cut >= r_max], r_cut[r_cut < r_max]])
-
-#     # this profile corresponds to the physically measured one
-#     # assuming h=0.7, but our theoretical rho ~ h^2
-#     prof_gas = dp.profile_beta(r_range / 0.7, m_x=f_gas500 * prms.m500c / 0.7,
-#                                    r_x=prms.r500c / 0.7, rc=rc * prms.r500c / 0.7,
-#                                    beta=np.array([beta] * prms.r500c.shape[0])) * (0.7)**(-2.)
-
-#     # mass inside r200m!!!
-#     prof_mass = m_gas200m_ana
-
-#     # now need to add the power law for r > r500c
-#     # also cut off the profile for r > r_cut
-#     for idx, prof in enumerate(prof_gas):
-#         sl_200 = tools.lte(rx[idx], 1.)
-#         sl_fb = tools.gte(rx[idx], r_cut[idx] / prms.r200m[idx])
-#         prof_gas[idx][~sl_200] = (dp.profile_plaw(r_range[idx].reshape(1,-1) / 0.7,
-#                                                   rho_x=rho_200m[idx].reshape(1,1) * (0.7)**2,
-#                                                   r_x=prms.r200m[idx].reshape(1,1) / 0.7,
-#                                                   r_y=r_max[idx].reshape(1,1) / 0.7,
-#                                                   gamma=np.array([gamma])).reshape(-1))[~sl_200] * (0.7)**(-2.)
-#         prof_gas[idx][sl_fb] = 0.
-
-#     gas_kwargs = {'cosmo': prms.cosmo,
-#                   'r_h': r_max,
-#                   'r200m_dmo': prms.r200m,
-#                   'm200m_dmo': prms.m200m,
-#                   'm_h': tools.m_h(prof_gas, r_range),
-#                   'profile': prof_gas,
-#                   'profile_mass': prof_mass,
-#                   # compute FT in dens
-#                   'profile_f': None}
-
-#     dens_gas = dens.Profile(**gas_kwargs)
-#     return dens_gas
-
-# # ----------------------------------------------------------------------
-# # End of load_gas_plaw_r200m_rmax()
-# # ----------------------------------------------------------------------
-
-def load_centrals(prms, f_comp='cen'):
-    '''
-    Return delta profiles with fstars_500c = f_obs
-
-    Parameters
-    ----------
-    prms : p.Parameters object
-      contains relevant model info
-    bar2dmo : bool
-      specifies whether to carry out hmf conversion for missing m200m
-    '''
-    # stellar fraction
-    f_cen = d.f_stars(prms.m200m / 0.7, comp=f_comp)
-
-    profile_args = {'m_range': f_cen * prms.m200m}
-    cen_kwargs = {'cosmo': prms.cosmo,
-                  'r_h': prms.r200m,
-                  'r200m_obs': prms.r200m,
-                  # 'r200m_dmo': prms.r200m,
-                  # 'm200m_dmo': prms.m200m,
-                  # only f_cen of halo mass in dm
-                  'm_h': prms.m200m * f_cen,
-                  'profile': dp.profile_delta,
-                  'profile_args': profile_args,
-                  'profile_mass': lambda r: dp.m_delta(r, **profile_args),
-                  'profile_f': dp.profile_delta_f,
-                  'profile_f_args': profile_args}
-
-    dens_cen = dens.Profile(**cen_kwargs)
-    return dens_cen
-
-# ------------------------------------------------------------------------------
-# End of load_centrals()
-# ------------------------------------------------------------------------------
-
-def load_satellites(prms, f_c=0.86):
-    '''
-    Return NFW profiles with fstars_500c = f_obs
-
-    Parameters
-    ----------
-    f_c : float
-      ratio between c_sat(m) and c_dm(m) used in iHOD
-    prms : p.Parameters object
-      contains relevant model info
-    bar2dmo : bool
-      specifies whether to carry out hmf conversion for missing m200m
-    '''
-    # stellar fraction
-    f_sat = d.f_stars(prms.m200m / 0.7, comp='sat')
-    c200m = tools.c_duffy(prms.m200m).reshape(-1)
-    c = f_c * c200m
-
-    profile_args = {'m_x': f_sat * prms.m200m,
-                    'c_x': c,
-                    'r_x': prms.r200m}
-    sat_kwargs = {'cosmo': prms.cosmo,
-                  'r_h': prms.r200m,
-                  'r200m_obs': prms.r200m,
-                  # 'r200m_dmo': prms.r200m,
-                  # 'm200m_dmo': prms.m200m,
-                  # only f_dm of halo mass in dm
-                  'm_h': prms.m200m * f_sat,
-                  'profile': dp.profile_NFW,
-                  'profile_args': profile_args,
-                  'profile_mass': lambda r: dp.m_NFW(r, **profile_args),
-                  'profile_f': dp.profile_NFW_f,
-                  'profile_f_args': profile_args}
-
-    dens_sat = dens.Profile(**sat_kwargs)
-    return dens_sat
-
-# ------------------------------------------------------------------------------
-# End of load_satellites()
-# ------------------------------------------------------------------------------
-
-def load_centrals_rmax(prms, r_max, f_comp='cen'):
+def load_centrals_rmax(prms, r_max, m200m_dmo, f_comp='cen'):
     '''
     Return delta profiles with fstars_500c = f_obs
 
     '''
     # stellar fraction
-    f_cen = d.f_stars(prms.m200m / 0.7, comp=f_comp)
+    f_cen = d.f_stars(m200m_dmo / 0.7, comp=f_comp)
 
-    profile_args = {'m_range': f_cen * prms.m200m}
+    profile_args = {'m_range': f_cen * m200m_dmo}
     cen_kwargs = {'cosmo': prms.cosmo,
                   'r_h': r_max,
-                  'r200m_obs': prms.r200m,
-                  # 'r200m_dmo': prms.r200m,
-                  # 'm200m_dmo': prms.m200m,
-                  # only f_cen of halo mass in dm
-                  'm_h': prms.m200m * f_cen,
                   'profile': dp.profile_delta,
                   'profile_args': profile_args,
-                  'profile_mass': lambda r: dp.m_delta(r, **profile_args),
+                  'profile_mass': lambda r, **kwargs: dp.m_delta(r, **profile_args),
                   'profile_f': dp.profile_delta_f,
                   'profile_f_args': profile_args}
 
@@ -447,7 +137,7 @@ def load_centrals_rmax(prms, r_max, f_comp='cen'):
 # End of load_centrals_rmax()
 # ------------------------------------------------------------------------------
 
-def load_satellites_rmax(prms, r_max, f_c=0.86):
+def load_satellites_rmax(prms, r_max, m200m_dmo, r200m_dmo, c200m_dmo, f_c=0.86):
     '''
     Return NFW profiles with fstars_500c = f_obs
 
@@ -460,38 +150,18 @@ def load_satellites_rmax(prms, r_max, f_c=0.86):
     bar2dmo : bool
       specifies whether to carry out hmf conversion for missing m200m
     '''
-    r_range = np.array([np.logspace(prms.r_min, np.log10(rm), prms.r_bins)
-                        for i,rm in enumerate(r_max)])
-    rx = r_range / prms.r200m.reshape(-1,1)
-
     # stellar fraction
-    f_sat = d.f_stars(prms.m200m / 0.7, comp='sat')
-    c200m = tools.c_duffy(prms.m200m).reshape(-1)
+    f_sat = d.f_stars(m200m_dmo / 0.7, comp='sat')
+    c_sat = f_c * c200m_dmo
 
-    c = f_c * c200m
-
-    prof_stars = np.zeros_like(rx)
-    for idx, prof in enumerate(prof_stars):
-        sl = (rx[idx] <= 1.)
-        prof_stars[idx][sl] = dp.profile_NFW(r_range[idx][sl].reshape(1,-1),
-                                             (f_sat[idx] * prms.m200m[idx]).reshape(-1),
-                                             c[idx].reshape(-1),
-                                             prms.r200m[idx].reshape(-1)).reshape(-1)
-
-
-    profile_args = {'m_x': f_sat * prms.m200m,
-                    'c_x': c,
-                    'r_x': prms.r200m}
+    profile_args = {'m_x': f_sat * m200m_dmo,
+                    'c_x': c_sat,
+                    'r_x': r200m_dmo}
     sat_kwargs = {'cosmo': prms.cosmo,
                   'r_h': r_max,
-                  'r200m_obs': prms.r200m,
-                  # 'r200m_dmo': prms.r200m,
-                  # 'm200m_dmo': prms.m200m,
-                  # only f_dm of halo mass in dm
-                  'm_h': prms.m200m * f_sat,
-                  'profile': prof_stars,
+                  'profile': dp.profile_NFW,
                   'profile_args': profile_args,
-                  'profile_mass': lambda r: dp.m_NFW(np.where(r < prms.r200m, r, prms.r200m), **profile_args),
+                  'profile_mass': lambda r, **kwargs: dp.m_NFW(r, **profile_args),
                   'profile_f': dp.profile_NFW_f,
                   'profile_f_args': profile_args}
 
@@ -502,77 +172,8 @@ def load_satellites_rmax(prms, r_max, f_c=0.86):
 # End of load_satellites_rmax()
 # ------------------------------------------------------------------------------
 
-def model_gamma(gamma, prms, r_max,
-                rc, beta, f_gas500, f_stars, f_dm,
-                stars_rmax, rho_500c,
-                f_c=0.86,
-                q_f=50, q_rc=50, q_beta=50,
-                delta=False, bar2dmo=True):
-    '''
-    Perform an MCMC fit to the simulations
-    '''
-    gas_plaw_r500c_rmax = load_gas_plaw_r500c_rmax(prms, f_stars, rho_500c, r_max,
-                                                   gamma,
-                                                   rc, beta, f_gas500,
-                                                   q_f, q_rc, q_beta)
-
-    dm_plaw_r500c_rmax = load_dm_rmax(prms, r_max,
-                                      m200m_obs=((f_stars + f_dm +
-                                                  gas_plaw_r500c_rmax.f200m_obs)
-                                                 * prms.m200m))
-
-    pow_gas_plaw_r500c_rmax = power.Power(dm_plaw_r500c_rmax + gas_plaw_r500c_rmax + stars_rmax,
-                                          bar2dmo=bar2dmo)
-
-    return pow_gas_plaw_r500c_rmax.delta_tot
-
-# ----------------------------------------------------------------------
-# End of model_gamma()
-# ----------------------------------------------------------------------
-
-def fit_model(prms,
-              r_max,
-              gamma=np.array([2.]),
-              f_c=0.86,
-              q_f=50, q_rc=50, q_beta=50,
-              delta=False, bar2dmo=True):
-    '''
-    MCMC fit the gamma model
-    '''
-    def lnlike(theta, k_range, delta, c_k):
-        model = model_gamma()
-
-    # the data assumed h=0.7, but resulting f_star is independent of h in our
-    # model
-    f_stars = d.f_stars(prms.m200m / 0.7, 'all')
-    f_dm = prms.cosmo.omegac / prms.cosmo.omegam
-
-    rc, beta = d.fit_prms(x=500, q_rc=50, q_beta=50)
-    # gas fractions
-    # h=0.7 needs to be converted here
-    f_prms = d.f_gas_prms(prms.cosmo, q=50)
-    f_gas500 = d.f_gas(prms.m500c / 0.7, cosmo=prms.cosmo, **f_prms)
-
-    # load stars
-    if not delta:
-        cen_rmax = load_centrals_rmax(prms, r_max, f_comp='cen')
-        sat_rmax = load_satellites_rmax(prms, r_max, f_c=f_c)
-        stars_rmax = cen_rmax + sat_rmax
-
-    else:
-        stars_rmax = load_centrals_rmax(prms, r_max, f_comp='all')
-
-     # compute density at r500c for the beta profile
-    rho_500c = dp.profile_beta(prms.r500c.reshape(-1,1), m_x=f_gas500 * prms.m500c,
-                               r_x=prms.r500c, rc=rc * prms.r500c,
-                               beta=np.array([beta]*prms.r500c.shape[0])).reshape(-1)
-
-# ----------------------------------------------------------------------
-# End of fit_model()
-# ----------------------------------------------------------------------
-
 @np.vectorize
-def m200m_dmo(m500c, r500c, f_gas500c, f_c, cosmo):
+def m500c_to_m200m_dmo(m500c, r500c, f_gas500c, f_c, cosmo):
     '''
     For a given measured halo mass, radius and gas fraction, compute the
     corresponding DMO equivalent mass taking into account the stellar
@@ -622,6 +223,22 @@ def m200m_dmo(m500c, r500c, f_gas500c, f_c, cosmo):
     m200m_dmo = opt.brentq(m_diff, m500c / 10., 10. * m500c)
     return m200m_dmo
 
+# ----------------------------------------------------------------------
+# End of m500c_to_m200m_dmo()
+# ----------------------------------------------------------------------
+
+def m200m_obs_from_profs(profs, idcs):
+    '''
+    Fast way of getting the mass
+    '''
+    m200m = np.zeros_like(idcs)
+    for idx in idcs:
+        for prof in profs:
+            args = prof.profile_args
+            for k,v in args:
+                args[k] = v[idx]
+                
+
 def load_gamma(prms, r_max,
                gamma=np.array([2.]),
                f_c=0.86,
@@ -657,20 +274,20 @@ def load_gamma(prms, r_max,
     results : dict
       dictionary containing the power.Power objects corresponding to our models
     '''
-    r_range = np.array([np.logspace(prms.r_min, np.log10(rm), prms.r_bins)
-                        for i,rm in enumerate(r_max)])
-
-    # we compute the DMO equivalent halo mass
-    # all models will have the same DMO equivalent halo mass
-    m200m_dmo = m200m_dmo(prms.m500c, prms.r500c, f_gas500, 0.86, prms.cosmo)
-    c200m_dmo = tools.c_duffy(m200m_dmo).reshape(-1)
-
     # We assume for now that our masses are the X-ray derived quantities
     # gas fractions
     # h=0.7 needs to be converted here
     f_prms = d.f_gas_prms(prms.cosmo, q=50)
     f_gas500 = d.f_gas(prms.m500c / 0.7, cosmo=prms.cosmo, **f_prms)
     rc, beta = d.fit_prms(x=500, q_rc=50, q_beta=50)
+
+    # we compute the DMO equivalent halo mass
+    # all models will have the same DMO equivalent halo mass
+    m200m_dmo = m500c_to_m200m_dmo(prms.m500c, prms.r500c, f_gas500, 0.86, prms.cosmo)
+    r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * prms.cosmo.rho_m)
+    c200m_dmo = tools.c_duffy(m200m_dmo).reshape(-1)
+    r_max = r200m_dmo
+
 
     # the data assumed h=0.7, but resulting f_star is independent of h in our
     # model
@@ -681,69 +298,113 @@ def load_gamma(prms, r_max,
 
     # load stars
     if not delta:
-        cen_rmax = load_centrals_rmax(prms=prms, r_max=r_max, f_comp='cen')
-        sat_rmax = load_satellites_rmax(prms=prms, r_max=r_max, f_c=f_c)
+        cen_rmax = load_centrals_rmax(prms=prms,
+                                      r_max=r_max,
+                                      m200m_dmo=m200m_dmo,
+                                      f_comp='cen')
+        sat_rmax = load_satellites_rmax(prms=prms,
+                                        r_max=r_max,
+                                        m200m_dmo=m200m_dmo,
+                                        r200m_dmo=r200m_dmo,
+                                        c200m_dmo=c200m_dmo,
+                                        f_c=f_c)
         stars_rmax = cen_rmax + sat_rmax
 
     else:
-        stars_rmax = load_centrals_rmax(prms=prms, r_max=r_max, f_comp='all')
+        stars_rmax = load_centrals_rmax(prms=prms,
+                                        r_max=r_max,
+                                        m200m_dmo=m200m_dmo,
+                                        f_comp='all')
 
-    f_stars500 = stars_rmax.m_r(prms.r500c) / prms.m500c
+    # now load dmo profiles
+    dm_dmo_rmax = load_dm_dmo_rmax(prms=prms,
+                                   r_max=r200m_dmo,
+                                   m200m_dmo=m200m_dmo,
+                                   r200m_dmo=r200m_dmo,
+                                   c200m_dmo=c200m_dmo)
 
-    # Now we can finally compute the corresponding X-ray mass
-    # However, the beta, rc and f_gas500 fits do come from the total
-    # hydrostatic mass!! This is not exactly the same as m500c
-    m500c_Xray = ((1 - prms.cosmo.omegab / prms.cosmo.omegam) * prms.m500c /
-                  (1 - f_gas500 - f_stars500))
-
-
-
-    # f_stars500 = np.array([tools.m_h(rho[tools.lte(stars_rmax.r_range[idx], prms.r500c[idx])],
-    #                                  stars_rmax.r_range[idx][tools.lte(stars_rmax.r_range[idx], prms.r500c[idx])]) /
-    #                        prms.m500c[idx]
-    #                        for idx, rho in enumerate(stars_rmax.rho_r)])
-
-
-    # calculate the DMO equivalent halo masses
-    m500c_dmo = (prms.m500c * (1 - f_gas500 - f_stars500) /
-                 (1 - prms.cosmo.omegab / prms.cosmo.omegam))
-    m200m_dmo = tools.m500c_to_m200m_duffy(m500c_dmo,
-                                           prms.cosmo.rho_crit,
-                                           prms.cosmo.rho_m)
-
-    prms.m200m_dmo = m200m_dmo
-
-    dm_dmo_rmax = load_dm_dmo_rmax(prms, r_max)
-    pow_dm_dmo_rmax = power.Power(dm_dmo_rmax, bar2dmo=False)
+    pow_dm_dmo_rmax = power.Power(m200m_dmo=m200m_dmo,
+                                  m200m_obs=m200m_dmo,
+                                  prof=dm_dmo_rmax,
+                                  bar2dmo=False)
 
     # compute density at r500c for the beta profile
-    rho_500c = dp.profile_beta(prms.r500c.reshape(-1,1), m_x=f_gas500 * prms.m500c,
-                               r_x=prms.r500c, rc=rc * prms.r500c,
-                               beta=np.array([beta]*prms.r500c.shape[0])).reshape(-1)
+    rho_500c = (dp.profile_beta(prms.r500c.reshape(-1,1),
+                                m_x=f_gas500 * prms.m500c / 0.7,
+                                r_x=prms.r500c / 0.7,
+                                rc=rc * prms.r500c / 0.7,
+                                beta=np.array([beta]*prms.r500c.shape[0])).reshape(-1) *
+                (0.7)**(-2.))
 
     results = {}
-    for idx, g in enumerate(gamma):
+    for idx_g, g in enumerate(gamma):
         gas_plaw_r500c_rmax = load_gas_plaw_r500c_rmax(prms=prms,
-                                                       f_stars=f_stars,
                                                        rho_500c=rho_500c,
                                                        r_max=r_max,
                                                        gamma=g,
                                                        rc=rc, beta=beta, f_gas500=f_gas500,
                                                        q_f=q_f, q_rc=q_rc, q_beta=q_beta)
 
+        # now compute DM parameters
+        f_stars500c = stars_rmax.m_r(prms.r500c) / prms.m500c
+        f_gas500c = gas_plaw_r500c_rmax.m_r(prms.r500c) / prms.m500c
+        m500c_dm = prms.m500c * (1 - f_gas500c - f_stars500c)
+        c500c_dm = c200m_dmo * prms.r500c / r200m_dmo
+
         dm_plaw_r500c_rmax = load_dm_rmax(prms=prms,
                                           r_max=r_max,
-                                          m200m_obs=((f_stars + f_dm)* prms.m200m +
-                                                     gas_plaw_r500c_rmax.m_r(prms.r200m)))
+                                          m500c=m500c_dm,
+                                          r500c=prms.r500c,
+                                          c500c=c500c_dm)
 
-        pow_gas_plaw_r500c_rmax = power.Power(dm_plaw_r500c_rmax + gas_plaw_r500c_rmax + stars_rmax,
+        prof_tot = dm_plaw_r500c_rmax + gas_plaw_r500c_rmax + stars_rmax
+
+        # need to make the function specific to one mass!
+        r200m_obs = np.zeros_like(prms.r500c)
+        r_fb = np.zeros_like(prms.r500c)
+        for idx in np.arange(0, prms.r500c.shape[0]):
+            m_r = (lambda r: dp.m_NFW(r, **{k: v[idx] for k,v in
+                                            dm_plaw_r500c_rmax.profile_args.iteritems()}) +
+                   dp.m_beta_plaw(r, **{k: v[idx] for k,v in
+                                        gas_plaw_r500c_rmax.profile_args.iteritems()}) +
+                   dp.m_delta(r, **{k: v[idx] for k,v in cen_rmax.profile_args.iteritems()}) +
+                   dp.m_NFW(r, **{k: v[idx] for k,v in sat_rmax.profile_args.iteritems()}))
+            fb = (lambda r: (dp.m_beta_plaw(r, **{k: v[idx] for k,v in
+                                                  gas_plaw_r500c_rmax.profile_args.iteritems()}) +
+                             dp.m_delta(r, **{k: v[idx] for k,v in cen_rmax.profile_args.iteritems()}) +
+                             dp.m_NFW(r, **{k: v[idx] for k,v in sat_rmax.profile_args.iteritems()})) /
+                  (dp.m_NFW(r, **{k: v[idx] for k,v in
+                                  dm_plaw_r500c_rmax.profile_args.iteritems()}) +
+                   dp.m_beta_plaw(r, **{k: v[idx] for k,v in
+                                        gas_plaw_r500c_rmax.profile_args.iteritems()}) +
+                   dp.m_delta(r, **{k: v[idx] for k,v in cen_rmax.profile_args.iteritems()}) +
+                   dp.m_NFW(r, **{k: v[idx] for k,v in sat_rmax.profile_args.iteritems()})))
+            r200m_obs[idx] = dp.r200m_from_m(m_r, prms.cosmo)
+            try:
+                r_fb[idx] = dp.r_fb_from_m(fb, prms.cosmo)
+            except ValueError:
+                r_fb[idx] = np.inf
+
+        m200m_obs = tools.radius_to_mass(r200m_obs, 200 * prms.cosmo.rho_m)
+        m_obs_200m_dmo = prof_tot.m_r(r200m_dmo)
+
+        pow_gas_plaw_r500c_rmax = power.Power(m200m_dmo=m200m_dmo,
+                                              m200m_obs=m200m_obs,
+                                              prof=prof_tot,
                                               bar2dmo=bar2dmo)
 
-        results['{:d}'.format(idx)] = {'pow_r500c': pow_gas_plaw_r500c_rmax,
-                                       'pow_dmo': pow_dm_dmo_rmax,
-                                       'd_gas_r500c': gas_plaw_r500c_rmax,
-                                       'd_dm_r500c': dm_plaw_r500c_rmax,
-                                       'd_stars': stars_rmax}
+        results['{:d}'.format(idx_g)] = {'pow': pow_gas_plaw_r500c_rmax,
+                                         'pow_dmo': pow_dm_dmo_rmax,
+                                         'd_gas': gas_plaw_r500c_rmax,
+                                         'd_dm': dm_plaw_r500c_rmax,
+                                         'd_stars': stars_rmax,
+                                         'd_tot': prof_tot,
+                                         'm200m_obs': m200m_obs,
+                                         'm_obs_200m_dmo': m_obs_200m_dmo,
+                                         'm200m_dmo': m200m_dmo,
+                                         'r_fb': r_fb,
+                                         'r200m_obs': r200m_obs,
+                                         'r_max': r_max}
 
     return results
 

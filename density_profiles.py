@@ -114,7 +114,7 @@ def r200m_m_NFW(m_x, r_x, c_x, cosmo, z_range=0):
 # ------------------------------------------------------------------------------
 
 @np.vectorize
-def m_NFW(r, m_x, r_x, c_x, z_range=0):
+def m_NFW(r, m_x, r_x, c_x, z_range=0, **kwargs):
     '''
     Calculate the mass of the NFW profile with c_x and r_x and m_x at r_x
 
@@ -312,7 +312,7 @@ def profile_beta(r_range, m_x, r_x, rc, beta):
 # # ------------------------------------------------------------------------------
 
 @np.vectorize
-def m_beta(r, m_x, r_x, rc, beta):
+def m_beta(r, m_x, r_x, rc, beta, **kwargs):
     '''
     Return the analytic enclosed mass for the beta profile normalized to
     m_x at r_x
@@ -408,7 +408,7 @@ def profile_plaw(r_range, rho_x, r_x, r_y, gamma):
 # ----------------------------------------------------------------------
 
 @np.vectorize
-def m_plaw(r, rho_x, r_x, r_y, gamma):
+def m_plaw(r, rho_x, r_x, r_y, gamma, **kwargs):
     '''
     Return the analytic enclosed mass for the power law profile
 
@@ -444,8 +444,66 @@ def m_plaw(r, rho_x, r_x, r_y, gamma):
 # End of m_plaw()
 # ----------------------------------------------------------------------
 
+def profile_beta_plaw(r_range, m_x, r_x, rc, beta, r_y, gamma, rho_x=None):
+    '''
+    Return a beta profile with mass m_x inside r_range <= r_x
+
+        rho[r] =  rho_c[m_range, rc, r_x] / (1 + ((r/r_x)/rc)^2)^(beta / 2)
+
+    and a power law outside
+
+        rho[r] = rho_x (r/r_x)^(-gamma)
+
+    rho_c is determined by the mass of the profile.
+
+    Parameters
+    ----------
+    r_range : (m,r) array
+      array containing r_range for each m
+    m_x : (m,) array
+      array containing masses to match at r_x
+    r_x : (m,) array
+      x overdensity radius to match m_x at, in units of r_range
+    beta : (m,) array
+      power law slope of profile
+    rc : (m,) array
+      physical core radius of beta profile in as a fraction
+
+    Returns
+    -------
+    profile : (m,r) array
+      array containing beta profile
+    '''
+    m = m_x.shape[0]
+
+    # analytic enclosed mass inside r_x gives normalization rho_0
+    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
+                                                       5./2, -(r_x / rc)**2))
+
+    rc = rc.reshape(m,1)
+    beta = beta.reshape(m,1)
+    r_x = r_x.reshape(m,1)
+    m_x = m_x.reshape(m,1)
+    rho_0 = rho_0.reshape(m,1)
+
+    if rho_x is None:
+        rho_x = profile_beta(r_x, m_x=m_x, r_x=r_x, rc=rc*r_x, beta=beta)
+
+    rho_x = rho_x.reshape(m,1)
+    profile = np.zeros_like(r_range)
+    for idx, r in enumerate(r_range):
+        sl_x = (r <= r_x[idx])
+        profile[idx][sl_x] = rho_0[idx] / (1 + (r[sl_x] / rc[idx])**2)**(3*beta[idx]/2)
+        profile[idx][~sl_x] = rho_x[idx] * (r[~sl_x]/r_x[idx])**(-gamma[idx])
+
+    return profile
+
+# ------------------------------------------------------------------------------
+# End of profile_beta_plaw()
+# ------------------------------------------------------------------------------
+
 @np.vectorize
-def m_beta_plaw(r, m_x, r_x, rc, beta, r_y, gamma, rho_x=None):
+def m_beta_plaw(r, m_x, r_x, rc, beta, r_y, gamma, rho_x=None, **kwargs):
     '''
     Return the analytic enclosed mass inside r for a beta profile upto
     r_x and a power law outside
@@ -558,7 +616,7 @@ def profile_uniform(r_range, m_y, r_x, r_y):
 # ------------------------------------------------------------------------------
 
 @np.vectorize
-def m_uniform(r, m_y, r_x, r_y):
+def m_uniform(r, m_y, r_x, r_y, **kwargs):
     '''
     Return a uniform, spherically symmetric profile between r_x and r_y
 
@@ -660,7 +718,7 @@ def profile_delta(r_range, m_range):
 # ------------------------------------------------------------------------------
 
 @np.vectorize
-def m_delta(r, m_range):
+def m_delta(r, m_range, **kwargs):
     '''
     Returns a delta function mass
     '''
@@ -718,5 +776,30 @@ def r200m_from_m(m_f, cosmo, **kwargs):
         m_diff = m_f(r, **kwargs) - m200m
         return m_diff
 
-    r200m = opt.brentq(diff_m200m, 0, 100)
+    r200m = opt.brentq(diff_m200m, 1e-4, 100)
     return r200m
+
+def r_fb_from_m(f_b, cosmo, **kwargs):
+    '''
+    For a given cumulative mass profile m_f that takes the radius as its first
+    argument, compute the radius where the mean enclosed density is 200 rho_m
+
+    Parameters
+    ----------
+    m_f : function
+      function to compute cumulative mass profile, radius is its first arg
+    kwargs : dict
+      arguments for m_f
+
+    Returns
+    -------
+    r200m : float
+      radius where mean enclosed density is 200 rho_m
+    '''
+    def diff_fb(r):
+        fb = cosmo.omegab / cosmo.omegam
+        f_diff = f_b(r, **kwargs) - fb
+        return f_diff
+
+    r_fb = opt.brentq(diff_fb, 0.1, 100.)
+    return r_fb

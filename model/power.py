@@ -24,7 +24,8 @@ class Power(cache.Cache):
     -------
 
     '''
-    def __init__(self, prof=density.Profile(),
+    def __init__(self, m200m_dmo, m200m_obs,
+                 prof=density.Profile(),
                  hmf_prms={'transfer_fit': 'FromFile',
                            'transfer_options': {'fname': 'camb/wmap9_transfer_out.dat'},
                            'mf_fit': 'Tinker10',
@@ -34,20 +35,24 @@ class Power(cache.Cache):
                            'delta_c': 1.686},
                  bar2dmo=True):
         super(Power, self).__init__()
+        self.m200m_dmo = m200m_dmo
+        self.m200m_obs = m200m_obs
         self.profile = prof
-        self.rho_k = prof.rho_k
         self.m_h = prof.m_h
-        self.m200m_obs = prof.m200m_obs
-        # self.m200m_dmo = prof.m200m_dmo
-        self.k_range = prof.k_range
+        try:
+            self.k_nan = np.min(np.where(np.isnan(prof.rho_k))[1])
+        except ValueError:
+            self.k_nan = prof.k_range.shape[0]
+        self.k_range = prof.k_range[:self.k_nan]
+        self.rho_k = prof.rho_k[:,:self.k_nan]
         self.z = prof.z
         self.cosmo = prof.cosmo
         self.bar2dmo = bar2dmo
 
         self.hmf_prms = tools.merge_dicts(prof.cosmo.cosmo_dict, hmf_prms)
-        self.hmf_prms['lnk_min'] = np.log(np.min(prof.k_range))
-        self.hmf_prms['lnk_max'] = np.log(np.max(prof.k_range))
-        self.hmf_prms['k_bins'] = prof.k_range.shape[0]
+        self.hmf_prms['lnk_min'] = np.log(np.min(self.k_range))
+        self.hmf_prms['lnk_max'] = np.log(np.max(self.k_range))
+        self.hmf_prms['k_bins'] = self.k_range.shape[0]
         self.hmf_prms['z'] = prof.z
         # m_range needs to be m200m_dmo
         # self.hmf_prms['m_range'] = prof.m200m
@@ -55,6 +60,14 @@ class Power(cache.Cache):
     #===========================================================================
     # Parameters
     #===========================================================================
+    @cache.parameter
+    def m200m_dmo(self, val):
+        return val
+
+    @cache.parameter
+    def m200m_obs(self, val):
+        return val
+
     @cache.parameter
     def profile(self, val):
         return val
@@ -72,12 +85,8 @@ class Power(cache.Cache):
         return val
 
     @cache.parameter
-    def m200m_obs(self, val):
+    def k_nan(self, val):
         return val
-
-    # @cache.parameter
-    # def m200m_dmo(self, val):
-    #     return val
 
     @cache.parameter
     def k_range(self, val):
@@ -102,32 +111,13 @@ class Power(cache.Cache):
     def rho_m(self):
         return self.m_fn.rho_m
 
-    # @cache.cached_property('m200m_obs', 'f200m_obs')
-    # def m200m_dmo(self):
-    #     '''
-    #     Return the dark matter only equivalent halo mass for the input profile.
-    #     The missing mass fraction from dark matter + baryons determines the
-    #     deficit between the observed mass and the dark matter only equivalent.
-
-    #     In our case, this should always correpsond to m200m_inf
-    #     '''
-    #     return self.m200m_obs / (1 - (1. - self.f200m_obs))
-
-    # @cache.cached_property('m200m_dmo', 'hmf_prms', 'cosmo', 'bar2dmo')
-    # def m_fn(self):
-    #     hmf_prms = self.hmf_prms
-    #     if self.bar2dmo:
-    #         hmf_prms['m_range'] = self.m200m_dmo
-    #     else:
-    #         hmf_prms['m_range'] = self.m200m_obs
-
-    #     m_fn = hmf.MassFunction(**hmf_prms)
-    #     return m_fn
-
-    @cache.cached_property('hmf_prms', 'cosmo')
+    @cache.cached_property('hmf_prms', 'cosmo', 'm200m_dmo', 'm200m_obs', 'bar2dmo')
     def m_fn(self):
         hmf_prms = self.hmf_prms
-        hmf_prms['m_range'] = self.m200m_dmo
+        if self.bar2dmo:
+            hmf_prms['m_range'] = self.m200m_dmo
+        else:
+            hmf_prms['m_range'] = self.m200m_obs
 
         m_fn = hmf.MassFunction(**hmf_prms)
         return m_fn

@@ -74,7 +74,7 @@ class Parameters(Cache):
       mean matter density of the universe
 
     '''
-    def __init__(self, m200m,
+    def __init__(self, m500c,
                  m200m_dmo=None,
                  # r_min needs to be low in order to get correct masses from
                  # integration
@@ -89,9 +89,9 @@ class Parameters(Cache):
                                               'n': 0.972}),
                  z=0.):
         super(Parameters, self).__init__()
-        self.m200m = m200m
+        self.m500c = m500c
         if m200m_dmo is None:
-            self.m200m_dmo = m200m
+            self.m200m_dmo = tools.m500c_to_m200m_duffy(m500c, cosmo.rho_crit, cosmo.rho_m)
         else:
             self.m200m_dmo = m200m_dmo
         self.r_min = r_min
@@ -106,7 +106,7 @@ class Parameters(Cache):
     # Parameters
     #===========================================================================
     @parameter
-    def m200m(self, val):
+    def m500c(self, val):
         return val
 
     @parameter
@@ -147,40 +147,36 @@ class Parameters(Cache):
     #===========================================================================
     # Methods
     #===========================================================================
-    @cached_property('m200m', 'cosmo')
-    def r200m(self):
-        return tools.mass_to_radius(self.m200m, self.cosmo.rho_m * 200)
+    @cached_property('m500c', 'cosmo')
+    def r500c(self):
+        return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
     @cached_property('m200m_dmo', 'cosmo')
     def r200m_dmo(self):
         return tools.mass_to_radius(self.m200m_dmo, self.cosmo.rho_m * 200)
 
-    @cached_property('m200m', 'cosmo')
-    def m200c(self):
-        return np.array([tools.m200m_to_m200c_duffy(m, self.cosmo.rho_crit,
-                                                    self.cosmo.rho_m)
-                         for m in self.m200m])
+    # @cached_property('m200m', 'cosmo')
+    # def m200c(self):
+    #     return np.array([tools.m200m_to_m200c_duffy(m, self.cosmo.rho_crit,
+    #                                                 self.cosmo.rho_m)
+    #                      for m in self.m200m])
 
-    @cached_property('m200c', 'cosmo')
-    def r200c(self):
-        return tools.mass_to_radius(self.m200c, 200 * self.cosmo.rho_crit)
+    # @cached_property('m200c', 'cosmo')
+    # def r200c(self):
+    #     return tools.mass_to_radius(self.m200c, 200 * self.cosmo.rho_crit)
 
-    @cached_property('m200m', 'cosmo', 'm200c')
-    def m500c(self):
-        return np.array([tools.m200m_to_m500c_duffy(m, self.cosmo.rho_crit,
-                                                    self.cosmo.rho_m)
-                         for m in self.m200m])
+    # @cached_property('m200m', 'cosmo', 'm200c')
+    # def m500c(self):
+    #     return np.array([tools.m200m_to_m500c_duffy(m, self.cosmo.rho_crit,
+    #                                                 self.cosmo.rho_m)
+    #                      for m in self.m200m])
 
-    @cached_property('m500c', 'cosmo')
-    def r500c(self):
-        return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
-
-    @cached_property('m200m', 'cosmo', 'r200m')
-    def c200m(self):
-        '''
-        The density profiles always assume cosmology dependent variables
-        '''
-        return tools.c_duffy(self.m200m).reshape(-1)
+    # @cached_property('m200m', 'cosmo', 'r200m')
+    # def c200m(self):
+    #     '''
+    #     The density profiles always assume cosmology dependent variables
+    #     '''
+    #     return tools.c_duffy(self.m200m).reshape(-1)
 
     # @cached_property('m200m', 'cosmo')
     # def r200m(self):
@@ -235,59 +231,6 @@ class Parameters(Cache):
             "omegav": self.omegav,
             "n": self.n}
 
-    # @cached_property('k_min', 'k_max', 'dlnk', 'z', 'transfer_fit',
-    #                  'transfer_options', 'cosmo_prms')
-    # def trans_prms(self):
-    #     trans = {
-    #         "lnk_min": np.log(10) * self.k_min,
-    #         "lnk_max": np.log(10) * self.k_max,
-    #         "dlnk": self.dlnk,
-    #         "transfer_fit": self.transfer_fit,
-    #         "transfer_options": self.transfer_options,
-    #         "z": self.z}
-    #     trans = tools.merge_dicts(self.cosmo_prms, trans)
-
-    #     return trans
-
-    # @cached_property('m200m', 'mf_fit', 'delta_h', 'cut_fit',
-    #                  'delta_wrt', 'delta_c', 'trans_prms')
-    # def m_fn_prms(self):
-    #     massf = {
-    #         "m_range": self.m200m,
-    #         "mf_fit": self.mf_fit,
-    #         "cut_fit": self.cut_fit,
-    #         "delta_h": self.delta_h,
-    #         "delta_wrt": self.delta_wrt,
-    #         "delta_c": self.delta_c}
-    #     massf = tools.merge_dicts(massf, self.trans_prms)
-
-    #     return massf
-
-    # @cached_property('m_fn_prms')
-    # def m_fn(self):
-    #     return hmf.MassFunction(**self.m_fn_prms)
-
-    # @cached_property('k_range', 'm_fn')
-    # def p_lin(self):
-    #     plin = np.exp(self.m_fn.power)
-
-    #     return plin
-
-    # @cached_property('k_range', 'm_fn', 'p_lin')
-    # def delta_lin(self):
-    #     delta_lin = 1. / (2 * np.pi**2) * self.k_range**3 * self.p_lin
-
-    #     return delta_lin
-
-    # @cached_property('m_fn', 'm200m')
-    # def dndm(self):
-    #     return self.m_fn.dndm
-
-    @cached_property('r_min', 'r200m', 'r_bins')
-    def r_range(self):
-        return np.array([np.logspace(self.r_min, np.log10(r_max), self.r_bins)
-                         for r_max in self.r200m])
-
 # ------------------------------------------------------------------------------
 # End of Parameters()
 # ------------------------------------------------------------------------------
@@ -295,9 +238,9 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m200m=np.logspace(11,12,101), k_min=-1.)
-prms2 = Parameters(m200m=np.logspace(12,13,101), k_min=-1.)
-prms3 = Parameters(m200m=np.logspace(13,14,101), k_min=-1.)
-prms4 = Parameters(m200m=np.logspace(14,15,101), k_min=-1.)
+prms1 = Parameters(m500c=np.logspace(11,12,101), k_min=-1.)
+prms2 = Parameters(m500c=np.logspace(12,13,101), k_min=-1.)
+prms3 = Parameters(m500c=np.logspace(13,14,101), k_min=-1.)
+prms4 = Parameters(m500c=np.logspace(14,15,101), k_min=-1.)
 
-prms = Parameters(m200m=np.logspace(11,15,101), k_min=-1.)
+prms = Parameters(m500c=np.logspace(11,15,101), k_min=-1.)

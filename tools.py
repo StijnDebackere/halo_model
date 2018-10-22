@@ -427,31 +427,9 @@ def c_correa_fit(m_range, z_range=0, h=0.7):
 # End of c_correa_fit()
 # ------------------------------------------------------------------------------
 
-def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
+def c_duffy(m_range, z_range=0.):
     '''
-    Returns the mass-concentration relation from Duffy et al (2008).
-
-        c = A * (m/m_pivot)^B * (1+z)^C
-
-    Parameters
-    ----------
-    m_range : (m,) array
-      array containing masses to compute NFW profile for (mass at z=0)
-    z_range : (z,) array
-      redshift to evaluate mass-concentration relation at
-    m_pivot : float (same units as m_range)
-      pivot scale for fit
-    A : float
-      scale parameter for fit
-    B : float
-      mass parameter for fit
-    C : float
-      redshift parameter for fit
-
-    Returns
-    -------
-    c : (m,z) array
-      array containing concentration for each (m,z)
+    Concentration mass relation of the Bahamas DMO simulation
     '''
     m_range, z_range = _check_iterable([m_range, z_range])
     m = m_range.shape[0]
@@ -460,12 +438,51 @@ def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
     m_range = m_range.reshape([m,1])
     z_range = np.array(z_range).reshape([1,z])
 
-    c = A * (m_range/m_pivot)**B * (1+z_range)**C
-    return c
+    A = 8.7449969011763216
+    B = -0.093399926987858539
 
-# ------------------------------------------------------------------------------
-# End of c_duffy()
-# ------------------------------------------------------------------------------
+    plaw =  A * (m_range/1e14)**B
+    return plaw
+
+# def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
+#     '''
+#     Returns the mass-concentration relation from Duffy et al (2008).
+
+#         c = A * (m/m_pivot)^B * (1+z)^C
+
+#     Parameters
+#     ----------
+#     m_range : (m,) array
+#       array containing masses to compute NFW profile for (mass at z=0)
+#     z_range : (z,) array
+#       redshift to evaluate mass-concentration relation at
+#     m_pivot : float (same units as m_range)
+#       pivot scale for fit
+#     A : float
+#       scale parameter for fit
+#     B : float
+#       mass parameter for fit
+#     C : float
+#       redshift parameter for fit
+
+#     Returns
+#     -------
+#     c : (m,z) array
+#       array containing concentration for each (m,z)
+#     '''
+#     m_range, z_range = _check_iterable([m_range, z_range])
+#     m = m_range.shape[0]
+#     z = z_range.shape[0]
+
+#     m_range = m_range.reshape([m,1])
+#     z_range = np.array(z_range).reshape([1,z])
+
+#     c = A * (m_range/m_pivot)**B * (1+z_range)**C
+#     return c
+
+# # ------------------------------------------------------------------------------
+# # End of c_duffy()
+# # ------------------------------------------------------------------------------
 
 def profile_NFW(r_range, m_range, c_x, r_x, rho_mean, z_range=0, Delta=200.):
     '''
