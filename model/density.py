@@ -87,6 +87,7 @@ class Profile(cache.Cache):
                                  'r_x': p.prms.r200m_dmo},
                  n=84,
                  taylor_err=1e-50,
+                 extrap=True,
                  cpus=multiprocessing.cpu_count()):
         '''
         Initializes some parameters
@@ -104,6 +105,7 @@ class Profile(cache.Cache):
         self.k_range = k_range
         self.z = z
         self.n = n
+        self.extrap = extrap
         self.cpus = cpus
         self.taylor_err = taylor_err
         self.profile = profile
@@ -147,6 +149,7 @@ class Profile(cache.Cache):
                        profile_f_args=None,
                        n=self.n,
                        taylor_err=self.taylor_err,
+                       extrap=self.extrap,
                        cpus=self.cpus)
 
     #===========================================================================
@@ -186,6 +189,10 @@ class Profile(cache.Cache):
 
     @cache.parameter
     def taylor_err(self, val):
+        return val
+
+    @cache.parameter
+    def extrap(self, val):
         return val
 
     @cache.parameter
@@ -433,7 +440,7 @@ class Profile(cache.Cache):
         return F_n
 
     @cache.cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'r_h',
-                           'taylor_err')
+                           'taylor_err', 'extrap')
     def rho_k_T(self):
         '''
         Computes the Fourier transform of the density profile, using a Taylor
@@ -474,9 +481,9 @@ class Profile(cache.Cache):
         self.taylor_nan = indices
         for idx, idx_max in enumerate(indices):
             u[idx,idx_max:] = np.nan
-            # # this extrapolation is not really very good...
-            # if idx_max != k_s:
-            #     u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
+            # this extrapolation is not really very good...
+            if (idx_max != k_s) and self.extrap:
+                u[idx] = tools.extrapolate_plaw(self.k_range, u[idx])
 
         # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
         # # systematic offset, while we know that theoretically u[k=0] = 1
@@ -506,5 +513,3 @@ class Profile(cache.Cache):
     #     fft_object()
 
     #     return rho_k
-
-

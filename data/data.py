@@ -504,7 +504,7 @@ def convert_hm(r200m=True):
     m500c = tools.radius_to_mass(r500c, 500 * p.prms.rho_crit * 0.7**2)
     m500e = tools.radius_to_mass(r500e, 500 * p.prms.rho_crit * 0.7**2)
 
-    # Get 500crit values
+    # Get 500crit values, these assume h=0.7!!!!
     m500cc = mgas_to_m500c(mgc)
     m500ce = mgas_to_m500c(mge)
 

@@ -148,7 +148,7 @@ def m_NFW(r, m_x, r_x, c_x, z_range=0, **kwargs):
 # End of r_where_m_NFW()
 # ------------------------------------------------------------------------------
 
-def profile_NFW_f(k_range, m_x, r_x, c_x, z_range=0):
+def profile_NFW_f(k_range, m_h, r_h, c_h, z_range=0):
     '''
     Returns the analytic Fourier transform of the NFW profile for
     m_range along axis 0 and k_range along axis 1 (and optional
@@ -158,11 +158,11 @@ def profile_NFW_f(k_range, m_x, r_x, c_x, z_range=0):
     ----------
     k_range : (k,) array
       array containing k_range for profile
-    m_x : (m,) array
-      array containing mass inside r_x
-    r_x : (m,z) array
-      array containing r_x to evaluate r_s from r_s = r_x/c_x
-    c_x : (m,z) array
+    m_h : (m,) array
+      array containing mass inside r_h
+    r_h : (m,z) array
+      array containing r_h to evaluate r_s from r_s = r_h/c_h
+    c_h : (m,z) array
       array containing mass-concentration relation
     z_range : float/array (default=0)
       redshift to evaluate mass-concentration relation at
@@ -176,26 +176,26 @@ def profile_NFW_f(k_range, m_x, r_x, c_x, z_range=0):
       array containing Fourier transform of NFW profile
 
     '''
-    m = m_x.shape[0]
+    m = m_h.shape[0]
     k = k_range.shape[0]
     # want an empty array for scalar z so we can easily construct shapes
     # later on
     z = np.array(np.array(z_range).shape)
 
     # (m,z) array
-    r_s = r_x.reshape([m] + list(z))/c_x.reshape([m] + list(z))
-    # rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    r_s = r_h.reshape([m] + list(z))/c_h.reshape([m] + list(z))
+    # rho_s = Delta/3. * rho_mean * c_h**3/(np.log(1+c_h) - c_h/(1+c_h))
 
     # reshape to match up with k range
     r_s = r_s.reshape([m,1] + list(z))
     # rho_s = rho_s.reshape([m,1] + list(z))
-    c_x = c_x.reshape([m,1] + list(z))
-    m_x = m_x.reshape([m,1] + list(z))
+    c_h = c_h.reshape([m,1] + list(z))
+    m_h = m_h.reshape([m,1] + list(z))
     # (m,1,z) array
     new_shape = [m,1] + list(z/z)
 
     # prefactor = 4 * np.pi * rho_s * r_s**3 / m_range.reshape(new_shape)
-    prefactor = m_x / (np.log(1+c_x) - c_x/(1+c_x))
+    prefactor = m_h / (np.log(1+c_h) - c_h/(1+c_h))
     # (1,k,1) array
     k_range = k_range.reshape([1,k] + list(z/z))
     K = k_range * r_s
@@ -203,14 +203,14 @@ def profile_NFW_f(k_range, m_x, r_x, c_x, z_range=0):
     # (1,k,1) array
     Si, Ci = spec.sici(K)
     # (m,k,z) array
-    Si_c, Ci_c = spec.sici((1+c_x) * K)
+    Si_c, Ci_c = spec.sici((1+c_h) * K)
 
     gamma_s = Si_c - Si
     gamma_c = Ci_c - Ci
 
     # (m,k,z) array
     profile_f = prefactor * (np.sin(K) * gamma_s + np.cos(K) * gamma_c -
-                             np.sin(c_x*K) / (K * (1+c_x)))
+                             np.sin(c_h*K) / (K * (1+c_h)))
 
     return profile_f
 
@@ -247,7 +247,7 @@ def profile_beta(r_range, m_x, r_x, rc, beta):
     m = m_x.shape[0]
 
     # analytic enclosed mass inside r_x gives normalization rho_0
-    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
+    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3. * beta / 2,
                                                        5./2, -(r_x / rc)**2))
 
     rc = rc.reshape(m,1)
@@ -335,7 +335,7 @@ def m_beta(r, m_x, r_x, rc, beta, **kwargs):
                                                        5./2, -(r_x / rc)**2))
 
     m = 4./3 * np.pi * rho_0 * r**3 * spec.hyp2f1(3./2, 3 * beta / 2,
-                                             5./2, -(r/rc)**2)
+                                                  5./2, -(r/rc)**2)
 
     return m
 
@@ -776,10 +776,10 @@ def r200m_from_m(m_f, cosmo, **kwargs):
         m_diff = m_f(r, **kwargs) - m200m
         return m_diff
 
-    r200m = opt.brentq(diff_m200m, 1e-4, 100)
+    r200m = opt.brentq(diff_m200m, 0.1, 100)
     return r200m
 
-def r_fb_from_m(f_b, cosmo, **kwargs):
+def r_fb_from_f(f_b, cosmo, **kwargs):
     '''
     For a given cumulative mass profile m_f that takes the radius as its first
     argument, compute the radius where the mean enclosed density is 200 rho_m
@@ -800,6 +800,12 @@ def r_fb_from_m(f_b, cosmo, **kwargs):
         fb = cosmo.omegab / cosmo.omegam
         f_diff = f_b(r, **kwargs) - fb
         return f_diff
+    if 'r_max' in kwargs:
+        r_max = kwargs['r_max']
 
-    r_fb = opt.brentq(diff_fb, 0.1, 100.)
+    try:
+        r_fb = opt.brentq(diff_fb, 0.1, r_max)
+    except ValueError:
+        r_fb = np.inf
+
     return r_fb

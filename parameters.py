@@ -155,28 +155,18 @@ class Parameters(Cache):
     def r200m_dmo(self):
         return tools.mass_to_radius(self.m200m_dmo, self.cosmo.rho_m * 200)
 
-    # @cached_property('m200m', 'cosmo')
-    # def m200c(self):
-    #     return np.array([tools.m200m_to_m200c_duffy(m, self.cosmo.rho_crit,
-    #                                                 self.cosmo.rho_m)
-    #                      for m in self.m200m])
 
-    # @cached_property('m200c', 'cosmo')
-    # def r200c(self):
-    #     return tools.mass_to_radius(self.m200c, 200 * self.cosmo.rho_crit)
+    @cached_property('m500c', 'cosmo')
+    def m200m(self):
+        return tools.m500c_to_m200m_duffy(self.m500c, self.cosmo.rho_crit,
+                                          self.cosmo.rho_m)
 
-    # @cached_property('m200m', 'cosmo', 'm200c')
-    # def m500c(self):
-    #     return np.array([tools.m200m_to_m500c_duffy(m, self.cosmo.rho_crit,
-    #                                                 self.cosmo.rho_m)
-    #                      for m in self.m200m])
-
-    # @cached_property('m200m', 'cosmo', 'r200m')
-    # def c200m(self):
-    #     '''
-    #     The density profiles always assume cosmology dependent variables
-    #     '''
-    #     return tools.c_duffy(self.m200m).reshape(-1)
+    @cached_property('m200m', 'cosmo')
+    def c200m(self):
+        '''
+        The density profiles always assume cosmology dependent variables
+        '''
+        return tools.c_duffy(self.m200m).reshape(-1)
 
     # @cached_property('m200m', 'cosmo')
     # def r200m(self):
