@@ -64,14 +64,19 @@ def read_croston():
     n_err = [np.loadtxt(f)[:,3] for idx, f in enumerate(files)] # [cm^-3 h_70^(1/2)]
 
     # Convert electron densities to gas density
-    # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.2461, Z=0.0039)
+    # Interpolate (X_0, Y_0, Z_0) = (0.75, 0.25, 0)
+    #          to (X_s, Y_s, Z_s) = (0.7133, 0.2735, 0.0132)
+    #         for (X, Y, Z) = (0.73899, 0.25705, 0.00396) for Z = 0.3Z_s
+    # mu = (1 + Y/X) / (2 + 3Y / (4X))
+    # rho = mu * m_p * n_gas -> fully ionised: mu=0.60 (X=0.73899, Y=0.25705, Z=0.00396)
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
     #       = (2 + 3Y/(4X))n_H
     # n_He = Y/(4X) n_H
-    # n_e = (2 + 3Y/(4X)) / (1 + Y/(2X)) n
+    # n_e = n_H + 2n_He = (1 + Y/(2X)) n_H
+    # n_gas = (2 + 3Y/(4X)) / (1 + Y/(2X)) n_e
     # => n_gas = 1.93 n_e
     # calculate correct mu factor for Z metallicity gas
-    n2rho = 1.93 * 0.59 * const.m_p.cgs * 1/u.cm**3 # in cgs
+    n2rho = 1.93 * 0.6 * const.m_p.cgs * 1/u.cm**3 # in cgs
     # change to ``cosmological'' coordinates
     cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
     rho =  [(ne * n2rho * cgs2cos).value for ne in n]
@@ -170,11 +175,16 @@ def read_eckert():
     idcs = [re.search('[0-9]*_nh.fits', f).span() for f in fnames]
     numdata = np.array([int(fnames[idx][i[0]:i[1]][:-8])
                         for idx,i in enumerate(idcs)])
-    # rho = mu * m_p * n_gas -> fully ionised: mu=0.59 (X=0.75, Y=0.2461, Z=0.0039)
+    # Interpolate (X_0, Y_0, Z_0) = (0.75, 0.25, 0)
+    #          to (X_s, Y_s, Z_s) = (0.7133, 0.2735, 0.0132)
+    #         for (X, Y, Z) = (0.73899, 0.25705, 0.00396) for Z = 0.3Z_s
+    # mu = (1 + Y/X) / (2 + 3Y / (4X))
+    # rho = mu * m_p * n_gas -> fully ionised: mu=0.6 (X=0.73899, Y=0.25705, Z=0.00396)
     # n_gas = n_e + n_H + n_He = 2n_H + 3n_He (fully ionized)
     # n_He = Y/(4X) n_H
-    # => n_gas = 2.25 n_H
-    n2rho = 2.25 * 0.59 * const.m_p.cgs * 1./u.cm**3 # [cm^-3]
+    # n_gas = 2 + 3Y/(4X) n_H
+    # => n_gas = 2.26 n_H
+    n2rho = 2.26 * 0.6 * const.m_p.cgs * 1./u.cm**3 # [cm^-3]
     cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
 
     r500 = np.empty((0,), dtype=float)
@@ -501,16 +511,16 @@ def convert_hm(r200m=True):
     rce, rceerr, be, beerr, msle, mge, r500e = fit_eckert()
 
     # we thus need to convert our critical density as well
-    m500c = tools.radius_to_mass(r500c, 500 * p.prms.rho_crit * 0.7**2)
-    m500e = tools.radius_to_mass(r500e, 500 * p.prms.rho_crit * 0.7**2)
+    m500c = tools.radius_to_mass(r500c, 500 * p.prms.cosmo.rho_crit * 0.7**2)
+    m500e = tools.radius_to_mass(r500e, 500 * p.prms.cosmo.rho_crit * 0.7**2)
 
     # Get 500crit values, these assume h=0.7!!!!
-    m500cc = mgas_to_m500c(mgc)
-    m500ce = mgas_to_m500c(mge)
+    m500cc = mgas_to_m500c(mgc, p.prms.cosmo)
+    m500ce = mgas_to_m500c(mge, p.prms.cosmo)
 
     # we thus need to convert our critical density as well
-    r500cc = tools.mass_to_radius(m500cc, 500 * p.prms.rho_crit * 0.7**2)
-    r500ce = tools.mass_to_radius(m500ce, 500 * p.prms.rho_crit * 0.7**2)
+    r500cc = tools.mass_to_radius(m500cc, 500 * p.prms.cosmo.rho_crit * 0.7**2)
+    r500ce = tools.mass_to_radius(m500ce, 500 * p.prms.cosmo.rho_crit * 0.7**2)
 
     m_range = np.logspace(np.log10(np.min(m500e)),
                           np.log10(np.max(m500c)), 100)
@@ -541,10 +551,10 @@ def convert_hm(r200m=True):
         m200me = np.array([tools.m500c_to_m200m(m, prms.rho_crit * 0.7**2,
                                                 prms.rho_m * 0.7**2, h=1.)
                            for m in m500ce])
-        r200mc = tools.mass_to_radius(m200mc, 200 * p.prms.rho_crit *
-                                      p.prms.omegam * 0.7**2)
-        r200me = tools.mass_to_radius(m200me, 200 * p.prms.rho_crit *
-                                      p.prms.omegam * 0.7**2)
+        r200mc = tools.mass_to_radius(m200mc, 200 * p.prms.cosmo.rho_crit *
+                                      p.prms.cosmo.omegam * 0.7**2)
+        r200me = tools.mass_to_radius(m200me, 200 * p.prms.cosmo.rho_crit *
+                                      p.prms.cosmo.omegam * 0.7**2)
 
         rcc *= r500cc/r200mc
         rccerr *= r500cc/r200mc
@@ -570,184 +580,6 @@ def convert_hm(r200m=True):
 
 # ------------------------------------------------------------------------------
 # End of convert_hm()
-# ------------------------------------------------------------------------------
-
-def plot_parameters(mean=False):
-    if mean:
-        with open('data/croston_200.p', 'rb') as f:
-            data_c = pickle.load(f)
-        with open('data/eckert_200.p', 'rb') as f:
-            data_e = pickle.load(f)
-    else:
-        with open('data/croston_500.p', 'rb') as f:
-            data_c = pickle.load(f)
-        with open('data/eckert_500.p', 'rb') as f:
-            data_e = pickle.load(f)
-
-    m500c = np.append(data_c['m500c'], data_e['m500c'])
-    rc = np.append(data_c['rc'], data_e['rc'])
-    rcerr = np.append(data_c['rcerr'], data_e['rcerr'])
-    b = np.append(data_c['b'], data_e['b'])
-    berr = np.append(data_c['berr'], data_e['berr'])
-
-    m = np.logspace(np.log10(m500c.min()), np.log10(m500c.max()), 20)
-    rc_med = np.median(rc) * np.ones_like(m)
-    rc_q16 = np.percentile(rc, 16) * np.ones_like(m)
-    rc_q84 = np.percentile(rc, 84) * np.ones_like(m)
-    b_med = np.median(b) * np.ones_like(m)
-    b_q16 = np.percentile(b, 16) * np.ones_like(m)
-    b_q84 = np.percentile(b, 84) * np.ones_like(m)
-
-    pl.set_style()
-    fig = plt.figure(figsize=(20,6))
-    ax1 = fig.add_subplot(131)
-    ax2 = fig.add_subplot(132)
-    ax3 = fig.add_subplot(133)
-    # ax4 = fig.add_subplot(144)
-
-    # Core radius rc
-    ax1.set_prop_cycle(pl.cycle_mark())
-    if mean:
-        ax1.errorbar(data_c['m200m'], data_c['rc'], yerr=data_c['rcerr'],
-                     marker='o', label=r'Croston+08')
-        ax1.errorbar(data_e['m200m'], data_e['rc'], yerr=data_e['rcerr'],
-                     marker='x', label=r'Eckert+16')
-        ax1.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
-        ax1.set_title(r'$r_c/r_{200\mathrm{m}}$')
-    else:
-        ax1.errorbar(data_c['m500c'], data_c['rc'], yerr=data_c['rcerr'],
-                     marker='o', label=r'Croston+08')
-        ax1.errorbar(data_e['m500c'], data_e['rc'], yerr=data_e['rcerr'],
-                     marker='x', label=r'Eckert+16')
-        ax1.set_prop_cycle(pl.cycle_line())
-        ax1.plot(m, rc_med, ls='-', c='k', lw=2)
-        ax1.plot(m, rc_q16, ls='--', c='k', lw=2)
-        ax1.plot(m, rc_q84, ls='--', c='k', lw=2)
-        ax1.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M}_\odot]$')
-        ax1.set_title(r'$r_c/r_{500\mathrm{c}}$')
-    ax1.legend(loc='best')
-    ax1.set_ylim([1e-3, 1])
-    ax1.set_xscale('log')
-    ax1.set_yscale('log')
-
-    # Slope beta
-    ax2.set_prop_cycle(pl.cycle_mark())
-    if mean:
-        ax2.errorbar(data_c['m200m'], data_c['b'], yerr=data_c['berr'], marker='o',
-                     label=r'Croston+08')
-        ax2.errorbar(data_e['m200m'], data_e['b'], yerr=data_e['berr'], marker='x',
-                     label=r'Eckert+16')
-        ax2.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
-    else:
-        ax2.errorbar(data_c['m500c'], data_c['b'], yerr=data_c['berr'], marker='o',
-                     label=r'Croston+08')
-        ax2.errorbar(data_e['m500c'], data_e['b'], yerr=data_e['berr'], marker='x',
-                     label=r'Eckert+16')
-        ax2.set_prop_cycle(pl.cycle_line())
-        ax2.plot(m, b_med, ls='-', c='k', lw=2)
-        ax2.plot(m, b_q16, ls='--', c='k', lw=2)
-        ax2.plot(m, b_q84, ls='--', c='k', lw=2)
-        ax2.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M}_\odot]$')
-    ax2.legend(loc='best')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax2.set_title(r'$\beta$')
-
-    # # Cut-off radius rx
-    # ax3.set_prop_cycle(pl.cycle_mark())
-    # if mean:
-    #     ax3.errorbar(data_c['m200m'], data_c['rx'], yerr=data_c['rxerr'],
-    #                  marker='o', label=r'Croston+08')
-    #     ax3.errorbar(data_e['m200m'], data_e['rx'], yerr=data_e['rxerr'],
-    #                  marker='x', label=r'Eckert+16')
-    #     ax3.set_xlabel(r'$m_{200\mathrm{m}} \, [\mathrm{M}_\odot]$')
-    #     ax3.set_title(r'$r_x/r_{200\mathrm{m}}$')
-    # else:
-    #     ax3.errorbar(data_c['m500c'], data_c['rx'], yerr=data_c['rxerr'],
-    #                  marker='o', label=r'Croston+08')
-    #     ax3.errorbar(data_e['m500c'], data_e['rx'], yerr=data_e['rxerr'],
-    #                  marker='x', label=r'Eckert+16')
-    #     ax3.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M}_\odot]$')
-    #     ax3.set_title(r'$r_x/r_{500\mathrm{c}}$')
-    # ax3.legend(loc='best')
-    # ax3.set_xscale('log')
-    # ax3.set_yscale('log')
-
-    # Gas fractions
-    m500_obs, f_obs = np.loadtxt(ddir +
-                                 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
-                                 unpack=True)
-    n_m = 15
-    m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m)
-    m = tools.bins2center(m_bins)
-    m_bin_idx = np.digitize(10**(m500_obs), m_bins)
-
-    f_med = np.array([np.median(f_obs[m_bin_idx == m_bin])
-                      for m_bin in np.arange(1, len(m_bins))])
-    f_q16 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 16)
-                      for m_bin in np.arange(1, len(m_bins))])
-    f_q84 = np.array([np.percentile(f_obs[m_bin_idx == m_bin], 84)
-                      for m_bin in np.arange(1, len(m_bins))])
-
-    fmopt, fmcov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0.04),
-                                 m[m>1e14], f_med[m>1e14],
-                                 bounds=([1e10, 0],
-                                         [1e15, 10]))
-    f1opt, f1cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0.02),
-                                 m[m>1e14], f_q16[m>1e14],
-                                 bounds=([1e10, 0],
-                                         [1e15, 10]))
-    f2opt, f2cov = opt.curve_fit(lambda m, mc, a: f_gas(m, mc, a, 0.06),
-                                 m[m>1e14], f_q84[m>1e14],
-                                 bounds=([1e10, 0],
-                                         [1e15, 10]))
-
-    fm_prms = {"mc": fmopt[0],
-               "a": fmopt[1],
-               "f0": 0.04}
-    f1_prms = {"mc": f1opt[0],
-               "a": f1opt[1],
-               "f0": 0.02}
-    f2_prms = {"mc": f2opt[0],
-               "a": f2opt[1],
-               "f0": 0.06}
-
-    ax3.set_prop_cycle(pl.cycle_mark())
-    ax3.plot(10**(m500_obs[23:33]), f_obs[23:33], marker='o',
-             label=r'Vikhlinin+2006')
-    ax3.plot(10**(m500_obs[128:165]), f_obs[128:165],
-             marker='^', label=r'Maughan+2008')
-    ax3.plot(10**(m500_obs[:23]), f_obs[:23], marker='v',
-             label=r'Sun+2009')
-    ax3.plot(10**(m500_obs[33:64]), f_obs[33:64], marker='<',
-             label=r'Pratt+2009')
-    ax3.plot(10**(m500_obs[64:128]), f_obs[64:128], marker='>',
-             label=r'Lin+2012')
-    ax3.plot(10**(m500_obs[165:]), f_obs[165:], marker='D',
-             label=r'Lovisari+2015')
-    ax3.set_prop_cycle(pl.cycle_line())
-    ax3.plot(m, f_med, ls='-', c='k', lw=2)
-    ax3.plot(m, f_q16, ls='--', c='k', lw=2)
-    ax3.plot(m, f_q84, ls='--', c='k', lw=2)
-    ax3.plot(m, f_gas(m, **fm_prms), ls='-', c='r', lw=1)
-    ax3.plot(m, f_gas(m, **f1_prms), ls='--', c='r', lw=1)
-    ax3.plot(m, f_gas(m, **f2_prms), ls='--', c='r', lw=1)
-    ax3.yaxis.tick_right()
-    ax3.yaxis.set_ticks_position('both')
-    ax3.yaxis.set_label_position("right")
-    ax3.set_xlim([1e13, 10**(15.5)])
-    ax3.set_ylim([0.01, 0.145])
-    ax3.set_xscale('log')
-    ax3.set_xlabel(r'$m_{500\mathrm{c}} \, [\mathrm{M_\odot}]$')
-    ax3.set_ylabel(r'$f_{\mathrm{gas}}$', rotation=270, labelpad=20)
-    ax3.set_title(r'$f_{\mathrm{gas,500c}}$')
-    leg = ax3.legend(loc='best', numpoints=1, frameon=True, framealpha=0.8)
-    leg.get_frame().set_linewidth(0.0)
-
-    plt.show()
-
-# ------------------------------------------------------------------------------
-# End of plot_parameters()
 # ------------------------------------------------------------------------------
 
 def f_gas(m, log10mc, a, cosmo):
@@ -779,10 +611,10 @@ def f_gas(m, log10mc, a, cosmo):
 # End of f_gas()
 # ------------------------------------------------------------------------------
 
-def logmgas(logm500c, cosmo, q=50):
+def logmgas(logm500c, cosmo, q=50, bias=False):
     return np.log10(np.power(10, logm500c) * f_gas(np.power(10, logm500c),
                                                    cosmo=cosmo,
-                                                   **f_gas_prms(cosmo, q)))
+                                                   **f_gas_prms(cosmo, q=q, bias=bias)))
 
 def mgas_to_m500c(mgas500, cosmo, q=50):
     '''
@@ -801,14 +633,19 @@ def mgas_to_m500c(mgas500, cosmo, q=50):
 # End of mgas_to_m500c()
 # ------------------------------------------------------------------------------
 
-def f_gas_prms(cosmo, q=50):
+def f_gas_prms(cosmo, q=50, bias=False):
     '''
     Compute best fit parameters to the f_gas(m500c) relation with both f_gas and
     m500c assuming h=0.7
     '''
-    m500_obs, f_obs = np.loadtxt(ddir +
-                                 'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
-                                 unpack=True)
+    if bias == False:
+        m500_obs, f_obs = np.loadtxt(ddir +
+                                     'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
+                                     unpack=True)
+    else:
+        m500_obs, f_obs = np.loadtxt(ddir +
+                                     'data_mccarthy/gas/M500_fgas_bias_corrected.dat',
+                                     unpack=True)
 
     n_m = 15
 
@@ -824,7 +661,7 @@ def f_gas_prms(cosmo, q=50):
     fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, cosmo),
                                  m[m>1e14], f_q[m>1e14],
                                  bounds=([10, 0],
-                                         [15, 10]))
+                                         [100, 20]))
 
     fq_prms = {"log10mc": fqopt[0],
                "a": fqopt[1]}
@@ -833,27 +670,6 @@ def f_gas_prms(cosmo, q=50):
 
 # ------------------------------------------------------------------------------
 # End of f_gas_prms()
-# ------------------------------------------------------------------------------
-
-def f_gas_prms_debiased(cosmo):
-    m500_obs, f_obs = np.loadtxt(ddir +
-                                 'data_mccarthy/gas/M500_fgas_bias_corrected.dat',
-                                 unpack=True)
-
-    m500 = m500_obs
-
-    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, cosmo),
-                                 m500, f_obs,
-                                 bounds=([10, 0],
-                                         [15, 10]))
-
-    fq_prms = {"log10mc": fqopt[0],
-               "a": fqopt[1]}
-
-    return fq_prms
-
-# ------------------------------------------------------------------------------
-# End of f_gas_prms_debiased()
 # ------------------------------------------------------------------------------
 
 def f_stars(m200m, comp='all'):
@@ -947,52 +763,6 @@ def fit_prms(x=500, q_rc=50, q_beta=50):
 # End of fit_prms()
 # ------------------------------------------------------------------------------
 
-def massdiff_dmo2bar(m_bar, m_dmo, f_b, prms, fm):
-    '''
-    Return the mass difference between the measured halo mass and the
-    dark matter only equivalent mass according to the relation
-
-        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
-
-    '''
-    f_g = f_gas(m_bar, prms=prms, **fm)
-
-    return (1 - (f_b - f_g)) * m_dmo - m_bar
-
-def m200dmo_to_m200b(m_dmo, prms):
-    '''
-    Invert the relation between the measured halo mass and the dark matter only
-    equivalent mass according to the relation
-
-        m_dmo(m_b) = m_b / ( 1 - (f_b - f_gas(m_b)) )
-    '''
-    f_b = 1 - prms.f_dm
-    fm = f_gas_prms(prms, q=50)
-    m200_b = opt.brentq(massdiff_dmo2bar, m_dmo / 10., m_dmo,
-                        args=(m_dmo, f_b, prms, fm))
-
-    return m200_b
-
-# ------------------------------------------------------------------------------
-# End of m200dmo_to_m200b()
-# ------------------------------------------------------------------------------
-
-def m200b_to_m200dmo(m_b, f_model, prms):
-    '''
-    Get the relation between the measured halo mass and the dark matter only
-    equivalent mass according to the relation
-
-        m_dmo(m_b) = m_b / ( 1 - (f_b - f_model(m_b)) )
-    '''
-    f_b = 1 - prms.f_dm
-    m200dmo = m_b / (1 - (f_b - f_model))
-
-    return m200dmo
-
-# ------------------------------------------------------------------------------
-# End of m200b_to_m200dmo()
-# ------------------------------------------------------------------------------
-
 def plot_profiles_paper(prms=prms):
     with open('data/croston.p', 'rb') as f:
         data_c = pickle.load(f)
@@ -1022,7 +792,7 @@ def plot_profiles_paper(prms=prms):
     rho_e = np.array(data_e['rho'])
 
     # this now goes as h_70^2
-    rho_crit = prms.rho_crit * 0.7**2
+    rho_crit = prms.cosmo.rho_crit * 0.7**2
 
 
     # now load halo model info
@@ -1111,7 +881,7 @@ def plot_profiles_paper(prms=prms):
 # End of plot_profiles()
 # ------------------------------------------------------------------------------
 
-def plot_fit_profiles_paper():
+def plot_profiles_fit_paper():
     with open('data/croston.p', 'rb') as f:
         data_c = pickle.load(f)
     with open('data/eckert.p', 'rb') as f:
@@ -1264,10 +1034,10 @@ def plot_fit_profiles_paper():
     plt.show()
 
 # ------------------------------------------------------------------------------
-# End of plot_fit_profiles()
+# End of plot_profiles_fit()
 # ------------------------------------------------------------------------------
 
-def plot_fit_prms_paper(prms=prms):
+def plot_beta_prof_fit_prms_paper(prms=prms):
     with open('data/croston_500.p', 'rb') as f:
         data_c = pickle.load(f)
     with open('data/eckert_500.p', 'rb') as f:
@@ -1296,9 +1066,9 @@ def plot_fit_prms_paper(prms=prms):
     m500c_c = data_c['m500c']
     m500c = np.append(m500c_e, m500c_c)
 
-    m200m_e = data200m_e['m200m']
-    m200m_c = data200m_c['m200m']
-    m200m = np.append(m200m_e, m200m_c)
+    # m200m_e = data200m_e['m200m']
+    # m200m_c = data200m_c['m200m']
+    # m200m = np.append(m200m_e, m200m_c)
     # m200m = np.array([tools.m500c_to_m200m(m500c.min(), prms.rho_crit, prms.rho_m, prms.h),
     #                   tools.m500c_to_m200m(m500c.max(), prms.rho_crit, prms.rho_m, prms.h)])
 
@@ -1316,27 +1086,27 @@ def plot_fit_prms_paper(prms=prms):
                facecolor='k', alpha=0.3)
     ax.annotate('median', xy=(1.05 * m500c.min(), 1.05 * np.median(rc)))
 
-    ##########################################################################
-    # Get shadow twiny instance for ratio plot, to also have m200m
-    # need it in this order to get correct yticks with log scale, since
-    # twin instance seems to mess things up...
-    axs = ax.twiny()
-    axs.plot([m200m.min(), m200m.max()], [m200m.min(), m200m.max()])
-    axs.cla()
+    # ##########################################################################
+    # # Get shadow twiny instance for ratio plot, to also have m200m
+    # # need it in this order to get correct yticks with log scale, since
+    # # twin instance seems to mess things up...
+    # axs = ax.twiny()
+    # axs.plot([m200m.min(), m200m.max()], [m200m.min(), m200m.max()])
+    # axs.cla()
 
     ax.set_xlim(m500c.min(), m500c.max())
-    axs.set_xlim(m200m.min(), m200m.max())
+    # axs.set_xlim(m200m.min(), m200m.max())
 
     ax.set_ylim(0,0.5)
     ax.set_xscale('log')
-    axs.set_xscale('log')
+    # axs.set_xscale('log')
 
     ax.xaxis.set_tick_params(pad=10)
-    axs.xaxis.set_tick_params(pad=5)
+    # axs.xaxis.set_tick_params(pad=5)
 
     ax.set_xlabel(r'$m_{\mathrm{500c}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$')
-    axs.set_xlabel(r'$m_{\mathrm{200m}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$',
-                   labelpad=15)
+    # axs.set_xlabel(r'$m_{\mathrm{200m}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$',
+    #                labelpad=15)
     ax.set_ylabel('$r_\mathrm{c}/r_{\mathrm{500c}}$')
     ax.legend(loc='best')
     plt.savefig('obs_rc_fit.pdf', transparent=True, bbox_inches='tight')
@@ -1354,64 +1124,33 @@ def plot_fit_prms_paper(prms=prms):
                facecolor='k', alpha=0.3)
     ax.annotate('median', xy=(1.05 * m500c.min(), 1.05 * np.median(beta)))
 
-    ##########################################################################
-    # Get shadow twiny instance for ratio plot, to also have m200m
-    # need it in this order to get correct yticks with log scale, since
-    # twin instance seems to mess things up...
-    axs = ax.twiny()
-    axs.plot([m200m.min(), m200m.max()], [m200m.min(), m200m.max()])
-    axs.cla()
+    # ##########################################################################
+    # # Get shadow twiny instance for ratio plot, to also have m200m
+    # # need it in this order to get correct yticks with log scale, since
+    # # twin instance seems to mess things up...
+    # axs = ax.twiny()
+    # axs.plot([m200m.min(), m200m.max()], [m200m.min(), m200m.max()])
+    # axs.cla()
 
     ax.set_xlim(m500c.min(), m500c.max())
-    axs.set_xlim(m200m.min(), m200m.max())
+    # axs.set_xlim(m200m.min(), m200m.max())
 
     ax.set_ylim(0.04, 1.7)
     ax.set_xscale('log')
-    axs.set_xscale('log')
+    # axs.set_xscale('log')
 
     ax.xaxis.set_tick_params(pad=10)
-    axs.xaxis.set_tick_params(pad=5)
+    # axs.xaxis.set_tick_params(pad=5)
 
     ax.set_xlabel('$m_{\mathrm{500c}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$')
-    axs.set_xlabel(r'$m_{\mathrm{200m}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$',
-                   labelpad=15)
+    # axs.set_xlabel(r'$m_{\mathrm{200m}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$',
+    #                labelpad=15)
     ax.set_ylabel(r'$\beta$')
     ax.legend(loc='best')
     plt.savefig('obs_beta_fit.pdf', transparent=True, bbox_inches='tight')
 
 # ------------------------------------------------------------------------------
-# End of plot_fit_prms_paper()
-# ------------------------------------------------------------------------------
-
-def plot_missing_mass_paper(comp_gas):
-    '''
-    Plot the total missing mass by assuming beta profile fit to gas up to r200m
-    '''
-    set_style('line')
-
-    fig = plt.figure(figsize=(10,9))
-    ax = fig.add_subplot(111)
-
-    m_range = comp_gas.m_range
-    f_dm = p.prms.f_dm * np.ones_like(m_range)
-    f_gas = comp_gas.m_h / m_range
-
-    m500c = np.array([tools.m200m_to_m500c(mass) for mass in m_range[::5]])
-    f500c = d.f_gas(m500c, **d.f_gas_prms(prms, q=50))
-
-    ax.plot(m_range, f_dm, label='$f_{\mathrm{dm}}$')
-    ax.plot(m_range, f_dm + f_gas, label='$f_{\mathrm{dm}} + f_{\mathrm{gas,200m}}$')
-    ax.plot(m_range[::5], f_dm[0] + f500c, label='$f_{\mathrm{dm}} + f_{\mathrm{gas,500c}}$')
-    ax.set_xscale('log')
-    ax.set_xlabel('$m_{\mathrm{200m}} \, [\mathrm{M_\odot}]$')
-    ax.set_ylabel('$f(m)$')
-    ax.xaxis.set_tick_params(pad=10)
-    ax.legend(loc='best')
-
-    plt.show()
-
-# ------------------------------------------------------------------------------
-# End of plot_missing_mass_paper()
+# End of plot_beta_prof_fit_prms_paper()
 # ------------------------------------------------------------------------------
 
 def plot_masses_hist_paper():
@@ -1428,12 +1167,14 @@ def plot_masses_hist_paper():
     m500c_c = data_c['m500c']
     m500c = np.append(m500c_e, m500c_c)
 
-    m200m_e = data200m_e['m200m']
-    m200m_c = data200m_c['m200m']
-    m200m = np.append(m200m_e, m200m_c)
+    # m200m_e = data200m_e['m200m']
+    # m200m_c = data200m_c['m200m']
+    # m200m = np.append(m200m_e, m200m_c)
 
-    mn = np.min(np.hstack([m200m_c, m200m_e]))
-    mx = np.max(np.hstack([m200m_c, m200m_e]))
+    # mn = np.min(np.hstack([m200m_c, m200m_e]))
+    # mx = np.max(np.hstack([m200m_c, m200m_e]))
+    mn = np.min(np.hstack([m500c_c, m500c_e]))
+    mx = np.max(np.hstack([m500c_c, m500c_e]))
 
     bins = np.logspace(np.log10(mn), np.log10(mx), 10)
 
@@ -1441,29 +1182,29 @@ def plot_masses_hist_paper():
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    ax.hist([m200m_c, m200m_e], bins=bins, stacked=True, histtype='barstacked',
+    ax.hist([m500c_c, m500c_e], bins=bins, stacked=True, histtype='barstacked',
             label=['Croston+08', 'Eckert+16'])
 
-    axs = ax.twiny()
-    axs.plot([m500c.min(), m500c.max()], [0, 0])
-    axs.cla()
+    # axs = ax.twiny()
+    # axs.plot([m200m.min(), m200m.max()], [0, 0])
+    # axs.cla()
 
-    ax.set_xlim(m200m.min(), m200m.max())
-    axs.set_xlim(m500c.min(), m500c.max())
+    ax.set_xlim(m500c.min(), m500c.max())
+    # axs.set_xlim(m500c.min(), m500c.max())
     ax.set_ylim(0,41)
 
     ax.minorticks_on()
-    ax.set_xlabel(r'$m_\mathrm{200m} \, [h_{70}^{-1} \, \mathrm{M_\odot}]$')
-    axs.set_xlabel(r'$m_{\mathrm{500c}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$',
-                   labelpad=15)
+    ax.set_xlabel(r'$m_{\mathrm{500c}}\, [h_{70}^{-1} \, \mathrm{M_\odot}]$')
+    # axs.set_xlabel(r'$m_\mathrm{200m} \, [h_{70}^{-1} \, \mathrm{M_\odot}]$',
+    #                labelpad=15)
 
     ax.set_ylabel(r'Frequency')
 
     ax.set_xscale('log')
-    axs.set_xscale('log')
+    # axs.set_xscale('log')
 
     ax.xaxis.set_tick_params(pad=10)
-    axs.xaxis.set_tick_params(pad=5)
+    # axs.xaxis.set_tick_params(pad=5)
 
     ax.legend(loc='best')
 
