@@ -152,6 +152,40 @@ class Profile(cache.Cache):
                        extrap=self.extrap,
                        cpus=self.cpus)
 
+    def __sub__(self, other):
+        if not np.allclose(self.r_min, other.r_min):
+            raise AttributeError('Profiles need same r_min')
+        if not np.allclose(self.r_h, other.r_h):
+            raise AttributeError('Profiles need same r_h')
+        if not np.allclose(self.r_bins, other.r_bins):
+            raise AttributeError('Profiles need same r_bins')
+        if not np.allclose(self.k_range, other.k_range):
+            raise AttributeError('Profiles need same k_range')
+        if not np.allclose(self.z, other.z):
+            raise AttributeError('Profiles need same z')
+
+        profile_args = tools.merge_dicts(self.profile_args, other.profile_args)
+        profile_mass = (lambda r, **kwargs: self.profile_mass(r, **self.profile_args) -
+                        other.profile_mass(r, **other.profile_args))
+        profile = self.rho_r - other.rho_r
+        profile_f = self.rho_k - other.rho_k
+
+        return Profile(cosmo=self.cosmo,
+                       r_min=self.r_min,
+                       r_h=self.r_h,
+                       r_bins=self.r_bins,
+                       k_range=self.k_range,
+                       z=self.z,
+                       profile=profile,
+                       profile_args=profile_args,
+                       profile_mass=profile_mass,
+                       profile_f=profile_f,
+                       profile_f_args=None,
+                       n=self.n,
+                       taylor_err=self.taylor_err,
+                       extrap=self.extrap,
+                       cpus=self.cpus)
+
     #===========================================================================
     # Parameters
     #===========================================================================
