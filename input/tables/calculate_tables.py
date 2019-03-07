@@ -1,0 +1,1156 @@
+import numpy as np
+import scipy.optimize as opt
+import scipy.interpolate as interp
+import scipy.special as spec
+import scipy.integrate as intg
+import multiprocessing as multi
+import asdf
+
+import halo.tools as tools
+
+
+import sys
+if sys.version_info[0] >= 3:
+    print("We cannot import commah, use the supplied table")
+else:
+    import commah
+
+import pdb
+
+if len(__file__.split("/")[:-1]) >= 1:
+    table_dir = "/".join(__file__.split("/")[:-1]) + "/"
+else:
+    table_dir = "".join(__file__.split("/")[:-1])
+
+######################
+# default parameters #
+######################
+
+m200c = np.logspace(0, 17, 100)
+m200m = np.logspace(1, 17, 100)
+
+z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
+sigma8 = np.linspace(0.821 - 0.02, 0.821 + 0.02, 3)
+omegam = np.linspace(0.2793 - 0.02, 0.2793 + 0.02, 3)
+omegav = np.linspace(0.7207 - 0.02, 0.7207 + 0.02, 3)
+n = np.linspace(0.972 - 0.02, 0.972 + 0.02, 3)
+h = np.linspace(0.7 - 0.04, 0.7 + 0.04, 3)
+
+###############################################
+# Tools for table and interpolation functions #
+###############################################
+
+def convert_cosmo_commah(cosmo):
+    """
+    Collect parameters into a dictionary suitable for cosmolopy.
+
+    Returns
+    -------
+    dict
+        Dictionary of values appropriate for cosmolopy
+    """
+    amap = {"h": "h",
+            "omegav": "omega_lambda_0",
+            "sigma8": "sigma_8",
+            "omegam": "omega_M_0",
+            "n": "n"}
+
+    return_dict = {}
+    for k, v in amap.items():
+        return_dict.update({v:cosmo[k]})
+
+    return return_dict
+
+# ------------------------------------------------------------------------------
+# End of arrays_to_coords()
+# ------------------------------------------------------------------------------
+
+def arrays_to_coords(*xi):
+    '''
+    Convert a set of coordinate arrays to a coordinate grid for the interpolator
+    '''
+    Xi = np.meshgrid(*xi, indexing='ij')
+    coords = np.concatenate([X.reshape(X.shape + (1,)) for X in Xi], axis=-1)
+    return coords.reshape(-1, len(xi))
+
+# ------------------------------------------------------------------------------
+# End of arrays_to_coords()
+# ------------------------------------------------------------------------------
+
+##############################
+# Functions to create tables #
+##############################
+
+def table_c200c_correa_cosmo(m200c=m200c,
+                             z=z,
+                             sigma8=sigma8,
+                             omegam=omegam,
+                             omegav=omegav,
+                             n=n,
+                             h=h,
+                             cpus=None):
+    '''Calculate the c(m) relation from Correa+2015 for the given mass, z
+    and cosmology range.
+
+    Parameters
+    ----------
+    m200c : array [M_sun / h]
+        range of m200c for which to compute
+    z : array
+        redshifts to compute for
+    sigma8 : array
+        values of sigma_8 to compute for
+    omegam : array
+        values of omega_m to compute for
+    omegav : array
+        values of omega_lambda to compute for
+    n : array
+        values of n to compute for
+    h : array
+        values of h to compute for
+    cpus : int
+        number of cores to use
+
+    Returns
+    ------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to c_correa_200c.asdf
+
+    '''
+    def c_cosmo(procn, m200c, sigma8, omegam, omegav, n, h, out_q):
+        cosmo = {}
+        c_all = np.empty(sigma8.shape + omegam.shape + omegav.shape + n.shape +
+                         h.shape + z.shape + m200c.shape)
+        for idx_s8, s8 in enumerate(sigma8):
+            cosmo["sigma_8"] = s8
+            for idx_om, om in enumerate(omegam):
+                cosmo["omega_M_0"] = om
+                for idx_ov, ov in enumerate(omegav):
+                    cosmo["omega_lambda_0"] = ov
+                    for idx_n, n_s in enumerate(n):
+                        cosmo["n"] = n_s
+                        for idx_h, h0 in enumerate(h):
+                            cosmo["h"] = h0
+                            c_all[idx_s8, idx_om, idx_ov, idx_n, idx_h] = commah.run(cosmology=cosmo,
+                                                                                     Mi=m200c/cosmo["h"],
+                                                                                     z=z,
+                                                                                     mah=False)['c'].T
+        out_q.put([procn, c_all])
+
+    # --------------------------------------------------
+    if cpus == None:
+        cpus = multi.cpu_count()
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    m200c_split = np.array_split(m200c, cpus)    
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i, m200c_split[i], sigma8, omegam,
+                                      omegav, n, h, out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    c = np.concatenate([item[1] for item in results], axis=-1)
+
+    result_info = {
+        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z", "m200c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200c": m200c,
+        "c200c": c
+    }
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "c200c_correa_cosmo.asdf")
+    af.close()
+
+    return result_info
+
+# ------------------------------------------------------------------------------
+# End of table_c200c_correa_cosmo()
+# ------------------------------------------------------------------------------
+
+def table_c200c_correa(m200c=m200c,
+                       z=z,
+                       sigma8=0.821,
+                       omegam=0.2793,
+                       omegav=0.7207,
+                       n=0.972,
+                       h=0.7,
+                       cpus=None):
+    '''Calculate the c(m) relation from Correa+2015 for the given mass, z
+    and cosmology.
+
+    Parameters
+    ----------
+    m200c : array [M_sun / h]
+        range of m200c for which to compute
+    z : array
+        redshifts to compute for
+    sigma8 : float
+        value of sigma_8 to compute for
+    omegam : float
+        value of omega_m to compute for
+    omegav : float
+        value of omega_lambda to compute for
+    n : float
+        value of n to compute for
+    h : float
+        value of h to compute for
+    cpus : int
+        number of cores to use
+
+    Returns
+    ------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to c_correa_200c.asdf
+
+    '''
+    def c_cosmo(procn, m200c, out_q):
+        c_all = commah.run(cosmology=cosmo,
+                           Mi=m200c/cosmo["h"],
+                           z=z,
+                           mah=False)['c'].T
+        
+        out_q.put([procn, c_all])
+
+    # --------------------------------------------------
+    cosmo = {}
+    cosmo["sigma_8"] = sigma8
+    cosmo["omega_M_0"] = omegam
+    cosmo["omega_lambda_0"] = omegav
+    cosmo["n"] = n
+    cosmo["h"] = h
+    
+    if cpus == None:
+        cpus = multi.cpu_count()
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    m200c_split = np.array_split(m200c, cpus)    
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i, m200c_split[i], out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    c = np.concatenate([item[1] for item in results], axis=-1)
+
+    result_info = {
+        "dims": np.array(["z", "m200c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200c": m200c,
+        "c200c": c
+    }
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "c200c_correa.asdf")
+    af.close()
+
+    return result_info
+
+# ------------------------------------------------------------------------------
+# End of table_c200c_correa()
+# ------------------------------------------------------------------------------
+
+def m_NFW(r, c_x, r_x, rho_mean, Delta=200):
+    '''
+    Calculate the mass of the NFW profile with c_x and r_x, relative to
+    Delta rho_meanup to r
+
+    Parameters
+    ----------
+    r : array
+      radii to compute mass for
+    c_x : float
+      concentration of halo
+    r_x : float
+      array containing r_x to evaluate r_s from r_s = r_x/c_x
+    rho_mean : float
+      mean dark matter density
+    Delta : float (default=200.)
+      critical overdensity for collapse
+
+    Returns
+    -------
+    m_h : float
+      mass
+    '''
+    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    r_s = r_x / c_x
+
+    prefactor = 4 * np.pi * rho_s * r_s**3
+    c_factor  = np.log((r_s + r) / r_s) - r / (r + r_s)
+
+    mass = prefactor * c_factor
+
+    return mass
+
+# ------------------------------------------------------------------------------
+# End of m_NFW()
+# ------------------------------------------------------------------------------
+
+def massdiff_2m2c(m200m, m200c, c200c, r200c, rhom, h, z):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    r200m = tools.mass_to_radius(m200m, 200 * rhom)
+    mass = m_NFW(r200c, c200c * r200m / r200c, r200m, rhom, Delta=200)
+
+    return mass - m200c
+
+@np.vectorize
+def m200c_to_m200m(m200c, c200c, r200c, rhom, h, z):
+    # these bounds should be reasonable for m200m < 1e18
+    # 1e19 Msun is ~maximum for c_correa
+    m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
+                       args=(m200c, c200c, r200c, rhom, h, z))
+    r200m = tools.mass_to_radius(m200m, 200 * rhom)
+    c200m = c200c * r200m / r200c
+
+    return m200m, c200m, r200m
+
+# ------------------------------------------------------------------------------
+# End of m200c_to_m200m()
+# ------------------------------------------------------------------------------
+
+def table_m200c_to_m200m(m200c=m200c,
+                         z=z,
+                         sigma8=0.821,
+                         omegam=0.2793,
+                         omegav=0.7207,
+                         n=0.972,
+                         h=0.7):
+    '''
+    Create a table that converts from m200c to the corresponding halo properties
+    m200m
+    '''
+    rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
+    rhom = omegam * rhoc
+
+    # get interpolator and coordinates for c200c
+    coords = arrays_to_coords(z, np.log10(m200c))
+    c_interp = c200c_interp(c_file=table_dir + "c200c_correa.asdf")
+
+    c200c = c_interp(coords).reshape(z.shape + m200c.shape)
+    r200c = tools.mass_to_radius(m200c, 200 * rhoc)
+    
+    m200m, c200m, r200m = m200c_to_m200m(m200c=m200c.reshape(1,-1),
+                                         c200c=c200c,
+                                         r200c=r200c.reshape(1,-1),
+                                         rhom=rhom,
+                                         h=h,
+                                         z=z.reshape(-1,1))
+
+    result_info = {
+        "dims": np.array(["z", "m200c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200c": m200c,
+        "r200c": r200c,
+        "c200c": c200c,
+        "m200m": m200m,
+        "r200m": r200m,
+        "c200m": c200m}
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "halo_200c_to_200m.asdf")
+    af.close()
+
+    return result_info
+
+# ------------------------------------------------------------------------------
+# End of table_m200c_to_m200m()
+# ------------------------------------------------------------------------------
+
+def massdiff_2m2c_cosmo(m200m, m200c, c200c, r200c, rhom, h, z):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    r200m = tools.mass_to_radius(m200m, 200 * rhom)
+    mass = m_NFW(r200c, c200c * r200m / r200c, r200m, rhom, Delta=200)
+
+    return mass - m200c
+
+@np.vectorize
+def m200c_to_m200m_cosmo(m200c, c200c, r200c, rhom, h, z):
+    # these bounds should be reasonable for m200m < 1e18
+    # 1e19 Msun is ~maximum for c_correa
+    m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
+                       args=(m200c, c200c, r200c, rhom, h, z))
+    r200m = tools.mass_to_radius(m200m, 200 * rhom)
+    c200m = c200c * r200m / r200c
+
+    return m200m, c200m, r200m
+
+# ------------------------------------------------------------------------------
+# End of m200c_to_m200m_cosmo()
+# ------------------------------------------------------------------------------
+
+def table_m200c_to_m200m_cosmo(m200c=m200c,
+                               z=z,
+                               sigma8=sigma8,
+                               omegam=omegam,
+                               omegav=omegav,
+                               n=n,
+                               h=h):
+    '''
+    Create a table that converts from m200c and the given cosmology to the corresponding
+    halo properties m200m
+    '''
+    # get interpolator and coordinates for c200c
+    coords = arrays_to_coords(sigma8, omegam, omegav, n, h, z, np.log10(m200c))
+    c_interp = c200c_cosmo_interp(c_file=table_dir + "c200c_correa_cosmo.asdf")
+
+    # set background densities
+    rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
+    rhom = omegam * rhoc
+
+    c200c = c_interp(coords).reshape(sigma8.shape + omegam.shape + omegav.shape +
+                                     n.shape + h.shape + z.shape + m200c.shape)
+    r200c = tools.mass_to_radius(m200c, 200 * rhoc)
+    
+    m200m, c200m, r200m = m200c_to_m200m_cosmo(m200c=m200c.reshape(1,1,1,1,1,1,-1),
+                                               c200c=c200c,
+                                               r200c=r200c.reshape(1,1,1,1,1,1,-1),
+                                               rhom=rhom.reshape(1,-1,1,1,1,1,1),
+                                               h=h.reshape(1,1,1,1,-1,1,1),
+                                               z=z.reshape(1,1,1,1,1,-1,1))
+
+    result_info = {
+        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z", "m200c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200c": m200c,
+        "r200c": r200c,
+        "c200c": c200c,
+        "m200m": m200m,
+        "r200m": r200m,
+        "c200m": c200m}
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "halo_200c_to_200m_cosmo.asdf")
+    af.close()
+
+    return result_info
+
+# ------------------------------------------------------------------------------
+# End of table_m200c_to_m200m_cosmo()
+# ------------------------------------------------------------------------------
+
+def table_c200m_correa(m200m=m200m,
+                       z=z,
+                       sigma8=0.821,
+                       omegam=0.2793,
+                       omegav=0.7207,
+                       n=0.972,
+                       h=0.7,
+                       cpus=None):
+    '''Interpolate the c200m(m200m, cosmo) relation from Correa+2015 for the given mass, z
+    and cosmology to a regular grid
+
+    Parameters
+    ----------
+    m200m : array [M_sun / h]
+        range of m200m for which to compute
+    z : array
+        redshifts to compute for
+    sigma8 : array
+        values of sigma_8 to compute for
+    omegam : array
+        values of omega_m to compute for
+    omegav : array
+        values of omega_lambda to compute for
+    n : array
+        values of n to compute for
+    h : array
+        values of h to compute for
+    cpus : int
+        number of cores to use
+
+    Returns
+    ------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to c_correa_200c.asdf
+
+    '''
+    def c_cosmo(procn, m200m_t, c200m_t, out_q):
+        c_all = np.empty((1,) + m200m.shape)
+
+        
+        c_interp = interp.interp1d(m200m_t[0],
+                                   c200m_t[0])
+                            
+                            
+        c_all[0] = c_interp(m200m)
+
+        out_q.put([procn, c_all])
+
+    # --------------------------------------------------
+    if cpus == None:
+        cpus = multi.cpu_count()
+
+    if cpus > 8:
+        cpus = 8
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    # load tables
+    af = asdf.open(table_dir + "halo_200c_to_200m.asdf")
+    m200m_tab = af.tree["m200m"][:]
+    c200m_tab = af.tree["c200m"][:]
+
+    # we split along the redshift axis, only mass is not reg grid
+    m200m_tab_split = np.array_split(m200m_tab, cpus, axis=-2)
+    c200m_tab_split = np.array_split(c200m_tab, cpus, axis=-2)
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i,
+                                      m200m_tab_split[i],
+                                      c200m_tab_split[i],
+                                      out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    c200m = np.concatenate([item[1] for item in results], axis=-2)
+
+    result_info = {
+        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z", "m200m"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200m": m200m,
+        "c200m": c200m
+    }
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "c200m_correa.asdf")
+    af.close()
+
+    return result_info
+
+# ------------------------------------------------------------------------------
+# End of table_c200m_correa()
+# ------------------------------------------------------------------------------
+
+def table_c200m_correa_cosmo(m200m=m200m,
+                             z=z,
+                             sigma8=sigma8,
+                             omegam=omegam,
+                             omegav=omegav,
+                             n=n,
+                             h=h,
+                             cpus=None):
+    '''Interpolate the c200m(m200m, cosmo) relation from Correa+2015 for the given mass, z
+    and cosmology to a regular grid
+
+    Parameters
+    ----------
+    m200m : array [M_sun / h]
+        range of m200m for which to compute
+    z : array
+        redshifts to compute for
+    sigma8 : array
+        values of sigma_8 to compute for
+    omegam : array
+        values of omega_m to compute for
+    omegav : array
+        values of omega_lambda to compute for
+    n : array
+        values of n to compute for
+    h : array
+        values of h to compute for
+    cpus : int
+        number of cores to use
+
+    Returns
+    ------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to c_correa_200c.asdf
+
+    '''
+    def c_cosmo(procn, m200m_t, c200m_t, out_q):
+        cosmo = {}
+        c_all = np.empty(m200m_t.shape[:-1] + m200m.shape)
+        for idx_s8 in range(m200m_t.shape[0]):
+            for idx_om in range(m200m_t.shape[1]):
+                for idx_ov in range(m200m_t.shape[2]):
+                    for idx_n in range(m200m_t.shape[3]):
+                        for idx_h in range(m200m_t.shape[4]):
+                            c_interp = interp.interp1d(m200m_t[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0],
+                                                       c200m_t[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0])
+                            
+                            
+                            c_all[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0] = c_interp(m200m)
+
+        out_q.put([procn, c_all])
+
+    # --------------------------------------------------
+    if cpus == None:
+        cpus = multi.cpu_count()
+
+    if cpus > 8:
+        cpus = 8
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    # load tables
+    af = asdf.open(table_dir + "halo_200c_to_200m_cosmo.asdf")
+    m200m_tab = af.tree["m200m"][:]
+    c200m_tab = af.tree["c200m"][:]
+
+    # we split along the redshift axis, only mass is not reg grid
+    m200m_tab_split = np.array_split(m200m_tab, cpus, axis=-2)
+    c200m_tab_split = np.array_split(c200m_tab, cpus, axis=-2)
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i,
+                                      m200m_tab_split[i],
+                                      c200m_tab_split[i],
+                                      out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    c200m = np.concatenate([item[1] for item in results], axis=-2)
+
+    result_info = {
+        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z", "m200m"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200m": m200m,
+        "c200m": c200m
+    }
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "c200m_correa_cosmo.asdf")
+    af.close()
+
+    return result_info
+
+# ------------------------------------------------------------------------------
+# End of table_c200m_correa_cosmo()
+# ------------------------------------------------------------------------------
+
+# def extrapolate_plaw(x_range, func, verbose=False):
+#     '''
+#     Extrapolate func NaN values as a powerlaw. Works best if power law behaviour
+#     is already apparent, extrapolates from largest change/bump in func.
+
+#     Parameters
+#     ----------
+#     x_range : array
+#       range for func
+#     func : array
+#       function where np.nan will be extrapolated
+
+#     Returns
+#     -------
+#     func : array
+#       function with np.nan extrapolated as power law
+#     '''
+#     def plaw_pos(x, slope):
+#         return slope * x
+
+#     def plaw_neg(x, slope):
+#         return np.power(x, slope)
+
+#     # find largest change in func, will extrapolate from there
+#     idx_xs = np.argmin(np.diff(func[~np.isnan(func)], axis=-1))
+#     idx_nan = np.argmax(np.isnan(func), axis=-1) - 1
+
+#     if idx_nan != 0:
+#         x_fit = x_range[~np.isnan(func)]/x_range[idx_xs]
+#         func_fit = func[~np.isnan(func)]/func[idx_xs]
+
+#         x_fit = x_fit[...,idx_xs:]
+#         func_fit = func_fit[...,idx_xs:]
+#         if (func_fit < 0).any():
+#             slope, cov = opt.curve_fit(plaw_neg,
+#                                        (x_fit).astype(float),
+#                                        (func_fit).astype(float))
+#         else:
+#             slope, cov = opt.curve_fit(plaw_pos,
+#                                        np.log10(x_fit).astype(float),
+#                                        np.log10(func_fit).astype(float))
+
+#         func[idx_nan:] = func[idx_nan] * \
+#                          (x_range[idx_nan:]/x_range[idx_nan])**slope
+#     if verbose: print('Power law slope: %f'%slope)
+#     return func
+
+# # ------------------------------------------------------------------------------
+# # End of extrapolate_plaw()
+# # ------------------------------------------------------------------------------
+
+# def _taylor_expansion_multi(n, r_range, profile, cpus):
+#     '''
+#     Computes the Taylor coefficients for the profile expansion for n_range.
+
+#         F_n = 1 / (2n+1)! int_r r^(2n+2) * profile[M,r]
+
+#     Parameters
+#     ----------
+#     n : int
+#       number of Taylor coefficients to compute
+#     r_range : (m,r) array
+#       radius range to integrate over
+#     profile : array
+#       density profile with M along axis 0 and r along axis 1
+#     cpus : int
+#       number of cpus to use
+
+#     Returns
+#     -------
+#     taylor_coefs : (m,k,n) array
+#       array containing Taylor coefficients of Fourier expansion
+#     '''
+#     def _taylor_expansion(procn, n_range, r, profile, out_q):
+#         '''
+#         Parameters
+#         ----------
+#         procn : int
+#           process id
+#         n_range : array
+#           array containing the index of the Taylor coefficients
+#         r : array
+#           radius range to integrate over
+#         profile : array
+#           density profile with M along axis 0 and r along axis 1
+#         out_q : queue
+#           queue to output results
+#         '''
+#         # (m,n) array
+#         F_n = np.empty((profile.shape[0],) + n_range.shape,dtype=np.longdouble)
+#         r = np.longdouble(r)
+
+#         for idx,n in enumerate(n_range):
+#             prefactor = 1./spec.factorial(2*n+1, exact=True)
+#             result = prefactor * intg.simps(y=np.power(r, (2.0*n+2)) *
+#                                             profile,
+#                                             x=r,
+#                                             axis=1,
+#                                             even='first')
+
+#             F_n[:,idx] = result
+
+#         results = [procn,F_n]
+#         out_q.put(results)
+#         return
+#     # --------------------------------------------------------------------------
+#     manager = multi.Manager()
+#     out_q = manager.Queue()
+
+#     taylor = np.arange(0,n+1)
+#     # Split array in number of CPUs
+#     taylor_split = np.array_split(taylor,cpus)
+
+#     # Start the different processes
+#     procs = []
+
+#     for i in range(cpus):
+#         process = multi.Process(target=_taylor_expansion,
+#                                 args=(i, taylor_split[i],
+#                                       r_range,
+#                                       profile,
+#                                       out_q))
+#         procs.append(process)
+#         process.start()
+
+#     # Collect all results
+#     result = []
+#     for i in range(cpus):
+#         result.append(out_q.get())
+
+#     result.sort()
+#     taylor_coefs = np.concatenate([item[1] for item in result],
+#                                   axis=-1)
+
+#     # Wait for all worker processes to finish
+#     for p in procs:
+#         p.join()
+
+#     return taylor_coefs
+
+# # ------------------------------------------------------------------------------
+# # End of taylor_expansion_multi()
+# # ------------------------------------------------------------------------------
+
+# def ft_taylor(k_range, r_range, rho_r, n=84, cpus=4, extrap=True,
+#               taylor_err=1e-50):
+#     '''
+#     Computes the Fourier transform of the density profile, using a Taylor
+#     expansion of the sin(kr)/(kr) term. We have
+
+#         u[M,k] = sum_n (-1)^n F_n[M] k^(2n)
+
+#     Returns
+#     -------
+#     u : (m,k) array
+#       Fourier transform of density profile
+#     '''
+#     def F_n(r_range, rho_r, n, cpus):
+#         '''
+#         Computes the Taylor coefficients in the Fourier expansion:
+
+#             F_n[M] = 4 * pi * 1 / (2n+1)! int_r r^(2n+2) * profile[M,r] dr
+
+#         Returns
+#         -------
+#         F_n : (m,n+1) array
+#           Taylor coefficients of Fourier expansion
+#         '''
+#         # Prefactor only changes along axis 0 (Mass)
+#         prefactor = (4.0 * np.pi)
+
+#         # F_n is (m,n+1) array
+#         F_n = _taylor_expansion_multi(n=n, r_range=r_range,
+#                                       profile=rho_r,
+#                                       cpus=cpus)
+#         F_n *= prefactor
+
+#         return F_n
+#     # --------------------------------------------------------------------------
+#     # define shapes for readability
+#     n_s = n
+#     m_s = r_range.shape[0]
+#     k_s = k_range.shape[0]
+
+#     Fn = F_n(r_range, rho_r, n, cpus)
+#     # need (1,n+1) array to match F_n
+#     n_arr = np.arange(0,n_s+1,dtype=np.longdouble).reshape(1,n_s+1)
+#     # -> (m,n) array
+#     c_n = np.power(-1,n_arr) * Fn
+
+#     # need (k,n+1) array for exponent
+#     k_n = np.power(np.tile(np.longdouble(k_range).reshape(k_s,1),
+#                            (1,n_s+1)),
+#                    (2 * n_arr))
+
+#     # need to match n terms and sum over them
+#     # result is (k,m) array -> transpose
+#     T_n = c_n.reshape(1,m_s,n_s+1) * k_n.reshape(k_s,1,n_s+1)
+#     u = np.sum(T_n,axis=-1).T
+
+#     # k-values which do not converge anymore will have coefficients
+#     # that do not converge to zero. Convergence to zero is determined
+#     # by taylor_err.
+#     indices = np.argmax((T_n[:,:,-1] > taylor_err), axis=0)
+#     indices[indices == 0] = k_s
+#     for idx, idx_max in enumerate(indices):
+#         u[idx,idx_max:] = np.nan
+#         # this extrapolation is not really very good...
+#         if (idx_max != k_s) and extrap:
+#             u[idx] = extrapolate_plaw(k_range, u[idx])
+
+#     # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
+#     # # systematic offset, while we know that theoretically u[k=0] = 1
+#     # if (np.abs(u[:,0]) - 1. > 1.e-2).any():
+#     #     print('-------------------------------------------------',
+#     #           '! Density profile mass does not match halo mass !',
+#     #           '-------------------------------------------------',
+#     #           sep='\n')
+
+#     # nonnil = (u[:,0] != 0)
+#     # u[nonnil] = u[nonnil] / u[nonnil,0].reshape(-1,1)
+
+#     return u
+
+# # ------------------------------------------------------------------------------
+# # End of ft_taylor()
+# # ------------------------------------------------------------------------------
+
+# def profile_beta(r_range, m_x, r_x, rc, beta):
+#     '''
+#     Return a beta profile with mass m_x inside r_range <= r_x
+
+#         rho[r] =  rho_c[m_x, rc, r_x] / (1 + ((r/r_x)/rc)^2)^(beta / 2)
+
+#     rho_c is determined by the mass of the profile.
+
+#     Parameters
+#     ----------
+#     r_range : (m,r) array
+#       array containing r_range for each m
+#     m_x : (m,) array
+#       array containing masses to match at r_x
+#     r_x : (m,) array
+#       x overdensity radius to match m_x at, in units of r_range
+#     beta : (m,) array
+#       power law slope of profile
+#     rc : (m,) array
+#       physical core radius of beta profile in as a fraction
+
+#     Returns
+#     -------
+#     profile : (m,r) array
+#       array containing beta profile
+#     '''
+#     m = m_x.shape[0]
+
+#     # analytic enclosed mass inside r_x gives normalization rho_0
+#     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3. * beta / 2,
+#                                                        5./2, -(r_x / rc)**2))
+
+#     rc = rc.reshape(m,1)
+#     beta = beta.reshape(m,1)
+#     r_x = r_x.reshape(m,1)
+#     m_x = m_x.reshape(m,1)
+#     rho_0 = rho_0.reshape(m,1)
+
+#     profile = rho_0 / (1 + (r_range / rc)**2)**(3*beta/2)
+
+#     return profile
+
+# # ------------------------------------------------------------------------------
+# # End of profile_beta()
+# # ------------------------------------------------------------------------------
+
+# def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
+#                           rho_x=None):
+#     '''
+#     Return a beta profile with mass m_x inside r_range <= r_x
+
+#         rho[r] =  rho_c[m_x, rc, r_x] / (1 + ((r/r_x)/rc)^2)^(beta / 2)
+
+#     and a power law outside
+
+#         rho[r] = rho_x (r/r_x)^(-gamma)
+
+#     rho_c is determined by the mass of the profile.
+
+#     Parameters
+#     ----------
+#     r_range : (m,r) array
+#       array containing r_range for each m
+#     m_x : (m,) array
+#       array containing masses to match at r_x
+#     r_x : (m,) array
+#       x overdensity radius to match m_x at, in units of r_range
+#     rc : (m,) array
+#       physical core radius of beta profile in as a fraction
+#     beta : (m,) array
+#       power law slope of profile
+#     r_y : (m,) array
+#       radius out to which power law holds
+#     gamma : (m,) array
+#       power law index
+
+#     Returns
+#     -------
+#     profile : (m,r) array
+#       array containing beta profile
+#     '''
+#     m = m_x.shape[0]
+
+#     # analytic enclosed mass inside r_x gives normalization rho_0
+#     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
+#                                                        5./2, -(r_x / rc)**2))
+
+#     rc = rc.reshape(m,1)
+#     beta = beta.reshape(m,1)
+#     r_x = r_x.reshape(m,1)
+#     m_x = m_x.reshape(m,1)
+#     r_y = r_y.reshape(m,1)
+#     rho_0 = rho_0.reshape(m,1)
+
+#     if rho_x is None:
+#         rho_x = profile_beta(r_x, m_x=m_x, r_x=r_x, rc=rc, beta=beta)
+
+#     rho_x = rho_x.reshape(m,1)
+#     profile = np.zeros_like(r_range)
+#     for idx, r in enumerate(r_range):
+#         # create slices for the different profiles
+#         sl_beta = (r <= r_x[idx])
+#         sl_plaw = ((r > r_x[idx]) & (r <= r_y[idx]))
+#         sl_uni = (r > r_y[idx])
+#         profile[idx][sl_beta] = rho_0[idx] / (1 + (r[sl_beta] / rc[idx])**2)**(3*beta[idx]/2)
+#         profile[idx][sl_plaw] = rho_x[idx] * (r[sl_plaw]/r_x[idx])**(-gamma[idx])
+#         profile[idx][sl_uni] = rho_x[idx] * (r_y[idx] / r_x[idx])**(-gamma[idx])
+
+#     return profile
+
+# # ------------------------------------------------------------------------------
+# # End of profile_beta_plaw_uni()
+# # ------------------------------------------------------------------------------
+
+# def profile_beta_plaw_uni_k(k_range, fgas500c, rc, beta, gamma):
+#     '''
+#     Calculate 
+#     '''
+#     r_range = np.logspace(-2, 1, 200)
+
+#     return
+
+# # ------------------------------------------------------------------------------
+# # End of profile_beta_plaw_uni_k()
+# # ------------------------------------------------------------------------------
+
+###################################
+# Functions to interpolate tables #
+###################################
+
+def c200c_cosmo_interp(c_file=table_dir + "c200c_correa_cosmo.asdf"):
+    '''
+    Return the interpolator for the given file
+    '''
+    af = asdf.open(c_file)
+
+    s8 = af.tree["sigma8"][:]
+    om = af.tree["omegam"][:]
+    ov = af.tree["omegav"][:]
+    n = af.tree["n"][:]
+    h = af.tree["h"][:]
+    
+    z = af.tree["z"][:]
+    m = af.tree["m200c"][:]
+    c = af.tree["c200c"][:]
+
+    coords = (s8, om, ov, n, h, z, np.log10(m))
+    c_interp = interp.RegularGridInterpolator(coords, c)
+
+    return c_interp
+
+# ------------------------------------------------------------------------------
+# End of c200c_cosmo_interp()
+# ------------------------------------------------------------------------------
+
+def c200c_interp(c_file=table_dir + "c200c_correa.asdf"):
+    '''
+    Return the interpolator for the given file
+    '''
+    af = asdf.open(c_file)
+
+    z = af.tree["z"][:]
+    m = af.tree["m200c"][:]
+    c = af.tree["c200c"][:]
+
+    coords = (z, np.log10(m))
+
+    c_interp = interp.RegularGridInterpolator(coords, c)
+
+    return c_interp
+
+# ------------------------------------------------------------------------------
+# End of c200c_interp()
+# ------------------------------------------------------------------------------
+
+def c200m_cosmo_interp(c_file=table_dir + "c200m_correa_cosmo.asdf"):
+    '''
+    Return the interpolator for the given file
+    '''
+    af = asdf.open(c_file)
+
+    s8 = af.tree["sigma8"][:]
+    om = af.tree["omegam"][:]
+    ov = af.tree["omegav"][:]
+    n = af.tree["n"][:]
+    h = af.tree["h"][:]
+    
+    z = af.tree["z"][:]
+    m = af.tree["m200m"][:]
+    c = af.tree["c200m"][:]
+
+    coords = (s8, om, ov, n, h, z, np.log10(m))
+    c_interp = interp.RegularGridInterpolator(coords, c)
+
+    return c_interp
+
+# ------------------------------------------------------------------------------
+# End of c200m_cosmo_interp()
+# ------------------------------------------------------------------------------
+
+def c200m_interp(c_file=table_dir + "c200m_correa.asdf"):
+    '''
+    Return the interpolator for the c200m(m200m) relation
+    '''
+    af = asdf.open(c_file)
+
+    z = af.tree["z"][:]
+    m = af.tree["m200m"][:]
+    c = af.tree["c200m"][:]
+
+    coords = (z, np.log10(m))
+
+    c_interp = interp.RegularGridInterpolator(coords, c)
+
+    return c_interp
+    
+# ------------------------------------------------------------------------------
+# End of c200m_interp()
+# ------------------------------------------------------------------------------
+
