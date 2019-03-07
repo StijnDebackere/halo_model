@@ -958,9 +958,3 @@ def r_fb_from_f(f_b, cosmo, **kwargs):
         r_fb = np.inf
 
     return r_fb
-
-
-
-
-
-

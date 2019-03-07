@@ -24,8 +24,7 @@ class Power(cache.Cache):
     -------
 
     '''
-    def __init__(self, m200m_dmo, m200m_obs,
-                 prof=density.Profile(),
+    def __init__(self, m200m_dmo, m200m_obs, prof,
                  hmf_prms={'transfer_fit': 'FromFile',
                            'transfer_options': {'fname': 'camb/wmap9_transfer_out.dat'},
                            'mf_fit': 'Tinker10',

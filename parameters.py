@@ -74,7 +74,8 @@ class Parameters(Cache):
       mean matter density of the universe
 
     '''
-    def __init__(self, m500c,
+    def __init__(self,
+                 m500c,
                  m200m_dmo=None,
                  # r_min needs to be low in order to get correct masses from
                  # integration
@@ -90,10 +91,7 @@ class Parameters(Cache):
                  z=0.):
         super(Parameters, self).__init__()
         self.m500c = m500c
-        if m200m_dmo is None:
-            self.m200m_dmo = tools.m500c_to_m200m_duffy(m500c, cosmo.rho_crit, cosmo.rho_m)
-        else:
-            self.m200m_dmo = m200m_dmo
+        # self.m200m_dmo = m200m_dmo
         self.r_min = r_min
         self.r_bins = r_bins
         self.k_min = k_min
@@ -109,9 +107,9 @@ class Parameters(Cache):
     def m500c(self, val):
         return val
 
-    @parameter
-    def m200m_dmo(self, val):
-        return val
+    # @parameter
+    # def m200m_dmo(self, val):
+    #     return val
 
     @parameter
     def r_min(self, val):
@@ -151,22 +149,22 @@ class Parameters(Cache):
     def r500c(self):
         return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
-    @cached_property('m200m_dmo', 'cosmo')
-    def r200m_dmo(self):
-        return tools.mass_to_radius(self.m200m_dmo, self.cosmo.rho_m * 200)
+    # @cached_property('m200m_dmo', 'cosmo')
+    # def r200m_dmo(self):
+    #     return tools.mass_to_radius(self.m200m_dmo, self.cosmo.rho_m * 200)
 
 
-    @cached_property('m500c', 'cosmo')
-    def m200m(self):
-        return tools.m500c_to_m200m_duffy(self.m500c, self.cosmo.rho_crit,
-                                          self.cosmo.rho_m)
+    # @cached_property('m500c', 'cosmo')
+    # def m200m(self):
+    #     return tools.m500c_to_m200m_duffy(self.m500c, self.cosmo.rho_crit,
+    #                                       self.cosmo.rho_m)
 
-    @cached_property('m200m', 'cosmo')
-    def c200m(self):
-        '''
-        The density profiles always assume cosmology dependent variables
-        '''
-        return tools.c_duffy(self.m200m).reshape(-1)
+    # @cached_property('m200m', 'cosmo')
+    # def c200m(self):
+    #     '''
+    #     The density profiles always assume cosmology dependent variables
+    #     '''
+    #     return tools.c_duffy(self.m200m).reshape(-1)
 
     # @cached_property('m200m', 'cosmo')
     # def r200m(self):
@@ -211,6 +209,8 @@ class Parameters(Cache):
     def k_range(self):
         return np.logspace(self.k_min, self.k_max, self.k_bins)
 
+    @cached_property()
+
     @cached_property('sigma_8', 'H0', 'omegab', 'omegac', 'omegav', 'n')
     def cosmo_prms(self):
         return {
@@ -228,6 +228,8 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
+
+
 prms1 = Parameters(m500c=np.logspace(11,12,101), k_min=-1.)
 prms2 = Parameters(m500c=np.logspace(12,13,101), k_min=-1.)
 prms3 = Parameters(m500c=np.logspace(13,14,101), k_min=-1.)

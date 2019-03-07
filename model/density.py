@@ -20,7 +20,7 @@ import pdb
 class Profile(cache.Cache):
     '''
     An object containing all relevant information for a density
-    profile rho(r|m)
+    profile rho(r|m,z)
 
     Parameters
     ----------
@@ -70,21 +70,17 @@ class Profile(cache.Cache):
     '''
     defaults = {}
     # this will indicate indices where taylor_err is exceeded for each m_h
-    def __init__(self, cosmo=p.prms.cosmo,
+    def __init__(self, cosmo, r_h, profile, profile_mass,
                  r_min=p.prms.r_min,
-                 r_h=p.prms.r200m_dmo,
+                 # r_h=p.prms.r200m_dmo,
                  r_bins=p.prms.r_bins,
                  k_range=p.prms.k_range,
                  z=p.prms.z,
-                 profile=profs.profile_NFW,
-                 profile_args={'m_x': p.prms.m200m_dmo,
-                               'c_x': tools.c_duffy(p.prms.m200m_dmo),
-                               'r_x': p.prms.r200m_dmo},
-                 profile_mass=tools.m_NFW,
-                 profile_f=profs.profile_NFW_f,
-                 profile_f_args={'m_x': p.prms.m200m_dmo,
-                                 'c_x': tools.c_duffy(p.prms.m200m_dmo),
-                                 'r_x': p.prms.r200m_dmo},
+                 # profile=profs.profile_NFW,
+                 profile_args=None,
+                 # profile_mass=tools.m_NFW,
+                 profile_f=None,
+                 profile_f_args=None,
                  n=84,
                  taylor_err=1e-50,
                  extrap=True,
@@ -152,39 +148,39 @@ class Profile(cache.Cache):
                        extrap=self.extrap,
                        cpus=self.cpus)
 
-    def __sub__(self, other):
-        if not np.allclose(self.r_min, other.r_min):
-            raise AttributeError('Profiles need same r_min')
-        if not np.allclose(self.r_h, other.r_h):
-            raise AttributeError('Profiles need same r_h')
-        if not np.allclose(self.r_bins, other.r_bins):
-            raise AttributeError('Profiles need same r_bins')
-        if not np.allclose(self.k_range, other.k_range):
-            raise AttributeError('Profiles need same k_range')
-        if not np.allclose(self.z, other.z):
-            raise AttributeError('Profiles need same z')
+    # def __sub__(self, other):
+    #     if not np.allclose(self.r_min, other.r_min):
+    #         raise AttributeError('Profiles need same r_min')
+    #     if not np.allclose(self.r_h, other.r_h):
+    #         raise AttributeError('Profiles need same r_h')
+    #     if not np.allclose(self.r_bins, other.r_bins):
+    #         raise AttributeError('Profiles need same r_bins')
+    #     if not np.allclose(self.k_range, other.k_range):
+    #         raise AttributeError('Profiles need same k_range')
+    #     if not np.allclose(self.z, other.z):
+    #         raise AttributeError('Profiles need same z')
 
-        profile_args = tools.merge_dicts(self.profile_args, other.profile_args)
-        profile_mass = (lambda r, **kwargs: self.profile_mass(r, **self.profile_args) -
-                        other.profile_mass(r, **other.profile_args))
-        profile = self.rho_r - other.rho_r
-        profile_f = self.rho_k - other.rho_k
+    #     profile_args = tools.merge_dicts(self.profile_args, other.profile_args)
+    #     profile_mass = (lambda r, **kwargs: self.profile_mass(r, **self.profile_args) -
+    #                     other.profile_mass(r, **other.profile_args))
+    #     profile = self.rho_r - other.rho_r
+    #     profile_f = self.rho_k - other.rho_k
 
-        return Profile(cosmo=self.cosmo,
-                       r_min=self.r_min,
-                       r_h=self.r_h,
-                       r_bins=self.r_bins,
-                       k_range=self.k_range,
-                       z=self.z,
-                       profile=profile,
-                       profile_args=profile_args,
-                       profile_mass=profile_mass,
-                       profile_f=profile_f,
-                       profile_f_args=None,
-                       n=self.n,
-                       taylor_err=self.taylor_err,
-                       extrap=self.extrap,
-                       cpus=self.cpus)
+    #     return Profile(cosmo=self.cosmo,
+    #                    r_min=self.r_min,
+    #                    r_h=self.r_h,
+    #                    r_bins=self.r_bins,
+    #                    k_range=self.k_range,
+    #                    z=self.z,
+    #                    profile=profile,
+    #                    profile_args=profile_args,
+    #                    profile_mass=profile_mass,
+    #                    profile_f=profile_f,
+    #                    profile_f_args=None,
+    #                    n=self.n,
+    #                    taylor_err=self.taylor_err,
+    #                    extrap=self.extrap,
+    #                    cpus=self.cpus)
 
     #===========================================================================
     # Parameters
@@ -499,8 +495,9 @@ class Profile(cache.Cache):
         c_n = np.power(-1,n_arr) * Fn
 
         # need (k,n+1) array for exponent
-        k_range = np.longdouble(self.k_range).reshape(k_s,1)
-        k_n = np.power(np.tile(k_range, (1,n_s+1)), (2 * n_arr))
+        k_n = np.power(np.tile(np.longdouble(self.k_range).reshape(k_s,1),
+                               (1,n_s+1)),
+                       (2 * n_arr))
 
         # need to match n terms and sum over them
         # result is (k,m) array -> transpose

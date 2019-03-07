@@ -23,6 +23,19 @@ import halo.model.power as power
 import halo.data.data as d
 
 import pdb
+import cProfile
+
+def do_cprofile(func):
+    def profiled_func(*args, **kwargs):
+        profile = cProfile.Profile()
+        try:
+            profile.enable()
+            result = func(*args, **kwargs)
+            profile.disable()
+            return result
+        finally:
+            profile.print_stats(sort='cumtime')
+    return profiled_func
 
 # ------------------------------------------------------------------------------
 # Definition of different matter components
@@ -746,69 +759,35 @@ def m500c_to_m200m_dmo(m500c, r500c, f_gas500c, f_c, cosmo):
 # End of m500c_to_m200m_dmo()
 # ----------------------------------------------------------------------
 
-# @np.vectorize
-# def m500c_to_m200m_dmo_vel(m500c, r500c, f_gas500c, f_c, cosmo):
-#     '''
-#     For a given measured halo mass, radius and gas fraction, compute the
-#     corresponding DMO equivalent mass taking into account the stellar
-#     contribution from HOD modeling
+def m200m_dmo(m500c, r500c, f_gas500c, f_c, cosmo):
+    '''
+    Return interpolated m200m_dmo(m500c) relation
 
-#     Parameters
-#     ----------
-#     m500c : float or array
-#       halo masses
-#     r500c : float or array
-#       corresponding halo radii
-#     f_gas500c : float or array
-#       corresponding measured gas fractions
-#     f_c : float or array
-#       ratio between the satellite and DMO halo concentration
-#     cosmo : dict
-#       cosmology parameters
+    Parameters
+    ----------
+    m500c : float or array
+      halo mass
+    cosmo : dict
+      dictionary with cosmological parameters
+    f_c : float
+      ratio between the satellite and DMO halo concentration
+    r_flat : float or None
+      values where gas profile goes flat in units of r500c,
+      if None, r200m_obs will be assumed
+    q_f : int
+      quantile for which to compute the f_gas,500c relation
+    q_rc : int
+      quantile for which to fit r_c
+    q_beta : int
+      quantile for which to fit beta
 
-#     Returns
-#     -------
-#     m500c_dmo : float or array
-#       resulting DMO equivalent halo masses
-#     '''
-#     def m_diff(m200m_dmo):
-#         # for a given halo mass, we know the matching
-#         # mass ratio
-#         A_m = -0.1077
-#         B_m = 0.1077
-#         C_m = -13.5715
-#         D_m = 0.2786
+    Returns
+    -------
+    m200m_dmo : DMO equivalent halo mass for each halo
+    '''
 
-#         m_ratio_vel = A_m + B_m / (1 + np.exp(-(np.log10(m200m_dmo) + C_m) / D_m))
-#         m200m_obs = (np.power(10, m_ratio_vel) * m200m_dmo)
-#         c200m_dmo = tools.c_duffy(m200m_dmo).reshape(-1)
-#         r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * cosmo.rho_m)
 
-#         # this give stellar fraction & concentration
-#         f_cen500c = d.f_stars(m200m_dmo / 0.7, 'cen') * m200m_dmo / m500c
-#         f_sat200m = d.f_stars(m200m_dmo / 0.7, 'sat')
-
-#         # which allows us to compute the stellar fraction at r500c
-#         f_sat500c = dp.m_NFW(r500c, m_x=f_sat200m*m200m_dmo, c_x=f_c*c200m_dmo,
-#                             r_x=r200m_dmo) / m500c
-
-#         # this is NOT m500c for our DMO halo, this is our DMO halo
-#         # evaluated at r500c for the observations, which when scaled
-#         # should match the observed m500c
-#         m_dmo_r500c = dp.m_NFW(r500c, m_x=m200m_dmo, c_x=c200m_dmo, r_x=r200m_dmo)
-
-#         m500c_cor = m_dmo_r500c * ((1 - cosmo.omegab / cosmo.omegam) /
-#                                    (1 - f_gas500c - f_cen500c - f_sat500c))
-
-#         return m500c_cor - m500c
-
-#     m200m_dmo = opt.brentq(m_diff, m500c / 10., 10. * m500c)
-#     return m200m_dmo
-
-# # ----------------------------------------------------------------------
-# # End of m500c_to_m200m_dmo_vel()
-# # ----------------------------------------------------------------------
-
+@do_cprofile
 def load_gamma(prms, r_max,
                gamma=np.array([2.]),
                r_flat=np.array([None]),
