@@ -5,8 +5,10 @@ import scipy.special as spec
 import scipy.integrate as intg
 import multiprocessing as multi
 import asdf
+from copy import copy
 
 import halo.tools as tools
+import halo.input.initialize as init
 
 
 import sys
@@ -28,17 +30,26 @@ else:
 
 m200c = np.logspace(0, 17, 100)
 m200m = np.logspace(1, 17, 100)
+m500c = np.logspace(1, 16, 100)
 
 z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
-sigma8 = np.linspace(0.821 - 0.02, 0.821 + 0.02, 3)
-omegam = np.linspace(0.2793 - 0.02, 0.2793 + 0.02, 3)
-omegav = np.linspace(0.7207 - 0.02, 0.7207 + 0.02, 3)
-n = np.linspace(0.972 - 0.02, 0.972 + 0.02, 3)
-h = np.linspace(0.7 - 0.04, 0.7 + 0.04, 3)
+
+cosmo = init.default["parameters"]["cosmology"]
+sigma8 = np.linspace(cosmo["sigma8"] - 0.02, cosmo["sigma8"] + 0.02, 3)
+omegam = np.linspace(cosmo["omegam"] - 0.02, cosmo["omegam"] + 0.02, 3)
+omegab = cosmo["omegab"]
+omegav = np.linspace(cosmo["omegav"] - 0.02, cosmo["omegav"] + 0.02, 3)
+n = np.linspace(cosmo["n"] - 0.02, cosmo["n"] + 0.02, 3)
+h = np.linspace(cosmo["h"] - 0.02, cosmo["h"] + 0.02, 3)
 
 ###############################################
 # Tools for table and interpolation functions #
 ###############################################
+
+@np.vectorize
+def optimize(func, a, b, *args):
+    result = opt.brentq(func, a, b, args=args)
+    return result
 
 def convert_cosmo_commah(cosmo):
     """
@@ -76,6 +87,23 @@ def arrays_to_coords(*xi):
 # ------------------------------------------------------------------------------
 # End of arrays_to_coords()
 # ------------------------------------------------------------------------------
+
+def arrays_to_ogrid(*xi):
+    '''
+    Return an ordered list of arrays reshaped to an ogrid
+    '''
+    n = len(xi)
+
+    shape = [1,] * n
+
+    ogrid = []
+    for i, x in enumerate(xi):
+        s = copy(shape)
+        s[i] = -1
+        s = tuple(s)
+        ogrid.append(x.reshape(s))
+
+    return ogrid
 
 ##############################
 # Functions to create tables #
@@ -704,6 +732,113 @@ def table_c200m_correa_cosmo(m200m=m200m,
 
 # ------------------------------------------------------------------------------
 # End of table_c200m_correa_cosmo()
+# ------------------------------------------------------------------------------
+
+def table_m500c_to_m200m_dmo(m500c=m500c,
+                             z=z,
+                             f500c=np.linspace(0, 1, 100),
+                             sigma8=sigma8,
+                             omegam=omegam,
+                             omegab=omegab,
+                             omegav=omegav,
+                             n=n,
+                             h=h,
+                             fname="m500c_to_m200m_dmo.asdf",
+                             cpus=None):
+    '''
+    Create a table that computes the DMO equivalent halo mass given the observations
+    m500c & f500c
+    '''
+    
+    
+    def m_diff(m200m_dmo, f500c, c200m, z, sigma8, omegam, omegab, omegav, n, h):
+        # for a given halo mass, we know the concentration
+        c200m_dmo = c200m([sigma8, omegam, omegav, n, h, z, m200m_dmo])
+        r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
+
+        # this is NOT m500c for our DMO halo, this is our DMO halo
+        # evaluated at r500c for the observations, which when scaled
+        # should match the observed m500c
+        m_dmo_r500c = m_NFW(r500c, c200m_dmo, r200m_dmo, omegam * rhoc, Delta=200)
+
+        m500c_cor = m_dmo_r500c * (1 - cosmo.omegab / cosmo.omegam) / (1 - f500c)
+
+        return m500c_cor - m500c
+
+    # --------------------------------------------------
+    def calc_m_diff(procn, m500c, r500c, f500c, c200m, sigma8, omegam, omegab,
+                    omegav, n, h, out_q):
+        m200m_dmo = optimize(m_diff, m500c, 10. * m500c,
+                             args=(f500c, c200m, sigma8, omegam, omegab, omegav, n, h))
+
+        out_q.put([procn, m200m_dmo])
+
+    # --------------------------------------------------
+    if cpus == None:
+        cpus = multi.cpu_count()
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    # reshape variables to match shapes
+    sigma8_r, omegam_r, omegav_r, n_r, h_r, z_r, m500c_r, f500c_r = arrays_to_ogrid(sigma8,
+                                                                                    omegam,
+                                                                                    omegav,
+                                                                                    n, h, z,
+                                                                                    m500c,
+                                                                                    f500c)
+    fb_500c = f500c_r * omegab / omegam_r
+
+    # set background densities
+    rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
+    
+    r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
+    
+    m500c_split = np.array_split(m500c_r, cpus, axis=-1)
+    r500c_split = np.array_split(r500c_r, cpus, axis=-1)
+    c200m_cosmo = c200m_cosmo_interp(c_file=table_dir + "c200m_correa_cosmo.asdf")
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i, m500c_split[i], r500c_split[i],
+                                      c200m_cosmo, sigma8_r, omegam_r, omegab,
+                                      omegav_r, n_r, h_r, out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    m200m_dmo = np.concatenate([item[1] for item in results], axis=-1)
+
+    result_info = {
+        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z",
+                          "m500c", "f_500c", "m200m_dmo"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegab": omegab,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m500c": m500c,
+        "f500c": f_500c,
+        "m200m_dmo": m200m_dmo
+    }
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + fname)
+    af.close()
+
+    return result_info
+
+# ------------------------------------------------------------------------------
+# End of table_m500c_to_m200m_dmo()
 # ------------------------------------------------------------------------------
 
 # def extrapolate_plaw(x_range, func, verbose=False):

@@ -37,6 +37,7 @@ default = {
         "z_bins": 16,
         # cosmology
         "cosmology": {
+            "sigma8": 0.821,
             "omegam": 0.2973,
             "omegac": 0.233,
             "omegab": 0.0463,
