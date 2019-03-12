@@ -49,10 +49,10 @@ h = np.linspace(cosmo["h"] - 0.02, cosmo["h"] + 0.02, 3)
 
 @np.vectorize
 def optimize(func, a, b, *args):
-    t1 = time.time()
+    # t1 = time.time()
     result = opt.brentq(func, a, b, args=args)
-    t2 = time.time()
-    print(t2 - t1)
+    # t2 = time.time()
+    # print(t2 - t1)
     return result
 
 def convert_cosmo_commah(cosmo):
@@ -772,6 +772,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # --------------------------------------------------
     def calc_m_diff(procn, m500c, r500c, f500c, c200m, z, sigma8, omegam, omegab,
                     omegav, n, h, out_q):
+        print(procn)
         m200m_dmo = optimize(m_diff, m500c, 10. * m500c,
                              *(m500c, r500c, f500c, c200m, z, sigma8, omegam,
                                omegab, omegav, n, h))
@@ -786,12 +787,13 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     out_q = manager.Queue()
 
     # reshape variables to match shapes
-    sigma8_r, omegam_r, omegav_r, n_r, h_r, z_r, m500c_r, f500c_r = arrays_to_ogrid(sigma8,
-                                                                                    omegam,
-                                                                                    omegav,
-                                                                                    n, h, z,
-                                                                                    m500c,
-                                                                                    f500c)
+    (sigma8_r, omegam_r, omegav_r,
+     n_r, h_r, z_r, m500c_r, f500c_r) = arrays_to_ogrid(sigma8,
+                                                        omegam,
+                                                        omegav,
+                                                        n, h, z,
+                                                        m500c,
+                                                        f500c)
     fb_500c = f500c_r * omegab / omegam_r
 
     # set background densities
@@ -799,8 +801,8 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     
     r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
     
-    m500c_split = np.array_split(m500c_r, cpus, axis=-1)
-    r500c_split = np.array_split(r500c_r, cpus, axis=-1)
+    m500c_split = np.array_split(m500c_r, cpus, axis=-2)
+    r500c_split = np.array_split(r500c_r, cpus, axis=-2)
     c200m_cosmo = c200m_cosmo_interp(c_file=table_dir + "c200m_correa_cosmo.asdf")
 
     procs = []
