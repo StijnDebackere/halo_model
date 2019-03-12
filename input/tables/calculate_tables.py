@@ -6,6 +6,7 @@ import scipy.integrate as intg
 import multiprocessing as multi
 import asdf
 from copy import copy
+import time
 
 import halo.tools as tools
 import halo.input.initialize as init
@@ -751,9 +752,10 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     '''
     
     
-    def m_diff(m200m_dmo, f500c, c200m, z, sigma8, omegam, omegab, omegav, n, h):
+    def m_diff(m200m_dmo, m500c, r500c, f500c, c200m,
+               z, sigma8, omegam, omegab, omegav, n, h):
         # for a given halo mass, we know the concentration
-        c200m_dmo = c200m([sigma8, omegam, omegav, n, h, z, m200m_dmo])
+        c200m_dmo = c200m(np.array([sigma8, omegam, omegav, n, h, z, np.log10(m200m_dmo)]))
         r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
 
         # this is NOT m500c for our DMO halo, this is our DMO halo
@@ -761,15 +763,15 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         # should match the observed m500c
         m_dmo_r500c = m_NFW(r500c, c200m_dmo, r200m_dmo, omegam * rhoc, Delta=200)
 
-        m500c_cor = m_dmo_r500c * (1 - cosmo.omegab / cosmo.omegam) / (1 - f500c)
-
+        m500c_cor = m_dmo_r500c * (1 - omegab / omegam) / (1 - f500c)
         return m500c_cor - m500c
 
     # --------------------------------------------------
-    def calc_m_diff(procn, m500c, r500c, f500c, c200m, sigma8, omegam, omegab,
+    def calc_m_diff(procn, m500c, r500c, f500c, c200m, z, sigma8, omegam, omegab,
                     omegav, n, h, out_q):
         m200m_dmo = optimize(m_diff, m500c, 10. * m500c,
-                             args=(f500c, c200m, sigma8, omegam, omegab, omegav, n, h))
+                             *(m500c, r500c, f500c, c200m, z, sigma8, omegam,
+                               omegab, omegav, n, h))
 
         out_q.put([procn, m200m_dmo])
 
@@ -800,9 +802,10 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
 
     procs = []
     for i in range(cpus):
-        process = multi.Process(target=c_cosmo,
+        process = multi.Process(target=calc_m_diff,
                                 args=(i, m500c_split[i], r500c_split[i],
-                                      c200m_cosmo, sigma8_r, omegam_r, omegab,
+                                      fb_500c, c200m_cosmo, z_r,
+                                      sigma8_r, omegam_r, omegab,
                                       omegav_r, n_r, h_r, out_q))
 
         procs.append(process)
