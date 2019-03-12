@@ -49,7 +49,10 @@ h = np.linspace(cosmo["h"] - 0.02, cosmo["h"] + 0.02, 3)
 
 @np.vectorize
 def optimize(func, a, b, *args):
+    t1 = time.time()
     result = opt.brentq(func, a, b, args=args)
+    t2 = time.time()
+    print(t2 - t1)
     return result
 
 def convert_cosmo_commah(cosmo):
