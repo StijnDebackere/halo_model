@@ -11,7 +11,6 @@ example.
 import numpy as np
 import scipy.special as spec
 import scipy.optimize as opt
-import pyfftw
 
 import matplotlib.pyplot as plt
 
