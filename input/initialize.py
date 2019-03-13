@@ -38,7 +38,7 @@ default = {
         # cosmology
         "cosmology": {
             "sigma8": 0.821,
-            "omegam": 0.2973,
+            "omegam": 0.2793,
             "omegac": 0.233,
             "omegab": 0.0463,
             "omegav": 0.7207,

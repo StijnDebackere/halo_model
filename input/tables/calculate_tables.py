@@ -758,7 +758,10 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     def m_diff(m200m_dmo, m500c, r500c, f500c, c200m,
                z, sigma8, omegam, omegab, omegav, n, h):
         # for a given halo mass, we know the concentration
-        c200m_dmo = c200m(np.array([sigma8, omegam, omegav, n, h, z, np.log10(m200m_dmo)]))
+        try:
+            c200m_dmo = c200m(np.array([sigma8, omegam, omegav, n, h, z, np.log10(m200m_dmo)]))
+        except ValueError:
+            print(np.array([sigma8, omegam, omegav, n, h, z, np.log10(m200m_dmo)]))
         r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
 
         # this is NOT m500c for our DMO halo, this is our DMO halo
@@ -772,8 +775,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # --------------------------------------------------
     def calc_m_diff(procn, m500c, r500c, f500c, c200m, z, sigma8, omegam, omegab,
                     omegav, n, h, out_q):
-        print(procn)
-        m200m_dmo = optimize(m_diff, m500c, 10. * m500c,
+        m200m_dmo = optimize(m_diff, m500c, 5. * m500c,
                              *(m500c, r500c, f500c, c200m, z, sigma8, omegam,
                                omegab, omegav, n, h))
 
@@ -800,15 +802,19 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
     
     r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
-    
+
+    # otherwise the code gets upset when passing empty arrays to optimize
+    if cpus > m500c.shape[0]:
+        cpus = m500c.shape[0]
+
     m500c_split = np.array_split(m500c_r, cpus, axis=-2)
     r500c_split = np.array_split(r500c_r, cpus, axis=-2)
     c200m_cosmo = c200m_cosmo_interp(c_file=table_dir + "c200m_correa_cosmo.asdf")
 
     procs = []
-    for i in range(cpus):
+    for i, (mi, ri) in enumerate(zip(m500c_split, r500c_split)):
         process = multi.Process(target=calc_m_diff,
-                                args=(i, m500c_split[i], r500c_split[i],
+                                args=(i, mi, ri,
                                       fb_500c, c200m_cosmo, z_r,
                                       sigma8_r, omegam_r, omegab,
                                       omegav_r, n_r, h_r, out_q))
@@ -817,12 +823,12 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         process.start()
 
     results = []
-    for i in range(cpus):
+    for i in range(len(m500c_split)):
         results.append(out_q.get())
 
     # need to sort results
     results.sort()
-    m200m_dmo = np.concatenate([item[1] for item in results], axis=-1)
+    m200m_dmo = np.concatenate([item[1] for item in results], axis=-2)
 
     result_info = {
         "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z",
@@ -835,7 +841,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         "h": h,
         "z": z,
         "m500c": m500c,
-        "f500c": f_500c,
+        "f500c": f500c,
         "m200m_dmo": m200m_dmo
     }
 
