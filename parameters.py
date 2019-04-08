@@ -8,9 +8,10 @@ add methods to Parameters docstring
 
 import numpy as np
 import scipy.interpolate as interp
-import halo.hmf as hmf
+import hmf
 
 import halo.tools as tools
+import halo.cosmo as cosmo
 from halo.model._cache import Cache, cached_property, parameter
 
 import pdb
@@ -81,13 +82,13 @@ class Parameters(Cache):
                  # integration
                  r_min=-4, r_bins=1000,
                  k_min=-1.8, k_max=2., k_bins=1000,
-                 cosmo=hmf.cosmo.Cosmology(**{'sigma_8': 0.821,
-                                              'H0': 70.0,
-                                              'omegab': 0.0463,
-                                              'omegac': 0.233,
-                                              'omegam': 0.0463 + 0.233,
-                                              'omegav': 0.7207,
-                                              'n': 0.972}),
+                 cosmo=cosmo.Cosmology(**{'sigma_8': 0.821,
+                                          'H0': 70.0,
+                                          'omegab': 0.0463,
+                                          'omegac': 0.233,
+                                          'omegam': 0.0463 + 0.233,
+                                          'omegav': 0.7207,
+                                          'n': 0.972}),
                  z=0.):
         super(Parameters, self).__init__()
         self.m500c = m500c
@@ -208,8 +209,6 @@ class Parameters(Cache):
     @cached_property('k_min', 'k_max', 'k_bins')
     def k_range(self):
         return np.logspace(self.k_min, self.k_max, self.k_bins)
-
-    @cached_property()
 
     @cached_property('sigma_8', 'H0', 'omegab', 'omegac', 'omegav', 'n')
     def cosmo_prms(self):

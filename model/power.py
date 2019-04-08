@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import halo.hmf as hmf
+import hmf
+from astropy.cosmology import WMAP9
 import halo.tools as tools
 from halo.tools import Integrate
 import halo.model._cache as cache
@@ -25,13 +26,10 @@ class Power(cache.Cache):
 
     '''
     def __init__(self, m200m_dmo, m200m_obs, prof,
-                 hmf_prms={'transfer_fit': 'FromFile',
-                           'transfer_options': {'fname': 'camb/wmap9_transfer_out.dat'},
-                           'mf_fit': 'Tinker10',
-                           'cut_fit': False,
-                           'delta_h': 200.,
-                           'delta_wrt': 'mean',
-                           'delta_c': 1.686},
+                 hmf_prms={'transfer_model': hmf.transfer_models.FromFile,
+                           'transfer_params': {'fname': 'camb/wmap9_transfer_out.dat'},
+                           'cosmo_model': WMAP9,
+                           'hmf_model': hmf.fitting_functions.Tinker08},
                  bar2dmo=True):
         super(Power, self).__init__()
         self.m200m_dmo = m200m_dmo
@@ -48,10 +46,12 @@ class Power(cache.Cache):
         self.cosmo = prof.cosmo
         self.bar2dmo = bar2dmo
 
-        self.hmf_prms = tools.merge_dicts(prof.cosmo.cosmo_dict, hmf_prms)
+        self.hmf_prms = tools.merge_dicts(prof.cosmo.astropy_dict, hmf_prms)
+        self.hmf_prms['n'] = prof.cosmo.n
+        self.hmf_prms['sigma_8'] = prof.cosmo.sigma_8
         self.hmf_prms['lnk_min'] = np.log(np.min(self.k_range))
         self.hmf_prms['lnk_max'] = np.log(np.max(self.k_range))
-        self.hmf_prms['k_bins'] = self.k_range.shape[0]
+        self.hmf_prms['dlnk'] = np.log(self.k_range[1]) - np.log(self.k_range[0])
         self.hmf_prms['z'] = prof.z
         # m_range needs to be m200m_dmo
         # self.hmf_prms['m_range'] = prof.m200m
@@ -114,9 +114,9 @@ class Power(cache.Cache):
     def m_fn(self):
         hmf_prms = self.hmf_prms
         if self.bar2dmo:
-            hmf_prms['m_range'] = self.m200m_dmo
+            hmf_prms['m'] = self.m200m_dmo
         else:
-            hmf_prms['m_range'] = self.m200m_obs
+            hmf_prms['m'] = self.m200m_obs
 
         m_fn = hmf.MassFunction(**hmf_prms)
         return m_fn

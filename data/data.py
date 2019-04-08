@@ -76,11 +76,11 @@ def read_croston():
     # n_gas = (2 + 3Y/(4X)) / (1 + Y/(2X)) n_e
     # => n_gas = 1.93 n_e
     # calculate correct mu factor for Z metallicity gas
-    n2rho = 1.93 * 0.6 * const.m_p.cgs * 1/u.cm**3 # in cgs
+    n2rho = (1.93 * 0.6 * const.m_p.cgs * 1/u.cm**3).value # [g/cm^3]
     # change to ``cosmological'' coordinates
-    cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
-    rho =  [(ne * n2rho * cgs2cos).value for ne in n]
-    rho_err = [(ne * n2rho * cgs2cos).value for ne in n_err]
+    cgs2cos = ((1e6 * const.pc.cgs)**3 / const.M_sun.cgs).value
+    rho =  [(ne * n2rho * cgs2cos) for ne in n]
+    rho_err = [(ne * n2rho * cgs2cos) for ne in n_err]
 
     mgas = np.empty((0,), dtype=float)
     m500gas = np.empty((0,), dtype=float)
@@ -129,12 +129,13 @@ def read_croston():
     data = {'m500gas': mgas,
             'r500': r500,
             'rx': rx,
-            'rho': rho}
+            'rho': rho,
+            'rho_err': rho_err}
 
     with open('data/croston.p', 'wb') as f:
         pickle.dump(data, f)
 
-    return m500gas, r500, rx, rho
+    return m500gas, r500, rx, rho, rho_err
 
 # ------------------------------------------------------------------------------
 # End of read_croston()
@@ -184,8 +185,8 @@ def read_eckert():
     # n_He = Y/(4X) n_H
     # n_gas = 2 + 3Y/(4X) n_H
     # => n_gas = 2.26 n_H
-    n2rho = 2.26 * 0.6 * const.m_p.cgs * 1./u.cm**3 # [cm^-3]
-    cgs2cos = (1e6 * const.pc.cgs)**3 / const.M_sun.cgs
+    n2rho = (2.26 * 0.6 * const.m_p.cgs * 1./u.cm**3).value # [cm^-3]
+    cgs2cos = ((1e6 * const.pc.cgs)**3 / const.M_sun.cgs).value
 
     r500 = np.empty((0,), dtype=float)
     z = np.empty((0,), dtype=float)
@@ -267,12 +268,13 @@ def read_eckert():
     data = {'m500gas': mgas,
             'r500': r500,
             'rx': rx,
-            'rho': rho}
+            'rho': rho,
+            'rho_err': rho_err}
 
     with open('data/eckert.p', 'wb') as f:
         pickle.dump(data, f)
 
-    return m500gas, r500, rx, rho
+    return m500gas, r500, rx, rho, rho_err
 
 # ------------------------------------------------------------------------------
 # End of read_eckert()
@@ -288,7 +290,7 @@ def bin_eckert(n=10):
       number of bins
     '''
     # these are all assuming h_70!!
-    m500g, r500, rx, rho = read_eckert()
+    m500g, r500, rx, rho, rho_err = read_eckert()
 
     # number of points to mass bin
     n_m = n + 1 # bin edges, not centers -> +1
@@ -364,7 +366,7 @@ def fit_croston():
     Fit profiles to the observations
     '''
     # these are all assuming h_70!
-    m500g, r500, rx, rho = read_croston()
+    m500g, r500, rx, rho, rho_err = read_croston()
 
     # we need to plug in the 0.7^2
     m500 = tools.radius_to_mass(r500, 500 * p.prms.cosmo.rho_crit * 0.7**2)
@@ -373,10 +375,8 @@ def fit_croston():
     a = np.empty((0,), dtype=float)
     b = np.empty((0,), dtype=float)
     m_sl = np.empty((0,), dtype=float)
-    # c = np.empty((0,), dtype=float)
     aerr = np.empty((0,), dtype=float)
     berr = np.empty((0,), dtype=float)
-    # cerr = np.empty((0,), dtype=float)
     for idx, prof in enumerate(rho):
         sl = ((prof > 0) & (rx[idx] >= 0.15) & (rx[idx] <= 1.))
         sl_500 = ((prof > 0) & (rx[idx] <= 1.))
@@ -391,14 +391,11 @@ def fit_croston():
         # need to match
         sl_fit = np.ones(sl.sum(), dtype=bool)
         popt, pcov = opt.curve_fit(lambda r, a, b: \
-                                   # , c:\
                                    prof_gas_hot(r, sl_fit, a, b,
-                                                # , c, \
                                                 mass, r500[idx]),
-                                   # r[sl], prof[sl], bounds=([0, 0, 0.5],
-                                   #                          [1, 5, 10]))
-                                   r[sl], prof[sl], bounds=([0, 0],
-                                                            [1, 5]))
+                                   r[sl], prof[sl],
+                                   sigma=rho_err[idx][sl],
+                                   bounds=([0, 0], [1, 5]))
 
         # print('f_gas,500c_actual :', m500g[idx] / m500[idx])
         # print('f_gas,500c_fitted :', m500gas / m500[idx])
@@ -418,10 +415,8 @@ def fit_croston():
         a = np.append(a, popt[0])
         b = np.append(b, popt[1])
         m_sl = np.append(m_sl, m500gas)
-        # c = np.append(c, popt[2])
         aerr = np.append(aerr, np.sqrt(np.diag(pcov))[0])
         berr = np.append(berr, np.sqrt(np.diag(pcov))[1])
-        # cerr = np.append(cerr, np.sqrt(np.diag(pcov)))[2]
 
     return a, aerr, b, berr, m_sl, m500g, r500 # c, cerr, m500g
 
@@ -431,8 +426,8 @@ def fit_croston():
 
 def fit_eckert():
     # these are all assuming h_70!!
-    rx, rho, rho_std, m500g, r500 = bin_eckert()
-    # m500g, r500, rx, rho = read_eckert()
+    # rx, rho, rho_std, m500g, r500 = bin_eckert()
+    m500g, r500, rx, rho, rho_err = read_eckert()
 
     # we need to plug in the 0.7^2
     m500 = tools.radius_to_mass(r500, 500 * p.prms.cosmo.rho_crit * 0.7**2)
@@ -441,10 +436,8 @@ def fit_eckert():
     a = np.empty((0,), dtype=float)
     b = np.empty((0,), dtype=float)
     m_sl = np.empty((0,), dtype=float)
-    # c = np.empty((0,), dtype=float)
     aerr = np.empty((0,), dtype=float)
     berr = np.empty((0,), dtype=float)
-    # cerr = np.empty((0,), dtype=float)
     for idx, prof in enumerate(rho):
         sl = ((prof > 0) & (rx[idx] >= 0.15) & (rx[idx] <= 1.))
         sl_500 = ((prof > 0) & (rx[idx] <= 1.))
@@ -454,28 +447,33 @@ def fit_eckert():
         # Determine different profile masses
         mass = tools.m_h(prof[sl], r[sl] * r500[idx])
         m500gas = tools.m_h(prof[sl_500], r[sl_500] * r500[idx])
-        # print 'm_gas500_actual/m_gas500_fit - 1 =', (m500g - m500gas) / m500gas
-        # print 'f_gas,500c_actual :', m500g / m500[idx]
-        # print 'f_gas,500c_fitted :', m500gas / m500[idx]
-        # print '-------------------'
 
         # Need to perform the fit for [0.15,1] r500c -> mass within this region
         # need to match
         sl_fit = np.ones(sl.sum(), dtype=bool)
+        print(rho[idx])
+        print(rho_err[idx])
         popt, pcov = opt.curve_fit(lambda r, a, b: \
-                                   # , c:\
-                                   prof_gas_hot(r, sl_fit, a, b, # , c,
+                                   prof_gas_hot(r, sl_fit, a, b,
                                                 mass, r500[idx]),
-                                   # r[sl], prof[sl], bounds=([0, 0, 0.5],
-                                   #                          [1, 5, 10]))
-                                   r[sl], prof[sl], bounds=([0, 0],
-                                                            [1, 5]))
+                                   r[sl], prof[sl],
+                                   sigma=rho_err[idx][sl],
+                                   bounds=([0, 0], [1, 5]))
 
-        # plt.clf()
+        # prof_fit = prof_gas_hot(r, sl_500, popt[0], popt[1],
+        #                         m500gas, r500[idx])
+        # mass_fit = tools.m_h(prof_fit[sl_500], r[sl_500])
+        # print(mass_fit / m500gas)
+        # print('-------------------')
+
+        # print('f_gas,500c_actual :', m500g[idx] / m500[idx])
+        # print('f_gas,500c_fitted :', m500gas / m500[idx])
+        # print('m_gas,500c_fitted / m_gas,500c_actual', m500gas / m500g[idx])
+        # print('-------------------')
         # plt.plot(r, prof, label='obs')
         # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # popt[2],
         #                          m500gas, r500[idx]),
-        #          label='fit')
+        #          label=r'$r_c={:.2f}, \beta={:.2f}$'.format(popt[0],popt[1]))
         # plt.title('%i'%idx)
         # plt.xscale('log')
         # plt.yscale('log')
@@ -486,10 +484,8 @@ def fit_eckert():
         a = np.append(a, popt[0])
         b = np.append(b, popt[1])
         m_sl = np.append(m_sl, m500gas)
-        # c = np.append(c, popt[2])
         aerr = np.append(aerr, np.sqrt(np.diag(pcov))[0])
         berr = np.append(berr, np.sqrt(np.diag(pcov))[1])
-        # cerr = np.append(cerr, np.sqrt(np.diag(pcov))[2])
 
     return a, aerr, b, berr, m_sl, m500g, r500 # c, cerr, m500g
 

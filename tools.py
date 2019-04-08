@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import scipy.integrate
 from scipy.special import hyp2f1, factorial
 import scipy.optimize as opt
-from . import commah
+# import commah
 
 import pdb
 

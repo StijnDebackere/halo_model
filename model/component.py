@@ -1,5 +1,5 @@
 import numpy as np
-import halo.hmf as hmf
+import hmf
 import scipy.special as spec
 import halo.density_profiles as profs
 import halo.parameters as p

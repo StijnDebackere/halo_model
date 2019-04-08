@@ -9,7 +9,7 @@ import mpmath as mp
 from scipy.special import factorial
 import warnings
 
-import halo.hmf as hmf
+import hmf
 import halo.tools as tools
 import halo.parameters as p
 import halo.density_profiles as profs

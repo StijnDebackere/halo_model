@@ -13,7 +13,7 @@ from copy import deepcopy
 sys.path.append('~/Documents/Leiden/MR/code')
 import plot as pl
 
-import halo.hmf as hmf
+import hmf
 import halo.parameters as p
 import halo.tools as tools
 import halo.density_profiles as dp
@@ -785,9 +785,9 @@ def m200m_dmo(m500c, r500c, f_gas500c, f_c, cosmo):
     -------
     m200m_dmo : DMO equivalent halo mass for each halo
     '''
+    pass
 
-
-@do_cprofile
+# @do_cprofile
 def load_gamma(prms, r_max,
                gamma=np.array([2.]),
                r_flat=np.array([None]),

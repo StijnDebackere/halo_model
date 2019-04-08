@@ -1,0 +1,38 @@
+components:
+  dm:
+    c_dm: null
+    delta: 500
+    delta_ref: crit
+    f_dm: null
+    profile: &id001 !!python/name:halo.density_profiles.profile_NFW ''
+  gas:
+    beta: null
+    delta: 500
+    delta_ref: crit
+    f_gas: null
+    profile: !!python/name:halo.density_profiles.profile_beta_plaw_uni ''
+    rc: null
+  stars:
+    cen:
+      f_cen: null
+      profile: !!python/name:halo.density_profiles.profile_delta ''
+    sat:
+      c_sat: null
+      f_sat: null
+      profile: *id001
+parameters:
+  cosmology:
+    n: 0.972
+    omegab: 0.0463
+    omegac: 0.233
+    omegam: 0.2973
+    omegav: 0.7207
+  logk_bins: 101
+  logk_max: 2.0
+  logk_min: -1.8
+  logm_bins: 101
+  logm_max: 15
+  logm_min: 11
+  z_bins: 16
+  z_max: 4
+  z_min: 0
