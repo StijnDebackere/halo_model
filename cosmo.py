@@ -159,7 +159,6 @@ class Cosmology(object):
             if kwargs["omegam"] != (kwargs["omegab"] + kwargs["omegac"]) / self.h ** 2:
                 raise ValueError("Inconsistent arguments: omegam_h2, omegac_h2, omegab")
 
-        print(kwargs.items())
         # # NOW SET THE VALUES
         for k, val in kwargs.items():
             if k in ["omegab", "omegac", "omegab_h2", "omegac_h2",
