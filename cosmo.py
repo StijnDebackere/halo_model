@@ -1,3 +1,5 @@
+import pdb
+
 class Cosmology(object):
     """
     A class that nicely deals with cosmological parameters.
@@ -71,13 +73,13 @@ class Cosmology(object):
 
     """
     rho_crit = 2.7763458 * (10.0**11.0)
-    def __init__(self, default="planck1_base", force_flat=False, **kwargs):
+    def __init__(self, default="wmap9_nobao", force_flat=False, **kwargs):
         # This gets the Cache system working
         super(Cosmology, self).__init__()
 
         # Map the 'default' cosmology to its dictionary
-        if default == "planck1_base":
-            self.__base = dict(planck1_base, **extras)
+        if default == "wmap9_nobao":
+            self.__base = dict(wmap9_nobao, **extras)
 
         # Set some simple parameters
         self.force_flat = force_flat
@@ -97,6 +99,7 @@ class Cosmology(object):
     def cosmo_update(self, **kwargs):
         # First update the base
         self.__update_base()
+
         #=======================================================================
         # Set the "easy" values (no dependence on anything else)
         #=======================================================================
@@ -141,8 +144,6 @@ class Cosmology(object):
         if "omegac" in kwargs and "omegac_h2" in kwargs:
             if kwargs["omegac"] != kwargs["omegac_h2"] * self.h ** 2:
                 raise ValueError("Inconsistent arguments: omegac and omegac_h2")
-            else:
-                del kwargs["omegac"]
 
         if "omegab" in kwargs and "omegac_h2" in kwargs:
             raise ValueError("Inconsistent arguments: omegab and omegac_h2")
@@ -153,15 +154,12 @@ class Cosmology(object):
         if "omegab" in kwargs and "omegac" in kwargs and "omegam" in kwargs:
             if kwargs["omegam"] != kwargs["omegab"] + kwargs["omegac"]:
                 raise ValueError("Inconsistent arguments: omegam, omegac, omegab")
-            else:
-                del kwargs["omegam"]
 
         if "omegab_h2" in kwargs and "omegac_h2" in kwargs and "omegam" in kwargs:
             if kwargs["omegam"] != (kwargs["omegab"] + kwargs["omegac"]) / self.h ** 2:
                 raise ValueError("Inconsistent arguments: omegam_h2, omegac_h2, omegab")
-            else:
-                del kwargs["omegam"]
 
+        print(kwargs.items())
         # # NOW SET THE VALUES
         for k, val in kwargs.items():
             if k in ["omegab", "omegac", "omegab_h2", "omegac_h2",
@@ -197,14 +195,17 @@ class Cosmology(object):
 
             elif "omegab_h2" in kwargs and "omegam" in kwargs:
                 self.omegac_h2 = self.omegam * self.h ** 2 - self.omegab_h2
+                self.omegam = self.omegam
 
             elif "omegab_h2" in kwargs and "omegav" in kwargs:
                 if self.force_flat:
                     self.omegam = 1 - self.omegav
+                    self.omegav = omegav
                     self.omegac_h2 = self.omegam * self.h ** 2 - self.omegab_h2
 
             elif "omegac_h2" in kwargs and "omegam" in kwargs:
                 self.omegab_h2 = self.omegam * self.h ** 2 - self.omegac_h2
+                self.omegam = self.omegam
 
             elif "omegac_h2" in kwargs and "omegav" in kwargs:
                 if self.force_flat:
@@ -217,6 +218,7 @@ class Cosmology(object):
 
             elif "omegab" in kwargs and "omegam" in kwargs:
                 self.omegac = self.omegam - self.omegab
+                self.omegam = self.omegam
                 self.omegab_h2 = self.omegab * self.h ** 2
                 self.omegac_h2 = self.omegac * self.h ** 2
 
@@ -229,6 +231,7 @@ class Cosmology(object):
 
             elif "omegac" in kwargs and "omegam" in kwargs:
                 self.omegab = self.omegam - self.omegac
+                self.omegam = self.omegam
                 self.omegab_h2 = self.omegab * self.h ** 2
                 self.omegac_h2 = self.omegac * self.h ** 2
 
@@ -245,6 +248,7 @@ class Cosmology(object):
                 self.omegab_h2 = self.__base["omegab_h2"]
                 self.omegab = self.omegab_h2 / self.h ** 2
                 self.omegac = self.omegam - self.omegab
+                self.omegam = self.omegam
                 self.omegac_h2 = self.omegac * self.h ** 2
 
 
@@ -415,3 +419,13 @@ planck1_base = {"omegab_h2"   : 0.022068,
                 "sigma_8":0.8344,
                 "n":0.9624,
                 }
+
+wmap9_nobao = {'sigma_8': 0.821,
+               'H0': 70.0,
+               'z_reion': 10.6,
+               'tau': 0.089,
+               'omegab': 0.0463,
+               'omegac': 0.233,
+               'omegam': 0.0463 + 0.233,
+               'omegav': 0.7207,
+               'n': 0.972}
