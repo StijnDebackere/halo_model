@@ -274,7 +274,7 @@ def read_eckert():
     with open('data/eckert.p', 'wb') as f:
         pickle.dump(data, f)
 
-    return m500gas, r500, rx, rho, rho_err
+    return m500gas, m500, r500, rx, rho, rho_err
 
 # ------------------------------------------------------------------------------
 # End of read_eckert()
@@ -290,7 +290,7 @@ def bin_eckert(n=10):
       number of bins
     '''
     # these are all assuming h_70!!
-    m500g, r500, rx, rho, rho_err = read_eckert()
+    m500g, m500, r500, rx, rho, rho_err = read_eckert()
 
     # number of points to mass bin
     n_m = n + 1 # bin edges, not centers -> +1
@@ -427,7 +427,7 @@ def fit_croston():
 def fit_eckert():
     # these are all assuming h_70!!
     # rx, rho, rho_std, m500g, r500 = bin_eckert()
-    m500g, r500, rx, rho, rho_err = read_eckert()
+    m500g, m500, r500, rx, rho, rho_err = read_eckert()
 
     # we need to plug in the 0.7^2
     m500 = tools.radius_to_mass(r500, 500 * p.prms.cosmo.rho_crit * 0.7**2)
@@ -628,7 +628,7 @@ def mgas_to_m500c(mgas500, cosmo, q=50):
 # ------------------------------------------------------------------------------
 # End of mgas_to_m500c()
 # ------------------------------------------------------------------------------
-
+    
 def f_gas_prms(cosmo, q=50, bias=False):
     '''
     Compute best fit parameters to the f_gas(m500c) relation with both f_gas and
@@ -636,12 +636,14 @@ def f_gas_prms(cosmo, q=50, bias=False):
     '''
     if bias == False:
         m500_obs, f_obs = np.loadtxt(ddir +
-                                     'data_mccarthy/gas/M500_fgas_BAHAMAS_data.dat',
+                                     'data_mccarthy/gas/m500_fgas_hydrostatic.dat',
                                      unpack=True)
+
     else:
         m500_obs, f_obs = np.loadtxt(ddir +
-                                     'data_mccarthy/gas/M500_fgas_bias_corrected.dat',
+                                     'data_mccarthy/gas/m500_fgas_bias_corrected.dat',
                                      unpack=True)
+        
 
     n_m = 15
 

@@ -5,18 +5,16 @@ TODO
 add methods to Parameters docstring
 
 '''
-
 import numpy as np
 import scipy.interpolate as interp
-import hmf
+import halo.hmf as hmf
 
 import halo.tools as tools
 import halo.cosmo as cosmo
-from halo.model._cache import Cache, cached_property, parameter
 
 import pdb
 
-class Parameters(Cache):
+class Parameters(object):
     '''
     An object containing all parameters for the halo model.
 
@@ -80,8 +78,8 @@ class Parameters(Cache):
                  m200m_dmo=None,
                  # r_min needs to be low in order to get correct masses from
                  # integration
-                 r_min=-4, r_bins=1000,
-                 k_min=-1.8, k_max=2., k_bins=1000,
+                 r_min=-4, r_bins=500,
+                 k_min=-1.8, k_max=2., k_bins=500,
                  cosmo=cosmo.Cosmology(**{'sigma_8': 0.821,
                                           'H0': 70.0,
                                           'omegab': 0.0463,
@@ -101,99 +99,54 @@ class Parameters(Cache):
         self.cosmo = cosmo
         self.z = z
 
-    #===========================================================================
-    # Parameters
-    #===========================================================================
-    @parameter
-    def m500c(self, val):
-        return val
-
-    # @parameter
-    # def m200m_dmo(self, val):
-    #     return val
-
-    @parameter
-    def r_min(self, val):
-        return val
-
-    @parameter
-    def r_bins(self, val):
-        return val
-
-    @parameter
-    def k_min(self, val):
-        return val
-
-    @parameter
-    def k_max(self, val):
-        return val
-
-    @parameter
-    def k_bins(self, val):
-        return val
-
-    @parameter
-    def cosmo(self, val):
-        return val
-
-    @parameter
-    def z(self, val):
-        if val >= 0:
-            return val
-        else:
-            raise ValueError('z needs to be >= 0')
-
-    #===========================================================================
-    # Methods
-    #===========================================================================
-    @cached_property('m500c', 'cosmo')
+    @property
     def r500c(self):
         return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
-    # @cached_property('m200m_dmo', 'cosmo')
+    # @property
     # def r200m_dmo(self):
     #     return tools.mass_to_radius(self.m200m_dmo, self.cosmo.rho_m * 200)
 
 
-    # @cached_property('m500c', 'cosmo')
+    # @property
     # def m200m(self):
     #     return tools.m500c_to_m200m_duffy(self.m500c, self.cosmo.rho_crit,
     #                                       self.cosmo.rho_m)
 
-    # @cached_property('m200m', 'cosmo')
+    # @property
     # def c200m(self):
     #     '''
     #     The density profiles always assume cosmology dependent variables
     #     '''
     #     return tools.c_duffy(self.m200m).reshape(-1)
 
-    # @cached_property('m200m', 'cosmo')
+    # @property
     # def r200m(self):
     #     return tools.mass_to_radius(self.m200m, self.cosmo.rho_m * 200)
 
-    # @cached_property('m200m', 'cosmo')
+    # @property
     # def m200c(self):
     #     return np.array([tools.m200m_to_m200c_correa(m, self.cosmo.rho_crit,
     #                                                  self.cosmo.rho_m,
     #                                                  self.cosmo.h)
     #                      for m in self.m200m])
 
-    # @cached_property('m200c', 'cosmo')
+    # @property
     # def r200c(self):
     #     return tools.mass_to_radius(self.m200c, 200 * self.cosmo.rho_crit)
 
-    # @cached_property('m200m', 'cosmo', 'm200c')
+    # @property
     # def m500c(self):
     #     return np.array([tools.m200m_to_m500c_correa(mm, self.cosmo.rho_crit,
     #                                                  self.cosmo.rho_m,
     #                                                  self.cosmo.h, mc)
     #                      for mm, mc in zip(self.m200m, self.m200c)])
 
-    # @cached_property('m500c', 'cosmo')
+    # @property
     # def r500c(self):
     #     return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
-    # @cached_property('m200c', 'cosmo', 'r200c', 'r200m')
+    # @property
     # def c200m(self):
     #     '''
     #     The density profiles always assume cosmology dependent variables
@@ -202,15 +155,15 @@ class Parameters(Cache):
     #                      for m in self.m200c]).reshape(-1)
     #             * self.r200m / self.r200c)
 
-    @cached_property('k_min', 'k_max', 'k_bins')
+    @property
     def dlnk(self):
         return np.log(10) * (self.k_max - self.k_min)/np.float(self.k_bins)
 
-    @cached_property('k_min', 'k_max', 'k_bins')
+    @property
     def k_range(self):
         return np.logspace(self.k_min, self.k_max, self.k_bins)
 
-    @cached_property('sigma_8', 'H0', 'omegab', 'omegac', 'omegav', 'n')
+    @property
     def cosmo_prms(self):
         return {
             "sigma_8": self.sigma_8,
@@ -227,8 +180,6 @@ class Parameters(Cache):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-
-
 prms1 = Parameters(m500c=np.logspace(11,12,101), k_min=-1.)
 prms2 = Parameters(m500c=np.logspace(12,13,101), k_min=-1.)
 prms3 = Parameters(m500c=np.logspace(13,14,101), k_min=-1.)

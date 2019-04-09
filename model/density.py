@@ -1,6 +1,5 @@
 '''
 TO-DO -> add z_range support to profile as new axis
-      -> try adding FFTlog for FT computation
 '''
 import multiprocessing
 
@@ -9,15 +8,14 @@ import mpmath as mp
 from scipy.special import factorial
 import warnings
 
-import hmf
+import halo.hmf as hmf
 import halo.tools as tools
 import halo.parameters as p
 import halo.density_profiles as profs
-import halo.model._cache as cache
 
 import pdb
 
-class Profile(cache.Cache):
+class Profile(object):
     '''
     An object containing all relevant information for a density
     profile rho(r|m,z)
@@ -183,73 +181,6 @@ class Profile(cache.Cache):
     #                    cpus=self.cpus)
 
     #===========================================================================
-    # Parameters
-    #===========================================================================
-    @cache.parameter
-    def cosmo(self, val):
-        return val
-
-    @cache.parameter
-    def r_min(self, val):
-        return val
-
-    @cache.parameter
-    def r_h(self, val):
-        return val
-
-    @cache.parameter
-    def r_bins(self, val):
-        return val
-
-    @cache.parameter
-    def k_range(self, val):
-        return val
-
-    @cache.parameter
-    def z(self, val):
-        return val
-
-    @cache.parameter
-    def n(self, val):
-        if val <= (170-1)/2.:
-            return val
-        # elif val == None:
-        else:
-            raise ValueError('n will result in (2n+1)! > 170! -> Overflow')
-
-    @cache.parameter
-    def taylor_err(self, val):
-        return val
-
-    @cache.parameter
-    def extrap(self, val):
-        return val
-
-    @cache.parameter
-    def cpus(self, val):
-        return val
-
-    @cache.parameter
-    def profile(self, val):
-        return val
-
-    @cache.parameter
-    def profile_args(self, val):
-        return val
-
-    @cache.parameter
-    def profile_mass(self, val):
-        return val
-
-    @cache.parameter
-    def profile_f(self, val):
-        return val
-
-    @cache.parameter
-    def profile_f_args(self, val):
-        return val
-
-    #===========================================================================
     # Methods
     #===========================================================================
     def m_r(self, r):
@@ -258,7 +189,7 @@ class Profile(cache.Cache):
         '''
         return self.profile_mass(r, **self.profile_args)
 
-    @cache.cached_property('r_min', 'r_h', 'r_bins')
+    @property
     def r_range(self):
         '''
         Transform the radial range to physical units
@@ -271,14 +202,14 @@ class Profile(cache.Cache):
         return np.array([np.logspace(self.r_min, np.log10(rm), self.r_bins)
                          for rm in self.r_h])
 
-    @cache.cached_property('r_h')
+    @property
     def m_h(self):
         '''
         Return total mass in the halo
         '''
         return self.m_r(self.r_h)
 
-    @cache.cached_property('r_range', 'r_h','profile', 'profile_args')
+    @property
     def rho_r(self):
         '''
         Computes the density profile either by calling the function with its args,
@@ -317,8 +248,7 @@ class Profile(cache.Cache):
         else:
             return dens_profile
 
-    @cache.cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'm_h',
-                           'taylor_err', 'profile_f', 'profile_f_args', 'rho_k_T')
+    @property
     def rho_k(self):
         '''
         Computes the Fourier profile either by calling the
@@ -444,7 +374,7 @@ class Profile(cache.Cache):
 
         return taylor_coefs
 
-    @cache.cached_property('rho_r', 'n', 'r_range', 'k_range', 'r_h')
+    @property
     def F_n(self):
         '''
         Computes the Taylor coefficients in the Fourier expansion:
@@ -469,8 +399,7 @@ class Profile(cache.Cache):
 
         return F_n
 
-    @cache.cached_property('rho_r', 'n', 'F_n', 'r_range', 'k_range', 'r_h',
-                           'taylor_err', 'extrap')
+    @property
     def rho_k_T(self):
         '''
         Computes the Fourier transform of the density profile, using a Taylor
@@ -528,19 +457,3 @@ class Profile(cache.Cache):
         # u[nonnil] = u[nonnil] / u[nonnil,0].reshape(-1,1)
 
         return u
-
-    # # @cache.cached_property('rho_r', 'k_range', 'm_range')
-    # def rho_k_FFTW(self):
-    #     '''
-    #     Test FFTW speed for the FT
-    #     '''
-    #     rho_r = pyfftw.empty_aligned(m_range.shape + k_range.shape, dtpye=float)
-    #     rho_k = pyfftw.empty_aligned(m_range.shape + k_range.shape, dtpye=float)
-
-    #     # no axes -> goes over the last axis
-    #     fft_object = pyfftw.FFTW(rho_k, rho_k, threads=self.cpus)
-
-    #     rho_r[:] = self.rho_r
-    #     fft_object()
-
-    #     return rho_k

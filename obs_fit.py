@@ -13,7 +13,7 @@ from copy import deepcopy
 sys.path.append('~/Documents/Leiden/MR/code')
 import plot as pl
 
-import hmf
+import halo.hmf as hmf
 import halo.parameters as p
 import halo.tools as tools
 import halo.density_profiles as dp

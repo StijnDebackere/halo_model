@@ -1,15 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import hmf
+import halo.hmf as hmf
 from astropy.cosmology import WMAP9
 import halo.tools as tools
 from halo.tools import Integrate
-import halo.model._cache as cache
 import halo.model.density as density
 import pdb
 
-class Power(cache.Cache):
+class Power(object):
     '''
     Object containing info on the total matter power spectrum of all matter
     components. Components should have same range properties.
@@ -46,7 +45,8 @@ class Power(cache.Cache):
         self.cosmo = prof.cosmo
         self.bar2dmo = bar2dmo
 
-        self.hmf_prms = tools.merge_dicts(prof.cosmo.astropy_dict, hmf_prms)
+        self.hmf_prms = hmf_prms
+        self.hmf_prms['cosmo_params'] = prof.cosmo.astropy_dict
         self.hmf_prms['n'] = prof.cosmo.n
         self.hmf_prms['sigma_8'] = prof.cosmo.sigma_8
         self.hmf_prms['lnk_min'] = np.log(np.min(self.k_range))
@@ -56,61 +56,11 @@ class Power(cache.Cache):
         # m_range needs to be m200m_dmo
         # self.hmf_prms['m_range'] = prof.m200m
 
-    #===========================================================================
-    # Parameters
-    #===========================================================================
-    @cache.parameter
-    def m200m_dmo(self, val):
-        return val
-
-    @cache.parameter
-    def m200m_obs(self, val):
-        return val
-
-    @cache.parameter
-    def profile(self, val):
-        return val
-
-    @cache.parameter
-    def cosmo(self, val):
-        return val
-
-    @cache.parameter
-    def bar2dmo(self, val):
-        return val
-
-    @cache.parameter
-    def m_h(self, val):
-        return val
-
-    @cache.parameter
-    def k_nan(self, val):
-        return val
-
-    @cache.parameter
-    def k_range(self, val):
-        return val
-
-    @cache.parameter
-    def rho_k(self, val):
-        return val
-
-    @cache.parameter
-    def z(self, val):
-        return val
-
-    @cache.parameter
-    def hmf_prms(self, val):
-        return val
-
-    #===========================================================================
-    # Methods
-    #===========================================================================
-    @cache.cached_property('m_fn')
+    @property
     def rho_m(self):
-        return self.m_fn.rho_m
+        return self.cosmo.rho_m
 
-    @cache.cached_property('hmf_prms', 'cosmo', 'm200m_dmo', 'm200m_obs', 'bar2dmo')
+    @property
     def m_fn(self):
         hmf_prms = self.hmf_prms
         if self.bar2dmo:
@@ -121,29 +71,29 @@ class Power(cache.Cache):
         m_fn = hmf.MassFunction(**hmf_prms)
         return m_fn
 
-    @cache.cached_property('m_fn')
+    @property
     def p_lin(self):
         '''
         Return linear power spectrum
         '''
-        return np.exp(self.m_fn.power)
+        return self.m_fn.power
 
-    @cache.cached_property('p_lin', 'k_range')
+    @property
     def delta_lin(self):
         '''
         Return linear dimensionless power spectrum
         '''
         return 0.5 / np.pi**2 * self.k_range**3 * self.p_lin
 
-    # @cache.cached_property('m_fn', 'm200m_dmo')
+    # @property
     # def dndm(self):
     #     return self.m_fn.dndm
 
-    @cache.cached_property('m_fn')
+    @property
     def dndm(self):
         return self.m_fn.dndm
 
-    @cache.cached_property('dndm', 'rho_m', 'm_h', 'rho_k')
+    @property
     def p_1h(self):
         '''
         Return the 1h power spectrum P_1h(k)
@@ -164,7 +114,7 @@ class Power(cache.Cache):
 
         return result
 
-    @cache.cached_property('p_1h', 'k_range')
+    @property
     def delta_1h(self):
         '''
         Return 1h dimensionless power
@@ -172,14 +122,14 @@ class Power(cache.Cache):
         return 0.5 / np.pi**2 * self.k_range**3 * self.p_1h
 
 
-    @cache.cached_property('p_1h', 'p_lin')
+    @property
     def p_tot(self):
         '''
         Return total power spectrum
         '''
         return self.p_lin + self.p_1h
 
-    @cache.cached_property('p_tot', 'k_range')
+    @property
     def delta_tot(self):
         '''
         Return total dimensionless power spectrum
