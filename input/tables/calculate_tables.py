@@ -732,7 +732,8 @@ def table_c200m_correa_cosmo(m200m=m200m,
 
 def table_m500c_to_m200m_dmo(m500c=m500c,
                              z=z,
-                             f500c=np.linspace(0, 1, 20),
+                             fg500c=np.linspace(0, 1, 20),
+                             f_c=0.86,
                              sigma8=0.821,
                              omegam=0.2793,
                              omegab=0.0463,
@@ -743,11 +744,11 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
                              cpus=None):
     '''
     Create a table that computes the DMO equivalent halo mass given the observations
-    m500c & f500c
+    m500c & fg500c
     '''
     
     
-    def m_diff(m200m_dmo, m500c, r500c, f500c, c200m, z):
+    def m_diff(m200m_dmo, m500c, r500c, fg500c, fs200m, fc500c, c200m, z):
         # for a given halo mass, we know the concentration
         try:
             c200m_dmo = c200m(np.array([z, np.log10(m200m_dmo)]))
@@ -755,21 +756,42 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
             print(np.array([z, np.log10(m200m_dmo)]))
         r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
 
+        # this give stellar fraction & concentration
+        fcen_500c = fc500c(m200m_dmo / 0.7) * m200m_dmo / m500c
+        fsat_200m = fs200m(m200m_dmo / 0.7)
+
+        # which allows us to compute the stellar fraction at r500c
+        fsat_500c = dp.m_NFW(r500c, m_x=fsat_200m*m200m_dmo, c_x=f_c*c200m_dmo,
+                             r_x=r200m_dmo) / m500c
+
         # this is NOT m500c for our DMO halo, this is our DMO halo
         # evaluated at r500c for the observations, which when scaled
         # should match the observed m500c
         m_dmo_r500c = dp.m_NFW_delta(r500c, c200m_dmo, r200m_dmo,
                                      omegam * rhoc, Delta=200)
 
-        m500c_cor = m_dmo_r500c * (1 - omegab / omegam) / (1 - f500c)
+        f500c = fg500c + fcen_500c + fsat_500c
+        fb = omegab / omegam
+        m500c_cor = m_dmo_r500c * (1 - fb) / (1 - f500c)
         return m500c_cor - m500c
 
     # --------------------------------------------------
-    def calc_m_diff(procn, m500c, r500c, f500c, c200m, z, out_q):
+    def calc_m_diff(procn, m500c, r500c, fg500c, fs200m,
+                    fc500c, c200m, z, out_q):
         m200m_dmo = optimize(m_diff, m500c, 5. * m500c,
-                             *(m500c, r500c, f500c, c200m, z))
+                             *(m500c, r500c, fg500c, fs200m,
+                               fc500c, c200m, z))
+        # now we have m200m_dmo, so we calculate again all the other
+        # resulting variables
+        c200m_dmo = c200m(np.array([z,m200m_dmo]))
+        r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
 
-        out_q.put([procn, m200m_dmo])
+        fcen_500c = fc500c(m200m_dmo / 0.7) * m200m_dmo / m500c
+        fsat_200m = fs200m(m200m_dmo / 0.7)
+        fsat_500c = dp.m_NFW(r500c, m_x=fsat_200m*m200m_dmo, c_x=f_c*c200m_dmo,
+                            r_x=r200m_dmo) / m500c
+        
+        out_q.put([procn, m200m_dmo, fcen_500c, fsat_500c])
 
     # --------------------------------------------------
     if cpus == None:
@@ -779,8 +801,10 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     out_q = manager.Queue()
 
     # reshape variables to match shapes
-    (z_r, m500c_r, f500c_r) = arrays_to_ogrid(z, m500c, f500c)
-    fb_500c = f500c_r * omegab / omegam
+    (z_r, m500c_r, fg500c_r) = arrays_to_ogrid(z, m500c, fg500c)
+    fgas_500c = fg500c_r * omegab / omegam
+    fcen_500c = d.f_stars_interp(comp="cen")
+    fsat_200m = d.f_stars_interp(comp="sat")
 
     # set background densities
     rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
@@ -798,8 +822,8 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     procs = []
     for i, (mi, ri) in enumerate(zip(m500c_split, r500c_split)):
         process = multi.Process(target=calc_m_diff,
-                                args=(i, mi, ri,
-                                      fb_500c, c200m, z_r, out_q))
+                                args=(i, mi, ri, fgas_500c, fsat_200m,
+                                      fcen_500c, c200m, z_r, out_q))
 
         procs.append(process)
         process.start()
@@ -811,9 +835,11 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # need to sort results
     results.sort()
     m200m_dmo = np.concatenate([item[1] for item in results], axis=-2)
+    fcen_500c = np.concatenate([item[2] for item in results], axis=-2)
+    fsat_500c = np.concatenate([item[3] for item in results], axis=-2)
 
     result_info = {
-        "dims": np.array(["z", "m500c", "f500c", "m200m_dmo"]),
+        "dims": np.array(["z", "m500c", "fg500c", "m200m_dmo"]),
         "sigma8": sigma8,
         "omegam": omegam,
         "omegab": omegab,
@@ -822,7 +848,9 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         "h": h,
         "z": z,
         "m500c": m500c,
-        "f500c": f500c,
+        "fgas_500c": fg500c,
+        "fcen_500c": fcen_500c,
+        "fsat_500c": fsat_500c,
         "m200m_dmo": m200m_dmo
     }
 
@@ -1062,6 +1090,7 @@ def table_m500c_to_m200m_obs(m500c=m500c,
 def table_m500c_fstar_500c(m500c=m500c,
                            z=z,
                            f500c=np.linspace(0, 1, 20),
+                           fgas500c=np.linspace
                            sigma8=0.821,
                            omegam=0.2793,
                            omegab=0.0463,
@@ -1098,15 +1127,20 @@ def table_m500c_fstar_500c(m500c=m500c,
     m200m_dmo = interp(m200m_dmo_interp(m_file=table_dir + "m500c_to_m200m_dmo.asdf"),
                        z, m500c, f500c)
 
-    # NEED TO RESHAPE m200m_dmo AND z TO FIT EXPECTATION OF c200m_interp
-    c200m_dmo = interp(c200m_interp(c_file=table_dir + "c200m_correa.asdf"),
-                       z, np.log10(m200m_dmo))
+    # m200m_dmo has higher dimensionality, need to fill z to match correctly
+    # then flatten and reshape final output
+    coords = np.vstack([np.tile(z.reshape(-1,1,1),
+                                (1,) + m200m_dmo.shape[1:]).flatten(),
+                        np.log10(m200m_dmo).flatten()]).T
+    c200m_dmo = c200m_interp(c_file=table_dir + "c200m_correa.asdf")(coords)
+    c200m_dmo = c200m_dmo.reshape(m200m_dmo.shape)
+    c200m_sat = f_c * c200m_dmo
     
-
-    fcen_500c = d.f_stars(m200m_dmo, comp='cen')
-    fsat_200m = d.f_stars(m200m_dmo, comp='sat')
+    # f_stars takes values in actual units with h=0.7!
+    # do not need to convert result, since independent of h in our model
+    fcen_500c = d.f_stars(m200m_dmo / 0.7, comp='cen')
+    fsat_200m = d.f_stars(m200m_dmo / 0.7, comp='sat')
     
-
     # set background density
     rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
 
@@ -1119,7 +1153,6 @@ def table_m500c_fstar_500c(m500c=m500c,
 
     m500c_split = np.array_split(m500c_r, cpus, axis=-2)
     r500c_split = np.array_split(r500c_r, cpus, axis=-2)
-    c200m = c200m_interp(c_file=table_dir + "c200m_correa.asdf")
 
     procs = []
     for i, (mi, ri) in enumerate(zip(m500c_split, r500c_split)):
