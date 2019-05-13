@@ -10,6 +10,7 @@ from copy import copy
 import time
 
 import halo.tools as tools
+import halo.data.data as d
 import halo.input.initialize as init
 import halo.density_profiles as dp
 
