@@ -758,7 +758,8 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         # this is NOT m500c for our DMO halo, this is our DMO halo
         # evaluated at r500c for the observations, which when scaled
         # should match the observed m500c
-        m_dmo_r500c = m_NFW(r500c, c200m_dmo, r200m_dmo, omegam * rhoc, Delta=200)
+        m_dmo_r500c = dp.m_NFW_delta(r500c, c200m_dmo, r200m_dmo,
+                                     omegam * rhoc, Delta=200)
 
         m500c_cor = m_dmo_r500c * (1 - omegab / omegam) / (1 - f500c)
         return m500c_cor - m500c
@@ -864,7 +865,8 @@ def table_m500c_to_m200m_dmo_cosmo(m500c=m500c,
         # this is NOT m500c for our DMO halo, this is our DMO halo
         # evaluated at r500c for the observations, which when scaled
         # should match the observed m500c
-        m_dmo_r500c = m_NFW(r500c, c200m_dmo, r200m_dmo, omegam * rhoc, Delta=200)
+        m_dmo_r500c = dp.m_NFW_delta(r500c, c200m_dmo, r200m_dmo,
+                                     omegam * rhoc, Delta=200)
 
         m500c_cor = m_dmo_r500c * (1 - omegab / omegam) / (1 - f500c)
         return m500c_cor - m500c
