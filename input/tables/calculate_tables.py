@@ -1090,7 +1090,6 @@ def table_m500c_to_m200m_obs(m500c=m500c,
 def table_m500c_fstar_500c(m500c=m500c,
                            z=z,
                            f500c=np.linspace(0, 1, 20),
-                           fgas500c=np.linspace
                            sigma8=0.821,
                            omegam=0.2793,
                            omegab=0.0463,
