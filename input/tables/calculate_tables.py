@@ -10,7 +10,6 @@ from copy import copy
 import time
 
 import halo.tools as tools
-import halo.data.data as d
 import halo.input.initialize as init
 import halo.density_profiles as dp
 
@@ -731,6 +730,50 @@ def table_c200m_correa_cosmo(m200m=m200m,
 # End of table_c200m_correa_cosmo()
 # ------------------------------------------------------------------------------
 
+def f_stars_interp(comp='all'):
+    '''
+    Return the stellar fraction interpolator as a function of halo mass as found 
+    by Zu & Mandelbaum (2015).
+
+    For m200m < 1e10 M_sun/h we return f_stars=0
+    For m200m > 1e16 M_sun/h we return f_stars=1.41e-2
+
+    THIS INTERPOLATOR ASSUMES h=0.7 FOR EVERYTHING!!
+
+    Returns
+    -------
+    f_stars : (m,) array [h_70^(-1)]
+      total stellar fraction for the halo mass
+    '''
+    comp_options = ['all', 'cen', 'sat']
+    if comp not in comp_options:
+        raise ValueError('comp needs to be in {}'.format(comp_options))
+
+    # m_h is in Hubble units
+    # all the fractions have assumed h=0.7
+    ddir = '/Users/stijn/Documents/MR/code/halo/data/'
+    fs_file = ddir + 'data_mccarthy/stars/StellarFraction-Mh.txt'
+    m_h, f_stars, f_cen, f_sat = np.loadtxt(fs_file, unpack=True)
+
+    # we need to convert the halo mass to h=0.7 as well
+    m_h = m_h / 0.7
+
+    if comp == 'all':
+        f_stars_interp = interp.interp1d(m_h, f_stars, bounds_error=False,
+                                         fill_value=(0,f_stars[-1]))
+    elif comp == 'cen':
+        f_stars_interp = interp.interp1d(m_h, f_cen, bounds_error=False,
+                                         fill_value=(0,f_cen[-1]))
+    else:
+        f_stars_interp = interp.interp1d(m_h, f_sat, bounds_error=False,
+                                         fill_value=(0,f_sat[-1]))
+
+    return f_stars_interp
+
+# ------------------------------------------------------------------------------
+# End of f_stars_interp()
+# ------------------------------------------------------------------------------
+
 def table_m500c_to_m200m_dmo(m500c=m500c,
                              z=z,
                              fg500c=np.linspace(0, 1, 20),
@@ -804,8 +847,8 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # reshape variables to match shapes
     (z_r, m500c_r, fg500c_r) = arrays_to_ogrid(z, m500c, fg500c)
     fgas_500c = fg500c_r * omegab / omegam
-    fcen_500c = d.f_stars_interp(comp="cen")
-    fsat_200m = d.f_stars_interp(comp="sat")
+    fcen_500c = f_stars_interp(comp="cen")
+    fsat_200m = f_stars_interp(comp="sat")
 
     # set background densities
     rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
