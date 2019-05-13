@@ -78,8 +78,8 @@ class Parameters(object):
                  m200m_dmo=None,
                  # r_min needs to be low in order to get correct masses from
                  # integration
-                 r_min=-4, r_bins=500,
-                 k_min=-1.8, k_max=2., k_bins=500,
+                 r_min=-4, r_bins=100,
+                 k_min=-1.8, k_max=2., k_bins=200,
                  cosmo=cosmo.Cosmology(**{'sigma_8': 0.821,
                                           'H0': 70.0,
                                           'omegab': 0.0463,

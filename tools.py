@@ -5,6 +5,7 @@ import multiprocessing
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.integrate
+from scipy.interpolate import interp1d
 from scipy.special import hyp2f1, factorial
 import scipy.optimize as opt
 # import commah
@@ -579,6 +580,38 @@ def radius_to_mass(r, mean_dens):
 
 # ------------------------------------------------------------------------------
 # End of radius_to_mass()
+# ------------------------------------------------------------------------------
+
+def sigma_from_rho(R, r_range, rho):
+    """
+    Project a 3-D density profile to a surface density profile.
+
+    Parameters
+    ----------
+    R : (R,) array
+        projected radii
+    r_range : (r,) array
+        radial range for the density profile
+    rho : (r,) array
+        density profile at r_range
+
+    Returns
+    -------
+    sigma : (R,) array
+        mass surface density from rho at R
+    """
+    sigma = np.zeros(R.shape)
+    for idx, r in enumerate(R):
+        rho_int = interp1d(r_range, rho)
+        # can neglect first part of integral since integrand converges to 0 there
+        r_int = np.logspace(np.log10(r + 1e-5), np.log10(r_range.max()), 150)
+        integrand = 2 * rho_int(r_int) * r_int / np.sqrt(r_int**2 - r**2)
+        sigma[idx] = Integrate(integrand, r_int)
+        
+    return sigma
+
+# ------------------------------------------------------------------------------
+# End of sigma_from_rho()
 # ------------------------------------------------------------------------------
 
 def m500c_Xray_from_m500c(m500c, cosmo, f_stars):
