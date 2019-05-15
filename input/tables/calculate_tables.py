@@ -751,7 +751,7 @@ def f_stars_interp(comp='all'):
 
     # m_h is in Hubble units
     # all the fractions have assumed h=0.7
-    fs_file = table_dir + 'observations/m200m_fcen_fstar.txt'
+    fs_file = table_dir + 'observations/m200m_fstar_fcen_fsat.txt'
     m_h, f_stars, f_cen, f_sat = np.loadtxt(fs_file, unpack=True)
 
     # we need to convert the halo mass to h=0.7 as well
