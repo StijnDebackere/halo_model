@@ -928,7 +928,9 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
                                                        5./2, -(r_x / rc)**2))
-    rho_x = rho_0 / (1 + (r_x / rc)**2)**(3*beta/2)
+    
+    if rho_x is None:
+        rho_x = rho_0 / (1 + (r_x / rc)**2)**(3*beta/2)
 
     rc = rc.reshape(m,1)
     beta = beta.reshape(m,1)
@@ -937,9 +939,6 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
     r_y = r_y.reshape(m,1)
     rho_0 = rho_0.reshape(m,1)
     rho_x = rho_x.reshape(m,1)
-
-    if rho_x is None:
-        rho_x = profile_beta(r_x, m_x=m_x, r_x=r_x, rc=rc, beta=beta)
 
     rho_x = rho_x.reshape(m,1)
     profile = np.zeros_like(r_range)
