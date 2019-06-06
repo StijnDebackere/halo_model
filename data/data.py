@@ -614,7 +614,8 @@ def f_gas(m, log10mc, a, cosmo):
       gas fraction at r500c for m
     '''
     x = np.log10(m) - log10mc
-    return (cosmo.omegab/cosmo.omegam) * (0.5 * (1 + np.tanh(x / a)))
+    # stellar fractions at r500c in clusters are ~1%
+    return (cosmo.omegab/cosmo.omegam - 0.015) * (0.5 * (1 + np.tanh(x / a)))
 
 # ------------------------------------------------------------------------------
 # End of f_gas()

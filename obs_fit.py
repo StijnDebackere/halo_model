@@ -427,7 +427,7 @@ def m_from_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, gamma,
                  'gamma': gamma,
                  'rho_x': rho_500c}
     m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw(r, **{k: v[sl] for k,v in
-                                                         gas_args.iteritems()})
+                                                         gas_args.items()})
 
     # ##### #
     # STARS #
@@ -445,9 +445,9 @@ def m_from_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, gamma,
                 'r_x': r200m_dmo}
 
     m_stars = lambda r, sl, **kwargs: (dp.m_delta(r, **{k: v[sl] for k,v in
-                                                        cen_args.iteritems()}) +
+                                                        cen_args.items()}) +
                                        dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                      sat_args.iteritems()}))
+                                                      sat_args.items()}))
 
     # ## #
     # DM #
@@ -461,7 +461,7 @@ def m_from_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, gamma,
                'r_x': prms.r500c}
 
     m_dm = lambda r, sl, **kwargs: dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                  dm_args.iteritems()})
+                                                  dm_args.items()})
 
     m_b = lambda r, sl, **kwargs: m_stars(r, sl) + m_gas(r, sl)
     m_tot = lambda r, sl, **kwargs: m_dm(r, sl) + m_stars(r, sl) + m_gas(r, sl)
@@ -499,13 +499,13 @@ def m_gas_model(prms, q_f, q_rc, q_beta, gamma, f_prms=None, r_flat=None,
         gas_args['gamma'] = gamma
         gas_args['rho_x'] = rho_500c
         m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw(r, **{k: v[sl] for k,v in
-                                                             gas_args.iteritems()})
+                                                             gas_args.items()})
     else:
         gas_args['r_y'] = r_flat * prms.r500c
         gas_args['gamma'] = gamma
         gas_args['rho_x'] = rho_500c
         m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw_uni(r, **{k: v[sl] for k,v in
-                                                                 gas_args.iteritems()})
+                                                                 gas_args.items()})
 
     return m_gas
 
@@ -533,9 +533,9 @@ def m_stars_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, f_c=0.86):
                 'r_x': r200m_dmo}
 
     m_stars = lambda r, sl, **kwargs: (dp.m_delta(r, **{k: v[sl] for k,v in
-                                                        cen_args.iteritems()}) +
+                                                        cen_args.items()}) +
                                        dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                      sat_args.iteritems()}))
+                                                      sat_args.items()}))
 
     return m_stars
 
@@ -557,7 +557,7 @@ def m_dm_model(prms, m200m_dmo, r200m_dmo, c200m_dmo,
                'r_x': prms.r500c}
 
     m_dm = lambda r, sl, **kwargs: dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                  dm_args.iteritems()})
+                                                  dm_args.items()})
 
     return m_dm
 
@@ -705,8 +705,8 @@ def gamma_max(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50, q_rc=50,
                                                                                                        slnc_str,
                                                                                                        bias_str)
     else:
-        fstr = (r_flat, f_prms["logmc"], f_prms["a"], q_rc, q_beta, slnc_str, bias_str)
-        fname = 'tables/m500c_gamma_max_r_flat_{}_logmc_{}_a_{}_qrc_{}_qb_{}_slnc_{}_bias_{}_table.npy'.format(fstr)
+        fstr = (r_flat, f_prms["log10mc"], f_prms["a"], q_rc, q_beta, slnc_str, bias_str)
+        fname = 'tables/m500c_gamma_max_r_flat_{}_logmc_{}_a_{}_qrc_{}_qb_{}_slnc_{}_bias_{}_table.npy'.format(*fstr)
         
     interp_file = '/'.join(__file__.split('/')[:-1] + [fname])
     if os.path.isfile(interp_file):
@@ -914,7 +914,7 @@ def load_gamma(prms, r_max,
         # the resuling r200m_obs
         gamma_mx = gamma_max(m500c=prms.m500c, cosmo=prms.cosmo, f_c=f_c,
                              r_flat=r_fl, q_f=q_f, q_rc=q_rc, q_beta=q_beta,
-                             sigma_lnc=sigma_lnc, bias=bias)
+                             f_prms=f_prms, sigma_lnc=sigma_lnc, bias=bias)
         # # We do not use the interpolation for now, since it goes wrong at
         # # the turnover between gamma = 0 and gamma > 0
         # gamma_mx = gamma_from_m500c(prms.m500c, prms.cosmo, f_c, r_fl,
