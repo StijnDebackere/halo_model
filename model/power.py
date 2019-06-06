@@ -2,13 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import halo.hmf as hmf
+from astropy.cosmology import WMAP9
 import halo.tools as tools
 from halo.tools import Integrate
-import halo.model._cache as cache
 import halo.model.density as density
 import pdb
 
-class Power(cache.Cache):
+class Power(object):
     '''
     Object containing info on the total matter power spectrum of all matter
     components. Components should have same range properties.
@@ -24,15 +24,11 @@ class Power(cache.Cache):
     -------
 
     '''
-    def __init__(self, m200m_dmo, m200m_obs,
-                 prof=density.Profile(),
-                 hmf_prms={'transfer_fit': 'FromFile',
-                           'transfer_options': {'fname': 'camb/wmap9_transfer_out.dat'},
-                           'mf_fit': 'Tinker10',
-                           'cut_fit': False,
-                           'delta_h': 200.,
-                           'delta_wrt': 'mean',
-                           'delta_c': 1.686},
+    def __init__(self, m200m_dmo, m200m_obs, prof,
+                 hmf_prms={'transfer_model': hmf.transfer_models.FromFile,
+                           'transfer_params': {'fname': 'camb/wmap9_transfer_out.dat'},
+                           'cosmo_model': WMAP9,
+                           'hmf_model': hmf.fitting_functions.Tinker08},
                  bar2dmo=True):
         super(Power, self).__init__()
         self.m200m_dmo = m200m_dmo
@@ -49,102 +45,55 @@ class Power(cache.Cache):
         self.cosmo = prof.cosmo
         self.bar2dmo = bar2dmo
 
-        self.hmf_prms = tools.merge_dicts(prof.cosmo.cosmo_dict, hmf_prms)
+        self.hmf_prms = hmf_prms
+        self.hmf_prms['cosmo_params'] = prof.cosmo.astropy_dict
+        self.hmf_prms['n'] = prof.cosmo.n
+        self.hmf_prms['sigma_8'] = prof.cosmo.sigma_8
         self.hmf_prms['lnk_min'] = np.log(np.min(self.k_range))
         self.hmf_prms['lnk_max'] = np.log(np.max(self.k_range))
-        self.hmf_prms['k_bins'] = self.k_range.shape[0]
+        self.hmf_prms['dlnk'] = np.log(self.k_range[1]) - np.log(self.k_range[0])
         self.hmf_prms['z'] = prof.z
         # m_range needs to be m200m_dmo
         # self.hmf_prms['m_range'] = prof.m200m
 
-    #===========================================================================
-    # Parameters
-    #===========================================================================
-    @cache.parameter
-    def m200m_dmo(self, val):
-        return val
-
-    @cache.parameter
-    def m200m_obs(self, val):
-        return val
-
-    @cache.parameter
-    def profile(self, val):
-        return val
-
-    @cache.parameter
-    def cosmo(self, val):
-        return val
-
-    @cache.parameter
-    def bar2dmo(self, val):
-        return val
-
-    @cache.parameter
-    def m_h(self, val):
-        return val
-
-    @cache.parameter
-    def k_nan(self, val):
-        return val
-
-    @cache.parameter
-    def k_range(self, val):
-        return val
-
-    @cache.parameter
-    def rho_k(self, val):
-        return val
-
-    @cache.parameter
-    def z(self, val):
-        return val
-
-    @cache.parameter
-    def hmf_prms(self, val):
-        return val
-
-    #===========================================================================
-    # Methods
-    #===========================================================================
-    @cache.cached_property('m_fn')
+    @property
     def rho_m(self):
-        return self.m_fn.rho_m
+        return self.cosmo.rho_m
 
-    @cache.cached_property('hmf_prms', 'cosmo', 'm200m_dmo', 'm200m_obs', 'bar2dmo')
+    @property
     def m_fn(self):
         hmf_prms = self.hmf_prms
         if self.bar2dmo:
-            hmf_prms['m_range'] = self.m200m_dmo
+            hmf_prms['m'] = self.m200m_dmo
         else:
-            hmf_prms['m_range'] = self.m200m_obs
+            hmf_prms['m'] = self.m200m_obs
 
         m_fn = hmf.MassFunction(**hmf_prms)
         return m_fn
 
-    @cache.cached_property('m_fn')
+    @property
     def p_lin(self):
         '''
         Return linear power spectrum
         '''
-        return np.exp(self.m_fn.power)
+        return self.m_fn.power
 
-    @cache.cached_property('p_lin', 'k_range')
+    @property
     def delta_lin(self):
         '''
         Return linear dimensionless power spectrum
         '''
         return 0.5 / np.pi**2 * self.k_range**3 * self.p_lin
 
-    # @cache.cached_property('m_fn', 'm200m_dmo')
+    # @property
     # def dndm(self):
     #     return self.m_fn.dndm
 
-    @cache.cached_property('m_fn')
+    @property
     def dndm(self):
         return self.m_fn.dndm
 
-    @cache.cached_property('dndm', 'rho_m', 'm_h', 'rho_k')
+    @property
     def p_1h(self):
         '''
         Return the 1h power spectrum P_1h(k)
@@ -165,7 +114,7 @@ class Power(cache.Cache):
 
         return result
 
-    @cache.cached_property('p_1h', 'k_range')
+    @property
     def delta_1h(self):
         '''
         Return 1h dimensionless power
@@ -173,14 +122,14 @@ class Power(cache.Cache):
         return 0.5 / np.pi**2 * self.k_range**3 * self.p_1h
 
 
-    @cache.cached_property('p_1h', 'p_lin')
+    @property
     def p_tot(self):
         '''
         Return total power spectrum
         '''
         return self.p_lin + self.p_1h
 
-    @cache.cached_property('p_tot', 'k_range')
+    @property
     def delta_tot(self):
         '''
         Return total dimensionless power spectrum

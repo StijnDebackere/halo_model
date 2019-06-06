@@ -5,9 +5,10 @@ import multiprocessing
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.integrate
+from scipy.interpolate import interp1d
 from scipy.special import hyp2f1, factorial
 import scipy.optimize as opt
-from . import commah
+# import commah
 
 import pdb
 
@@ -160,184 +161,6 @@ def median_slices(data, medians, bins):
 # End of median_slices()
 # ------------------------------------------------------------------------------
 
-def _taylor_expansion_multi(n, r_range, profile, cpus):
-    '''
-    Computes Taylor expansion of the density profile in parallel.
-
-    Parameters
-    ----------
-    n : int
-      number of Taylor coefficients to compute
-    r_range : (m,r) array
-      radius range to integrate over
-    profile : array
-      density profile with M along axis 0 and r along axis 1
-    cpus : int
-      number of cpus to use
-
-    Returns
-    -------
-    taylor_coefs : (m,k,n) array
-      array containing Taylor coefficients of Fourier expansion
-    '''
-    def _taylor_expansion(procn, n_range, r, profile, out_q):
-        '''
-        Computes the Taylor coefficients for the profile expansion for n_range.
-
-            F_n = 1 / (2n+1)! int_r r^(2n+2) * profile[M,r]
-
-        Parameters
-        ----------
-        procn : int
-          process id
-        n_range : array
-          array containing the index of the Taylor coefficients
-        r : array
-          radius range to integrate over
-        profile : array
-          density profile with M along axis 0 and r along axis 1
-        out_q : queue
-          queue to output results
-
-        '''
-        # (m,n) array
-        F_n = np.empty((profile.shape[0],) + n_range.shape,dtype=np.longdouble)
-        r = np.longdouble(r)
-
-        for idx,n in enumerate(n_range):
-            prefactor = 1./factorial(2*n+1, exact=True)
-            result = prefactor * Integrate(y=np.power(r, (2.0*n+2)) *
-                                           profile,
-                                           x=r,
-                                           axis=1)
-
-            F_n[:,idx] = result
-
-        results = [procn,F_n]
-        out_q.put(results)
-
-        return
-
-    # ----------------------------------------------------------------------
-    # End of taylor_expansion()
-    # ----------------------------------------------------------------------
-    manager = multiprocessing.Manager()
-    out_q = manager.Queue()
-
-    taylor = np.arange(0,n+1)
-    # Split array in number of CPUs
-    taylor_split = np.array_split(taylor,cpus)
-
-    # Start the different processes
-    procs = []
-
-    for i in range(cpus):
-        process = multiprocessing.Process(target=_taylor_expansion,
-                                          args=(i, taylor_split[i],
-                                                r_range,
-                                                profile,
-                                                out_q))
-        procs.append(process)
-        process.start()
-
-    # Collect all results
-    result = []
-    for i in range(cpus):
-        result.append(out_q.get())
-
-    result.sort()
-    taylor_coefs = np.concatenate([item[1] for item in result],
-                                  axis=-1)
-
-    # Wait for all worker processes to finish
-    for p in procs:
-        p.join()
-
-    return taylor_coefs
-
-# ----------------------------------------------------------------------
-# End of _taylor_expansion_multi()
-# ----------------------------------------------------------------------
-
-def _F_n(r_range, rho_r, m_h, n=84, cpus=4):
-    '''
-    Computes the Taylor coefficients in the Fourier expansion:
-
-        F_n[M] = 4 * pi * 1 / (2n+1)! int_r r^(2n+2) * profile[M,r] dr
-
-    Returns
-    -------
-    F_n : (m,n+1) array
-      Taylor coefficients of Fourier expansion
-    '''
-    # define shapes for readability
-    m_s = m_h.shape[0]
-    # Prefactor only changes along axis 0 (Mass)
-    prefactor = (4.0 * np.pi)
-
-    # F_n is (m,n+1) array
-    F_n = _taylor_expansion_multi(n=n, r_range=r_range,
-                                  profile=rho_r,
-                                  cpus=cpus)
-    F_n *= prefactor
-
-    return F_n
-
-def FTT(k_range, m_h, r_range, rho_r, n=84, cpus=4, taylor_err=1e-50):
-    '''
-    Computes the Fourier transform of the density profile, using a Taylor
-    expansion of the sin(kr)/(kr) term. We have
-            u[M,k] = sum_n (-1)^n F_n[M] k^(2n)
-
-    Returns
-    -------
-    u : (m,k) array
-        Fourier transform of density profile
-    '''
-    # define shapes for readability
-    n_s = n
-    m_s = m_h.shape[0]
-    k_s = k_range.shape[0]
-
-    Fn = _F_n(r_range, rho_r, m_h, n, cpus)
-    # need (1,n+1) array to match F_n
-    n_arr = np.arange(0,n_s+1,dtype=np.longdouble).reshape(1,n_s+1)
-    # -> (m,n) array
-    c_n = np.power(-1,n_arr) * Fn
-
-    # need (k,n+1) array for exponent
-    k_range_resh = np.longdouble(k_range).reshape(k_s,1)
-    k_n = np.power(np.tile(k_range_resh, (1,n_s+1)), (2 * n_arr))
-
-    # need to match n terms and sum over them
-    # result is (k,m) array -> transpose
-    T_n = c_n.reshape(1,m_s,n_s+1) * k_n.reshape(k_s,1,n_s+1)
-    u = np.sum(T_n,axis=-1).T
-
-    # k-values which do not converge anymore will have coefficients
-    # that do not converge to zero. Convergence to zero is determined
-    # by taylor_err.
-    indices = np.argmax((T_n[:,:,-1] > taylor_err), axis=0)
-    indices[indices == 0] = k_s
-    for idx, idx_max in enumerate(indices):
-        u[idx,idx_max:] = np.nan
-        if idx_max != k_s:
-            u[idx] = extrapolate_plaw(k_range, u[idx])
-
-    # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
-    # # systematic offset, while we know that theoretically u[k=0] = 1
-    # if (np.abs(u[:,0]) - 1. > 1.e-2).any():
-    #     print('-------------------------------------------------',
-    #           '! Density profile mass does not match halo mass !',
-    #           '-------------------------------------------------',
-    #           sep='\n')
-
-    # nonnil = (u[:,0] != 0)
-    # u[nonnil] = u[nonnil] / u[nonnil,0].reshape(-1,1)
-
-    return u
-
-
 def c_correa(m200c, z_range=0, h=0.7, cosmology='WMAP9'):
     '''
     Returns the mass-concentration relation from Correa et al (2015c)
@@ -365,83 +188,115 @@ def c_correa(m200c, z_range=0, h=0.7, cosmology='WMAP9'):
 # End of c_correa()
 # ------------------------------------------------------------------------------
 
-def c_correa_fit(m_range, z_range=0, h=0.7):
+# def c200m_correa(m200m, z_range=0, h=0.7):
+#     '''
+#     Returns the mass-concentration relation from Correa et al (2015c)
+#     through the commah code.
+
+#     Parameters
+#     ----------
+#     m200m : (m,) array
+#       array containing masses to compute NFW profile for (mass at z=0)
+#     z_range : (z,) array
+#       redshift to evaluate mass-concentration relation at
+#     cosmology : string or dict for commah
+#       cosmological parameters for commah
+
+#     Returns
+#     -------
+#     c : (z,m) array
+#       array containing concentration for each (m,z)
+#     '''
+#     # (z,m) array
+#     c = ct
+#     c = commah.run(cosmology=cosmology, Mi=m200c/h, z=z_range, mah=False)['c'].T
+#     return c
+
+# # ------------------------------------------------------------------------------
+# # End of c_correa()
+# # ------------------------------------------------------------------------------
+
+# def c_correa_fit(m_range, z_range=0, h=0.7):
+#     '''
+#     Returns the mass-concentration relation from Correa et al (2015c)
+#     through the commah code.
+
+#     Parameters
+#     ----------
+#     m_range : (m,) array
+#       array containing masses to compute NFW profile for (mass at z=0)
+#     z_range : (z,) array
+#       redshift to evaluate mass-concentration relation at
+
+#     Returns
+#     -------
+#     c : (z,m) array
+#       array containing concentration for each (m,z)
+#     '''
+#     m_range, z_range = _check_iterable([m_range, z_range])
+#     m = m_range.shape[0]
+#     z = z_range.shape[0]
+
+#     # discern high and low z
+#     lo_idx = (0. <= z_range) & (z_range <= 4.)
+#     hi_idx = (z_range > 4.)
+
+#     # reshape to match our output requirement
+#     m_range = m_range.reshape([1,m])
+#     z_range = np.array(z_range).reshape([z,1])
+
+#     lo_z = z_range[lo_idx]
+#     hi_z = z_range[hi_idx]
+
+#     if lo_z.size > 0:
+#         # fit coefficients for lo_z
+#         a_lo = 1.7543 - 0.2766 * (1 + lo_z) + 0.02039 * (1 + lo_z)**2
+#         b_lo = 0.2753 + 0.00351 * (1 + lo_z) - 0.3038 * (1 + lo_z)**(0.0269)
+#         g_lo = -0.01537 + 0.02102 * (1 + lo_z)**(-0.1475)
+
+#         # log10c for lo_z
+#         log10c_lo = a_lo + b_lo * np.log10(m_range) * (1 + g_lo * np.log10(m_range)**2)
+
+#     if hi_z.size > 0:
+#         # fit coefficients for hi_z
+#         a_hi = 1.3081 - 0.1078 * (1 + hi_z) + 0.00398 * (1 + hi_z)**2
+#         b_hi = 0.0223 - 0.0944 * (1 + hi_z)**(-0.3907)
+
+#         # log10c for lo_z
+#         log10c_hi = a_hi + b_hi * np.log10(m_range)
+
+#     if (lo_z.size > 0) and (hi_z.size > 0):
+#         log10c = np.concatenate((log10c_lo, log10c_hi), axis=0)
+#     elif (lo_z.size > 0) and (hi_z.size == 0):
+#         log10c = log10c_lo
+#     elif (lo_z.size == 0) and (hi_z.size > 0):
+#         log10c = log10c_hi
+#     else:
+#         raise ValueError('need to provide positive redshifts')
+
+#     return np.power(10, log10c)
+
+# # ------------------------------------------------------------------------------
+# # End of c_correa_fit()
+# # ------------------------------------------------------------------------------
+
+def c_duffy(m_range, z_range=0., sigma_lnc=0.):
     '''
-    Returns the mass-concentration relation from Correa et al (2015c)
-    through the commah code.
-
-    Parameters
-    ----------
-    m_range : (m,) array
-      array containing masses to compute NFW profile for (mass at z=0)
-    z_range : (z,) array
-      redshift to evaluate mass-concentration relation at
-
-    Returns
-    -------
-    c : (z,m) array
-      array containing concentration for each (m,z)
-    '''
-    z_range, = _check_iterable([z_range])
-
-    # reshape arrays for matching outputs
-    z_range = z_range.reshape(-1,1)
-    m_range = m_range.reshape(1,-1) / h
-
-    # discern high and low z
-    lo_idx = (0. <= z_range <= 4.)
-    hi_idx = (z_range > 4.)
-
-    lo_z = z_range[lo_idx]
-    hi_z = z_range[hi_idx]
-
-    if lo_z.size > 0:
-        # fit coefficients for lo_z
-        a_lo = 1.7543 - 0.2766 * (1 + lo_z) + 0.02039 * (1 + lo_z)**2
-        b_lo = 0.2753 + 0.00351 * (1 + lo_z) - 0.3038 * (1 + lo_z)**(0.0269)
-        g_lo = -0.01537 + 0.02102 * (1 + lo_z)**(-0.1475)
-
-        # log10c for lo_z
-        log10c_lo = a_lo + b_lo * np.log10(m_range) * (1 + g_lo * np.log10(m_range)**2)
-
-    if hi_z.size > 0:
-        # fit coefficients for hi_z
-        a_hi = 1.3081 - 0.1078 * (1 + hi_z) + 0.00398 * (1 + hi_z)**2
-        b_hi = 0.0223 - 0.0944 * (1 + hi_z)**(-0.3907)
-
-        # log10c for lo_z
-        log10c_hi = a_hi + b_hi * np.log10(m_range)
-
-    if (lo_z.size > 0) and (hi_z.size > 0):
-        log10c = np.concatenate((log10c_lo, log10c_hi), axis=0)
-    elif (lo_z.size > 0) and (hi_z.size == 0):
-        log10c = log10c_lo
-    elif (lo_z.size == 0) and (hi_z.size > 0):
-        log10c = log10c_hi
-    else:
-        raise ValueError('need to provide positive redshifts')
-
-    return np.power(10, log10c)
-
-# ------------------------------------------------------------------------------
-# End of c_correa_fit()
-# ------------------------------------------------------------------------------
-
-def c_duffy(m_range, z_range=0.):
-    '''
-    Concentration mass relation of the Bahamas DMO simulation
+    Concentration mass relation of Duffy+08 
+    (mean relation for full sample between 0<z<2)
     '''
     m_range, z_range = _check_iterable([m_range, z_range])
     m = m_range.shape[0]
     z = z_range.shape[0]
 
-    m_range = m_range.reshape([m,1])
-    z_range = np.array(z_range).reshape([1,z])
+    m_range = m_range.reshape([1,m])
+    z_range = np.array(z_range).reshape([z,1])
 
-    A = 8.7449969011763216
-    B = -0.093399926987858539
+    A = 10.14
+    B = -0.081
+    C = -1.01
 
-    plaw =  A * (m_range/1e14)**B
+    plaw =  A * (m_range/(2e12))**B * (1+z_range)**C * np.e**sigma_lnc
     return plaw
 
 # def c_duffy(m_range, z_range=0., m_pivot=1e14, A=5.05, B=-.101, C=0.):
@@ -757,6 +612,38 @@ def radius_to_mass(r, mean_dens):
 
 # ------------------------------------------------------------------------------
 # End of radius_to_mass()
+# ------------------------------------------------------------------------------
+
+def sigma_from_rho(R, r_range, rho):
+    """
+    Project a 3-D density profile to a surface density profile.
+
+    Parameters
+    ----------
+    R : (R,) array
+        projected radii
+    r_range : (r,) array
+        radial range for the density profile
+    rho : (r,) array
+        density profile at r_range
+
+    Returns
+    -------
+    sigma : (R,) array
+        mass surface density from rho at R
+    """
+    sigma = np.zeros(R.shape)
+    for idx, r in enumerate(R):
+        rho_int = interp1d(r_range, rho)
+        # can neglect first part of integral since integrand converges to 0 there
+        r_int = np.logspace(np.log10(r + 1e-5), np.log10(r_range.max()), 150)
+        integrand = 2 * rho_int(r_int) * r_int / np.sqrt(r_int**2 - r**2)
+        sigma[idx] = Integrate(integrand, r_int)
+        
+    return sigma
+
+# ------------------------------------------------------------------------------
+# End of sigma_from_rho()
 # ------------------------------------------------------------------------------
 
 def m500c_Xray_from_m500c(m500c, cosmo, f_stars):

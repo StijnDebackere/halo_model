@@ -11,7 +11,7 @@ example.
 import numpy as np
 import scipy.special as spec
 import scipy.optimize as opt
-import pyfftw
+import mpmath as mp
 
 import matplotlib.pyplot as plt
 
@@ -33,6 +33,233 @@ import pdb
 
 #     '''
 
+def extrapolate_plaw(x_range, func, verbose=False):
+    '''
+    Extrapolate func NaN values as a powerlaw. Works best if power law behaviour
+    is already apparent, extrapolates from largest change/bump in func.
+
+    Parameters
+    ----------
+    x_range : array
+      range for func
+    func : array
+      function where np.nan will be extrapolated
+
+    Returns
+    -------
+    func : array
+      function with np.nan extrapolated as power law
+    '''
+    def plaw_pos(x, slope):
+        return slope * x
+
+    def plaw_neg(x, slope):
+        return np.power(x, slope)
+
+    # find largest change in func, will extrapolate from there
+    idx_xs = np.argmin(np.diff(func[~np.isnan(func)], axis=-1))
+    idx_nan = np.argmax(np.isnan(func), axis=-1) - 1
+
+    if idx_nan != 0:
+        x_fit = x_range[~np.isnan(func)]/x_range[idx_xs]
+        func_fit = func[~np.isnan(func)]/func[idx_xs]
+
+        x_fit = x_fit[...,idx_xs:]
+        func_fit = func_fit[...,idx_xs:]
+        if (func_fit < 0).any():
+            slope, cov = opt.curve_fit(plaw_neg,
+                                       (x_fit).astype(float),
+                                       (func_fit).astype(float))
+        else:
+            slope, cov = opt.curve_fit(plaw_pos,
+                                       np.log10(x_fit).astype(float),
+                                       np.log10(func_fit).astype(float))
+
+        func[idx_nan:] = func[idx_nan] * \
+                         (x_range[idx_nan:]/x_range[idx_nan])**slope
+    if verbose: print('Power law slope: %f'%slope)
+    return func
+
+# ------------------------------------------------------------------------------
+# End of extrapolate_plaw()
+# ------------------------------------------------------------------------------
+
+def _taylor_expansion_multi(n, r_range, profile, cpus):
+    '''
+    Computes the Taylor coefficients for the profile expansion for n_range.
+
+        F_n = 1 / (2n+1)! int_r r^(2n+2) * profile[M,r]
+
+    Parameters
+    ----------
+    n : int
+      number of Taylor coefficients to compute
+    r_range : (m,r) array
+      radius range to integrate over
+    profile : array
+      density profile with M along axis 0 and r along axis 1
+    cpus : int
+      number of cpus to use
+
+    Returns
+    -------
+    taylor_coefs : (m,k,n) array
+      array containing Taylor coefficients of Fourier expansion
+    '''
+    def _taylor_expansion(procn, n_range, r, profile, out_q):
+        '''
+        Parameters
+        ----------
+        procn : int
+          process id
+        n_range : array
+          array containing the index of the Taylor coefficients
+        r : array
+          radius range to integrate over
+        profile : array
+          density profile with M along axis 0 and r along axis 1
+        out_q : queue
+          queue to output results
+        '''
+        # (m,n) array
+        F_n = np.empty((profile.shape[0],) + n_range.shape,dtype=np.longdouble)
+        r = np.longdouble(r)
+
+        for idx, n in enumerate(n_range):
+            prefactor = 1./spec.factorial(2*n+1, exact=True)
+            result = prefactor * intg.simps(y=np.power(r, (2.0*n+2)) *
+                                            profile,
+                                            x=r,
+                                            axis=1,
+                                            even='first')
+
+            F_n[:,idx] = result
+
+        results = [procn,F_n]
+        out_q.put(results)
+        return
+    # --------------------------------------------------------------------------
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    taylor = np.arange(0,n+1)
+    # Split array in number of CPUs
+    taylor_split = np.array_split(taylor,cpus)
+
+    # Start the different processes
+    procs = []
+
+    for i in range(cpus):
+        process = multi.Process(target=_taylor_expansion,
+                                args=(i, taylor_split[i],
+                                      r_range,
+                                      profile,
+                                      out_q))
+        procs.append(process)
+        process.start()
+
+    # Collect all results
+    result = []
+    for i in range(cpus):
+        result.append(out_q.get())
+
+    result.sort()
+    taylor_coefs = np.concatenate([item[1] for item in result],
+                                  axis=-1)
+
+    # Wait for all worker processes to finish
+    for p in procs:
+        p.join()
+
+    return taylor_coefs
+
+# ------------------------------------------------------------------------------
+# End of taylor_expansion_multi()
+# ------------------------------------------------------------------------------
+
+def profile_f(k_range, r_range, profile, n=84, cpus=4, extrap=True,
+              taylor_err=1e-50):
+    '''
+    Computes the Fourier transform of the density profile, using a Taylor
+    expansion of the sin(kr)/(kr) term. We have
+
+        u[M,k] = sum_n (-1)^n F_n[M] k^(2n)
+
+    Returns
+    -------
+    u : (m,k) array
+      Fourier transform of density profile
+    '''
+    def F_n(r_range, rho_r, n, cpus):
+        '''
+        Computes the Taylor coefficients in the Fourier expansion:
+
+            F_n[M] = 4 * pi * 1 / (2n+1)! int_r r^(2n+2) * profile[M,r] dr
+
+        Returns
+        -------
+        F_n : (m,n+1) array
+          Taylor coefficients of Fourier expansion
+        '''
+        # Prefactor only changes along axis 0 (Mass)
+        prefactor = (4.0 * np.pi)
+
+        # F_n is (m,n+1) array
+        F_n = _taylor_expansion_multi(n=n, r_range=r_range,
+                                      profile=rho_r,
+                                      cpus=cpus)
+        F_n *= prefactor
+
+        return F_n
+    # --------------------------------------------------------------------------
+    # define shapes for readability
+    n_s = n
+    m_s = r_range.shape[0]
+    k_s = k_range.shape[0]
+
+    Fn = F_n(r_range, rho_r, n, cpus)
+    # need (1,n+1) array to match F_n
+    n_arr = np.arange(0,n_s+1,dtype=np.longdouble).reshape(1,n_s+1)
+    # -> (m,n) array
+    c_n = np.power(-1,n_arr) * Fn
+
+    # need (k,n+1) array for exponent
+    k_n = np.power(np.tile(np.longdouble(k_range).reshape(k_s,1),
+                           (1,n_s+1)),
+                   (2 * n_arr))
+
+    # need to match n terms and sum over them
+    # result is (k,m) array -> transpose
+    T_n = c_n.reshape(1,m_s,n_s+1) * k_n.reshape(k_s,1,n_s+1)
+    u = np.sum(T_n,axis=-1).T
+
+    # k-values which do not converge anymore will have coefficients
+    # that do not converge to zero. Convergence to zero is determined
+    # by taylor_err.
+    indices = np.argmax((T_n[:,:,-1] > taylor_err), axis=0)
+    indices[indices == 0] = k_s
+    for idx, idx_max in enumerate(indices):
+        u[idx,idx_max:] = np.nan
+        # this extrapolation is not really very good...
+        if (idx_max != k_s) and extrap:
+            u[idx] = extrapolate_plaw(k_range, u[idx])
+
+    # # normalize spectrum so that u[k=0] = 1, otherwise we get a small
+    # # systematic offset, while we know that theoretically u[k=0] = 1
+    # if (np.abs(u[:,0]) - 1. > 1.e-2).any():
+    #     print('-------------------------------------------------',
+    #           '! Density profile mass does not match halo mass !',
+    #           '-------------------------------------------------',
+    #           sep='\n')
+
+    # nonnil = (u[:,0] != 0)
+    # u[nonnil] = u[nonnil] / u[nonnil,0].reshape(-1,1)
+
+    return u
+
+# ------------------------------------------------------------------------------
+# End of profile_f()
+# ------------------------------------------------------------------------------
 
 def profile_NFW(r_range, m_x, c_x, r_x, z_range=0):
     '''
@@ -111,6 +338,43 @@ def r200m_m_NFW(m_x, r_x, c_x, cosmo, z_range=0):
 
 # ------------------------------------------------------------------------------
 # End of r200m_m_NFW()
+# ------------------------------------------------------------------------------
+
+def m_NFW_delta(r, c_x, r_x, rho_mean, Delta=200):
+    '''
+    Calculate the mass of the NFW profile with c_x and r_x, relative to
+    Delta rho_meanup to r
+
+    Parameters
+    ----------
+    r : array
+      radii to compute mass for
+    c_x : float
+      concentration of halo
+    r_x : float
+      array containing r_x to evaluate r_s from r_s = r_x/c_x
+    rho_mean : float
+      mean dark matter density
+    Delta : float (default=200.)
+      critical overdensity for collapse
+
+    Returns
+    -------
+    m_h : float
+      mass
+    '''
+    rho_s = Delta/3. * rho_mean * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    r_s = r_x / c_x
+
+    prefactor = 4 * np.pi * rho_s * r_s**3
+    c_factor  = np.log((r_s + r) / r_s) - r / (r + r_s)
+
+    mass = prefactor * c_factor
+
+    return mass
+
+# ------------------------------------------------------------------------------
+# End of m_NFW_delta()
 # ------------------------------------------------------------------------------
 
 @np.vectorize
@@ -394,12 +658,17 @@ def profile_plaw(r_range, rho_x, r_x, gamma):
     profile : (m,r) array
       array containing beta profile
     '''
-    profile_plaw = np.zeros_like(r_range)
-    for idx, r in enumerate(r_range):
-        sl = (tools.gte(r, r_x[idx]))
-        profile_plaw[idx][sl] = rho_x[idx] * (r[sl]/r_x[idx])**(-gamma)
+    m = r_x.shape[0]
 
-    return profile_plaw
+    gamma = gamma.reshape(m,1)
+    r_x = r_x.reshape(m,1)
+    r_y = r_y.reshape(m,1)
+    rho_x = rho_x.reshape(m,1)
+
+    profile = rho_x * (r_range / r_x)**(-gamma)
+    profile[(r_range < r_x) | (r_range > r_y)] = 0.
+
+    return profile
 
 # ----------------------------------------------------------------------
 # End of profile_plaw()
@@ -434,6 +703,54 @@ def m_plaw(r, rho_x, r_x, gamma, **kwargs):
 # ----------------------------------------------------------------------
 # End of m_plaw()
 # ----------------------------------------------------------------------
+
+def profile_plaw_f(k_range, rho_x, r_x, r_y, gamma):
+    '''
+    Return the analytic 3D radially symmetric FT of a power law between
+    between r_x & r_y
+
+    Parameters
+    ----------
+    k_range : (k,) array
+      array containing r_range for each m
+    rho_x : (m,) array
+      array containing densities to match at r_x
+    r_x : (m,) array
+      x overdensity radius to match rho_x at, in units of r_range
+    r_y : (m,) array
+      y radius, in units of r_range
+    gamma : (m,) array
+      power law slope of profile
+    
+    Returns
+    -------
+    profile : (m,r) array
+      array containing power law profile
+    '''
+    k_range = k_range.reshape(1,-1)
+    rho_x = rho_x.reshape(-1,1)
+    r_x = r_x.reshape(-1,1)
+    r_y = r_y.reshape(-1,1)
+    gamma = gamma.reshape(-1,1)
+
+    prefactor = 4 * np.pi * rho_x * r_x**3 / (2 * k_range**2)
+
+    ikry = 1j * k_range * r_y
+    ikrx = 1j * k_range * r_x
+    gm2 = 2 - gamma
+    ryxmg = (r_y / r_x)**(-gamma)
+
+    gammainc = np.vectorize(mp.gammainc)
+    upper_bound = (-1j * ryxmg * ((-ikry)**gamma * gammainc(gm2, -ikry) -
+                                  (ikry)**gamma * gammainc(gm2, ikry)))
+    lower_bound = (-1j * ((-ikrx)**gamma * gammainc(gm2, -ikrx) -
+                          (ikrx)**gamma * gammainc(gm2, ikrx)))
+
+    return prefactor * (upper_bound - lower_bound)
+
+# ------------------------------------------------------------------------------
+# End of profile_plaw_f()
+# ------------------------------------------------------------------------------
 
 def profile_beta_plaw(r_range, m_x, r_x, rc, beta, gamma, rho_x=None):
     '''
@@ -611,6 +928,9 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
                                                        5./2, -(r_x / rc)**2))
+    
+    if rho_x is None:
+        rho_x = rho_0 / (1 + (r_x / rc)**2)**(3*beta/2)
 
     rc = rc.reshape(m,1)
     beta = beta.reshape(m,1)
@@ -618,9 +938,7 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
     m_x = m_x.reshape(m,1)
     r_y = r_y.reshape(m,1)
     rho_0 = rho_0.reshape(m,1)
-
-    if rho_x is None:
-        rho_x = profile_beta(r_x, m_x=m_x, r_x=r_x, rc=rc, beta=beta)
+    rho_x = rho_x.reshape(m,1)
 
     rho_x = rho_x.reshape(m,1)
     profile = np.zeros_like(r_range)
@@ -958,9 +1276,3 @@ def r_fb_from_f(f_b, cosmo, **kwargs):
         r_fb = np.inf
 
     return r_fb
-
-
-
-
-
-
