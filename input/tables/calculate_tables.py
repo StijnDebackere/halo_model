@@ -1695,7 +1695,6 @@ def m200m_dmo_interp(m_file=table_dir + "m500c_to_m200m_dmo.asdf"):
     m200m_dmo = af.tree["m200m_dmo"][:]
 
     coords = (z, np.log10(m), f)
-    print(m200m_dmo.shape)
 
     m200m_dmo_interp = interpolate.RegularGridInterpolator(coords, m200m_dmo)
 
@@ -1703,4 +1702,25 @@ def m200m_dmo_interp(m_file=table_dir + "m500c_to_m200m_dmo.asdf"):
     
 # ------------------------------------------------------------------------------
 # End of m200m_dmo_interp()
+# ------------------------------------------------------------------------------
+
+def fsat500c_interp(m_file=table_dir + "m500c_to_m200m_dmo.asdf"):
+    '''
+    Return the interpolator for the c200m(m200m) relation
+    '''
+    af = asdf.open(m_file)
+
+    z = af.tree["z"][:]
+    m = af.tree["m500c"][:]
+    f = af.tree["f500c"][:]
+    fsat_500c = af.tree["fsat_500c"][:]
+
+    coords = (z, np.log10(m), f)
+
+    fsat_500c_interp = interpolate.RegularGridInterpolator(coords, fsat_500c)
+
+    return fsat_500c_interp
+    
+# ------------------------------------------------------------------------------
+# End of fsat_500c_interp()
 # ------------------------------------------------------------------------------

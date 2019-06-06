@@ -21,6 +21,7 @@ import halo.tools as tools
 import halo.model.density as dens
 import halo.model.power as power
 import halo.data.data as d
+import halo.input.tables.calculate_tables as ct
 
 import pdb
 import cProfile
