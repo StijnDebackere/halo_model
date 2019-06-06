@@ -814,7 +814,8 @@ def load_gamma(prms, r_max,
                delta=False,
                bar2dmo=True,
                f_b=True,
-               bias=False):
+               bias=False,
+               comps=False):
     '''
     Load all of our different models, the ones upto r200m and the ones upto
     r_max.
@@ -1028,11 +1029,6 @@ def load_gamma(prms, r_max,
             prof_tot = dm_plaw_r500c_rmax + gas_plaw_r500c_rmax + stars_rmax
             m_obs_200m_dmo = prof_tot.m_r(r200m_dmo)
 
-            pow_gas_plaw_r500c_rmax = power.Power(m200m_dmo=m200m_dmo,
-                                                  m200m_obs=m200m_obs,
-                                                  prof=prof_tot,
-                                                  bar2dmo=bar2dmo)
-
             # now load dmo profiles
             dm_dmo_rmax = load_dm_dmo_rmax(prms=prms,
                                            r_max=r_max_fb,
@@ -1045,6 +1041,23 @@ def load_gamma(prms, r_max,
                                           prof=dm_dmo_rmax,
                                           bar2dmo=False)
 
+            if not comps:
+                pow_gas_plaw_r500c_rmax = power.Power(m200m_dmo=m200m_dmo,
+                                                      m200m_obs=m200m_obs,
+                                                      prof=prof_tot,
+                                                      bar2dmo=bar2dmo)
+
+            else:
+                profiles = [dm_plaw_r500c_rmax, gas_plaw_r500c_rmax, stars_rmax]
+                names    = ["dm", "gas", "stars"]
+                pow_gas_plaw_r500c_rmax = power.Power_Components(m200m_dmo=m200m_dmo,
+                                                                 m200m_obs=m200m_obs,
+                                                                 cosmo=prms.cosmo,
+                                                                 k_range=prms.k_range,
+                                                                 profiles=profiles,
+                                                                 names=names,
+                                                                 bar2dmo=bar2dmo)
+                
             temp = {'pow': pow_gas_plaw_r500c_rmax,
                     'pow_dmo': pow_dm_dmo_rmax,
                     'd_gas': gas_plaw_r500c_rmax,
