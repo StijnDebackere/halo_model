@@ -830,7 +830,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         # we need to tile the redshift to match m200m_dmo
         shape_final = m200m_dmo.shape
         z_tiled = np.tile(z, (1,) + shape_final[1:])
-        coords = np.vstack([z_tiled.flatten(), m200m_dmo.flatten()])
+        coords = np.vstack([z_tiled.flatten(), m200m_dmo.flatten()]).T
 
         # calculate the concentration and reshape to match m200m_dmo
         c200m_dmo = c200m(coords).reshape(shape_final)
