@@ -758,14 +758,14 @@ def f_stars_interp(comp='all'):
     m_h = m_h / 0.7
 
     if comp == 'all':
-        f_stars_interp = interp.interp1d(m_h, f_stars, bounds_error=False,
-                                         fill_value=(0,f_stars[-1]))
+        f_stars_interp = interpolate.interp1d(m_h, f_stars, bounds_error=False,
+                                              fill_value=(0,f_stars[-1]))
     elif comp == 'cen':
-        f_stars_interp = interp.interp1d(m_h, f_cen, bounds_error=False,
-                                         fill_value=(0,f_cen[-1]))
+        f_stars_interp = interpolate.interp1d(m_h, f_cen, bounds_error=False,
+                                              fill_value=(0,f_cen[-1]))
     else:
-        f_stars_interp = interp.interp1d(m_h, f_sat, bounds_error=False,
-                                         fill_value=(0,f_sat[-1]))
+        f_stars_interp = interpolate.interp1d(m_h, f_sat, bounds_error=False,
+                                              fill_value=(0,f_sat[-1]))
 
     return f_stars_interp
 
