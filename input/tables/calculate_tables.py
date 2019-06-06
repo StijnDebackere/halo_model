@@ -550,7 +550,7 @@ def table_c200m_correa(m200m=m200m,
         c_all = np.empty((1,) + m200m.shape)
         
         c_interp = interpolate.interp1d(np.log10(m200m_t[0]),
-                                   c200m_t[0])
+                                        c200m_t[0])
                             
         c_all[0] = c_interp(np.log10(m200m))
 
@@ -826,7 +826,14 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
                                fc500c, c200m, z))
         # now we have m200m_dmo, so we calculate again all the other
         # resulting variables
-        c200m_dmo = c200m(np.array([z,m200m_dmo]))
+
+        # we need to tile the redshift to match m200m_dmo
+        shape_final = m200m_dmo.shape
+        z_tiled = np.tile(z, (1,) + shape_final[1:])
+        coords = np.vstack([z_tiled.flatten(), m200m_dmo.flatten()])
+
+        # calculate the concentration and reshape to match m200m_dmo
+        c200m_dmo = c200m(coords).reshape(shape_final)
         r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
 
         fcen_500c = fc500c(m200m_dmo / 0.7) * m200m_dmo / m500c
