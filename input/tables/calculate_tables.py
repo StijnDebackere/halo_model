@@ -775,7 +775,7 @@ def f_stars_interp(comp='all'):
 
 def table_m500c_to_m200m_dmo(m500c=m500c,
                              z=z,
-                             fg500c=np.linspace(0, 1, 20),
+                             fg500c=np.linspace(0, 1, 100),
                              f_c=0.86,
                              sigma8=0.821,
                              omegam=0.2793,
