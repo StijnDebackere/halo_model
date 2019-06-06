@@ -302,7 +302,7 @@ def m_dm_stars_from_m500c(m500c, cosmo, f_c=0.86, sigma_lnc=0., bias=False):
 # ----------------------------------------------------------------------
 
 def m_gas_from_m500c(m500c, cosmo, gamma, r_flat=None, q_f=50, q_rc=50,
-                     q_beta=50, bias=False):
+                     q_beta=50, f_prms=None, bias=False):
     '''
     Determine the enclosed mass profiles for the gas mass component
     in a power law with index gamma for r>r500c
@@ -337,7 +337,8 @@ def m_gas_from_m500c(m500c, cosmo, gamma, r_flat=None, q_f=50, q_rc=50,
     # We assume for now that our masses are the X-ray derived quantities
     # gas fractions
     # h=0.7 needs to be converted here
-    f_prms = d.f_gas_prms(cosmo, q=q_f, bias=bias)
+    if f_prms is None:
+        f_prms = d.f_gas_prms(cosmo, q=q_f, bias=bias)
     f_gas500 = d.f_gas(m500c / 0.7, cosmo=cosmo, **f_prms)
 
     # ### #
@@ -426,7 +427,7 @@ def m_from_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, gamma,
                  'gamma': gamma,
                  'rho_x': rho_500c}
     m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw(r, **{k: v[sl] for k,v in
-                                                         gas_args.items()})
+                                                         gas_args.iteritems()})
 
     # ##### #
     # STARS #
@@ -444,9 +445,9 @@ def m_from_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, gamma,
                 'r_x': r200m_dmo}
 
     m_stars = lambda r, sl, **kwargs: (dp.m_delta(r, **{k: v[sl] for k,v in
-                                                        cen_args.items()}) +
+                                                        cen_args.iteritems()}) +
                                        dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                      sat_args.items()}))
+                                                      sat_args.iteritems()}))
 
     # ## #
     # DM #
@@ -460,7 +461,7 @@ def m_from_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, gamma,
                'r_x': prms.r500c}
 
     m_dm = lambda r, sl, **kwargs: dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                  dm_args.items()})
+                                                  dm_args.iteritems()})
 
     m_b = lambda r, sl, **kwargs: m_stars(r, sl) + m_gas(r, sl)
     m_tot = lambda r, sl, **kwargs: m_dm(r, sl) + m_stars(r, sl) + m_gas(r, sl)
@@ -471,7 +472,7 @@ def m_from_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, gamma,
 # End of m_from_model()
 # ----------------------------------------------------------------------
 
-def m_gas_model(prms, q_f, q_rc, q_beta, gamma, r_flat=None,
+def m_gas_model(prms, q_f, q_rc, q_beta, gamma, f_prms=None, r_flat=None,
                 bias=False):
     '''
     Return the gas mass profile
@@ -479,7 +480,8 @@ def m_gas_model(prms, q_f, q_rc, q_beta, gamma, r_flat=None,
     # We assume for now that our masses are the X-ray derived quantities
     # gas fractions
     # h=0.7 needs to be converted here
-    f_prms = d.f_gas_prms(prms.cosmo, q=q_f, bias=bias)
+    if f_prms is None:
+        f_prms = d.f_gas_prms(prms.cosmo, q=q_f, bias=bias)
     f_gas500 = d.f_gas(prms.m500c / 0.7, cosmo=prms.cosmo, **f_prms)
     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
     rho_500c = dp.profile_beta(prms.r500c.reshape(-1,1),
@@ -497,13 +499,13 @@ def m_gas_model(prms, q_f, q_rc, q_beta, gamma, r_flat=None,
         gas_args['gamma'] = gamma
         gas_args['rho_x'] = rho_500c
         m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw(r, **{k: v[sl] for k,v in
-                                                             gas_args.items()})
+                                                             gas_args.iteritems()})
     else:
         gas_args['r_y'] = r_flat * prms.r500c
         gas_args['gamma'] = gamma
         gas_args['rho_x'] = rho_500c
         m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw_uni(r, **{k: v[sl] for k,v in
-                                                                 gas_args.items()})
+                                                                 gas_args.iteritems()})
 
     return m_gas
 
@@ -531,9 +533,9 @@ def m_stars_model(prms, m200m_dmo, r200m_dmo, c200m_dmo, f_c=0.86):
                 'r_x': r200m_dmo}
 
     m_stars = lambda r, sl, **kwargs: (dp.m_delta(r, **{k: v[sl] for k,v in
-                                                        cen_args.items()}) +
+                                                        cen_args.iteritems()}) +
                                        dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                      sat_args.items()}))
+                                                      sat_args.iteritems()}))
 
     return m_stars
 
@@ -555,7 +557,7 @@ def m_dm_model(prms, m200m_dmo, r200m_dmo, c200m_dmo,
                'r_x': prms.r500c}
 
     m_dm = lambda r, sl, **kwargs: dp.m_NFW(r, **{k: v[sl] for k,v in
-                                                  dm_args.items()})
+                                                  dm_args.iteritems()})
 
     return m_dm
 
@@ -594,7 +596,8 @@ def r200m_from_m(m_f, cosmo, **kwargs):
 
 @np.vectorize
 def gamma_from_m500c(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50,
-                     q_rc=50, q_beta=50, sigma_lnc=0., bias=False):
+                     q_rc=50, q_beta=50, f_prms=None, sigma_lnc=0.,
+                     bias=False):
     '''
     Determine the maximum power law slope gamma for which
 
@@ -626,9 +629,11 @@ def gamma_from_m500c(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50,
     -------
     gamma : maximum allowed gamma for each m500c
     '''
-    def fb_diff(gamma, m500c, cosmo, r_flat, q_f, q_rc, q_beta, bias,
-                m_dm, m_stars):
-        m_gas = m_gas_from_m500c(m500c, cosmo, gamma, r_flat, q_f, q_rc, q_beta, bias)
+    def fb_diff(gamma, m500c, cosmo, r_flat, q_f, q_rc, q_beta, f_prms,
+                bias, m_dm, m_stars):
+        m_gas = m_gas_from_m500c(m500c=m500c, cosmo=cosmo, gamma=gamma,
+                                 r_flat=r_flat, q_f=q_f, q_rc=q_rc,
+                                 q_beta=q_beta, f_prms=f_prms, bias=bias)
         f_b = cosmo.omegab / cosmo.omegam
         
         m_b = lambda r: m_stars(r) + m_gas(r)
@@ -647,8 +652,8 @@ def gamma_from_m500c(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50,
 
     try:
         gamma = opt.brentq(fb_diff, 0, 1000, args=(m500c, cosmo, r_flat,
-                                                   q_f, q_rc, q_beta, bias,
-                                                   m_dm, m_stars))
+                                                   q_f, q_rc, q_beta, f_prms,
+                                                   bias, m_dm, m_stars))
     # if not solution is found, set boundary to gamma = 0
     except ValueError:
         gamma = 0.
@@ -660,7 +665,7 @@ def gamma_from_m500c(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50,
 # ----------------------------------------------------------------------
 
 def gamma_max(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50, q_rc=50,
-              q_beta=50, sigma_lnc=0., bias=False):
+              q_beta=50, f_prms=None, sigma_lnc=0., bias=False):
     '''
     Return interpolated m500c-gamma_max relation
 
@@ -693,11 +698,16 @@ def gamma_max(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50, q_rc=50,
 
     bias_str = str(bias).replace(".", "p")
     slnc_str = str(sigma_lnc).replace(".", "p")
-    fname = 'tables/m500c_gamma_max_r_flat_{}_qf_{}_qrc_{}_qb_{}_slnc_{}_bias_{}_table.npy'.format(r_flat,
-                                                                                                   q_f, q_rc,
-                                                                                                   q_beta,
-                                                                                                   slnc_str,
-                                                                                                   bias_str)
+    if f_prms is None:
+        fname = 'tables/m500c_gamma_max_r_flat_{}_qf_{}_qrc_{}_qb_{}_slnc_{}_bias_{}_table.npy'.format(r_flat,
+                                                                                                       q_f, q_rc,
+                                                                                                       q_beta,
+                                                                                                       slnc_str,
+                                                                                                       bias_str)
+    else:
+        fstr = (r_flat, f_prms["logmc"], f_prms["a"], q_rc, q_beta, slnc_str, bias_str)
+        fname = 'tables/m500c_gamma_max_r_flat_{}_logmc_{}_a_{}_qrc_{}_qb_{}_slnc_{}_bias_{}_table.npy'.format(fstr)
+        
     interp_file = '/'.join(__file__.split('/')[:-1] + [fname])
     if os.path.isfile(interp_file):
         m_interp, gamma_max_interp = np.load(interp_file)
@@ -705,8 +715,8 @@ def gamma_max(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50, q_rc=50,
     else:
         m_interp = np.logspace(logm_min, logm_max, 201)
         gamma_max_interp = gamma_from_m500c(m500c=m_interp, cosmo=cosmo, f_c=f_c,
-                                            r_flat=r_flat, q_f=q_f, q_rc=q_rc,
-                                            q_beta=q_beta, sigma_lnc=sigma_lnc, bias=bias)
+                                            r_flat=r_flat, q_f=q_f, q_rc=q_rc, q_beta=q_beta,
+                                            f_prms=f_prms, sigma_lnc=sigma_lnc, bias=bias)
         np.save(interp_file, (m_interp, gamma_max_interp))
 
     gamma_max = intp.interp1d(m_interp, gamma_max_interp,
@@ -810,6 +820,7 @@ def load_gamma(prms, r_max,
                q_f=50,
                q_rc=50,
                q_beta=50,
+               f_prms=None,
                sigma_lnc=0.,
                delta=False,
                bar2dmo=True,
@@ -856,7 +867,8 @@ def load_gamma(prms, r_max,
     # We assume for now that our masses are the X-ray derived quantities
     # gas fractions
     # h=0.7 needs to be converted here
-    f_prms = d.f_gas_prms(prms.cosmo, q=q_f, bias=bias)
+    if f_prms is None:
+        f_prms = d.f_gas_prms(prms.cosmo, q=q_f, bias=bias)
     f_gas500 = d.f_gas(prms.m500c / 0.7, cosmo=prms.cosmo, **f_prms)
     rc, beta = d.fit_prms(x=500, q_rc=q_rc, q_beta=q_beta)
 
@@ -922,6 +934,7 @@ def load_gamma(prms, r_max,
                                      q_rc=q_rc,
                                      q_beta=q_beta,
                                      gamma=g,
+                                     f_prms=f_prms,
                                      r_flat=r_fl,
                                      bias=bias)
 
@@ -956,6 +969,7 @@ def load_gamma(prms, r_max,
                                    q_rc=q_rc,
                                    q_beta=q_beta,
                                    gamma=g,
+                                   f_prms=f_prms,
                                    r_flat=r_fl,
                                    bias=bias)
             m_b_fb = lambda r, sl, **kwargs: m_stars(r, sl) + m_gas_fb(r, sl)
