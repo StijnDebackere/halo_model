@@ -161,14 +161,14 @@ def median_slices(data, medians, bins):
 # End of median_slices()
 # ------------------------------------------------------------------------------
 
-def c_correa(m200c, z_range=0, h=0.7, cosmology='WMAP9'):
+def c_correa(m200m, z_range=0):
     '''
     Returns the mass-concentration relation from Correa et al (2015c)
     through the commah code.
 
     Parameters
     ----------
-    m200c : (m,) array
+    m200m : (m,) array
       array containing masses to compute NFW profile for (mass at z=0)
     z_range : (z,) array
       redshift to evaluate mass-concentration relation at
@@ -187,98 +187,6 @@ def c_correa(m200c, z_range=0, h=0.7, cosmology='WMAP9'):
 # ------------------------------------------------------------------------------
 # End of c_correa()
 # ------------------------------------------------------------------------------
-
-# def c200m_correa(m200m, z_range=0, h=0.7):
-#     '''
-#     Returns the mass-concentration relation from Correa et al (2015c)
-#     through the commah code.
-
-#     Parameters
-#     ----------
-#     m200m : (m,) array
-#       array containing masses to compute NFW profile for (mass at z=0)
-#     z_range : (z,) array
-#       redshift to evaluate mass-concentration relation at
-#     cosmology : string or dict for commah
-#       cosmological parameters for commah
-
-#     Returns
-#     -------
-#     c : (z,m) array
-#       array containing concentration for each (m,z)
-#     '''
-#     # (z,m) array
-#     c = ct
-#     c = commah.run(cosmology=cosmology, Mi=m200c/h, z=z_range, mah=False)['c'].T
-#     return c
-
-# # ------------------------------------------------------------------------------
-# # End of c_correa()
-# # ------------------------------------------------------------------------------
-
-# def c_correa_fit(m_range, z_range=0, h=0.7):
-#     '''
-#     Returns the mass-concentration relation from Correa et al (2015c)
-#     through the commah code.
-
-#     Parameters
-#     ----------
-#     m_range : (m,) array
-#       array containing masses to compute NFW profile for (mass at z=0)
-#     z_range : (z,) array
-#       redshift to evaluate mass-concentration relation at
-
-#     Returns
-#     -------
-#     c : (z,m) array
-#       array containing concentration for each (m,z)
-#     '''
-#     m_range, z_range = _check_iterable([m_range, z_range])
-#     m = m_range.shape[0]
-#     z = z_range.shape[0]
-
-#     # discern high and low z
-#     lo_idx = (0. <= z_range) & (z_range <= 4.)
-#     hi_idx = (z_range > 4.)
-
-#     # reshape to match our output requirement
-#     m_range = m_range.reshape([1,m])
-#     z_range = np.array(z_range).reshape([z,1])
-
-#     lo_z = z_range[lo_idx]
-#     hi_z = z_range[hi_idx]
-
-#     if lo_z.size > 0:
-#         # fit coefficients for lo_z
-#         a_lo = 1.7543 - 0.2766 * (1 + lo_z) + 0.02039 * (1 + lo_z)**2
-#         b_lo = 0.2753 + 0.00351 * (1 + lo_z) - 0.3038 * (1 + lo_z)**(0.0269)
-#         g_lo = -0.01537 + 0.02102 * (1 + lo_z)**(-0.1475)
-
-#         # log10c for lo_z
-#         log10c_lo = a_lo + b_lo * np.log10(m_range) * (1 + g_lo * np.log10(m_range)**2)
-
-#     if hi_z.size > 0:
-#         # fit coefficients for hi_z
-#         a_hi = 1.3081 - 0.1078 * (1 + hi_z) + 0.00398 * (1 + hi_z)**2
-#         b_hi = 0.0223 - 0.0944 * (1 + hi_z)**(-0.3907)
-
-#         # log10c for lo_z
-#         log10c_hi = a_hi + b_hi * np.log10(m_range)
-
-#     if (lo_z.size > 0) and (hi_z.size > 0):
-#         log10c = np.concatenate((log10c_lo, log10c_hi), axis=0)
-#     elif (lo_z.size > 0) and (hi_z.size == 0):
-#         log10c = log10c_lo
-#     elif (lo_z.size == 0) and (hi_z.size > 0):
-#         log10c = log10c_hi
-#     else:
-#         raise ValueError('need to provide positive redshifts')
-
-#     return np.power(10, log10c)
-
-# # ------------------------------------------------------------------------------
-# # End of c_correa_fit()
-# # ------------------------------------------------------------------------------
 
 def c_duffy(m_range, z_range=0., sigma_lnc=0.):
     '''

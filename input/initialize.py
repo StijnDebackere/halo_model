@@ -20,72 +20,43 @@ variables for the halo model
 import numpy as np
 import yaml
 
-import halo.density_profiles as dp
+import halo.input.interpolators as interp
+import halo.cosmo as cosmo
+from halo.parameters import Parameters
 
 default = {
-    "parameters": {
-        # m500c grid
-        "logm_min": 11,
-        "logm_max": 15,
-        "logm_bins": 101,
-        # k grid
-        "logk_min": -1.8,
-        "logk_max": 2.,
-        "logk_bins": 101,
-        "z_min": 0,
-        "z_max": 4,
-        "z_bins": 16,
-        # cosmology
-        "cosmology": {
-            "sigma8": 0.821,
-            "omegam": 0.2793,
-            "omegac": 0.233,
-            "omegab": 0.0463,
-            "omegav": 0.7207,
-            "n": 0.972,
-            "h": 0.7
-        }
-    },
-    "components": {
-        "gas": {
-            "profile": dp.profile_beta_plaw_uni,
-            "parameters": {
-                "delta": 500,
-                "delta_ref": "crit",
-                "f_gas": None,
-                "beta": None,
-                "rc": None
-            },
-        },
-        "dm": {
-            "profile": dp.profile_NFW,
-            "parameters":{
-                "delta": 500,
-                "delta_ref": "crit",
-                "f_dm": None,
-                "c_dm": None
-            },
-        },
-        "stars": {
-            "cen" : {
-                "profile": dp.profile_delta,
-                "parameters":{
-                    "delta": 200,
-                    "delta_ref": "mean",
-                    "f_cen": None
-                },
-            },
-            "sat" : {
-                "profile": dp.profile_NFW,
-                "parameters":{
-                    "delta": 200,
-                    "delta_ref": "mean",
-                    "f_sat": None,
-                    "c_sat": None
-                },
-            }
-        }
-    },
+    # m500c grid
+    "m500c": np.logspace(11, 15, 101),
+    # r grid
+    "r_min": -4,
+    "r_bins": 100,
+    # k grid
+    "logk_min": -1.8,
+    "logk_max": 2.,
+    "logk_bins": 101,
+    # z grid
+    # "z_range": np.linspace(0, 2, 8),
+    "z_range": 0.,
+    # stellar parameters
+    # => matters for initialization of the model,
+    # if this is changed, need to rerun
+    # table_m500c_to_m200m_dmo() to get correct halo masses
+    "f_c": 0.86,
+    "sigma_lnc": 0.0,
+    # hot gas parameters
+    # => only matter for halo model
+    "fgas500c_prms" : {"log10mt": 13.94,
+                       "a": 1.35,
+                       "fstar500c_max": interp.fsat500c_interp(f_c=0.86,
+                                                               sigma_lnc=0.0)},
+    # cosmology
+    "cosmo": cosmo.Cosmology(**{"sigma_8": 0.821,
+                                "omegam": 0.2793,
+                                "omegac": 0.233,
+                                "omegab": 0.0463,
+                                "omegav": 0.7207,
+                                "n": 0.972,
+                                "h": 0.7})
 }
 
 def init_model(fname=None):
@@ -102,11 +73,4 @@ def init_model(fname=None):
             except yaml.YAMLError as exc:
                 print(exc)
 
-    
-    
-
-
-
-
-
-
+    return Parameters(**prms)

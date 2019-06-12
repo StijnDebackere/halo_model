@@ -508,17 +508,18 @@ def profile_beta(r_range, m_x, r_x, rc, beta):
     profile : (m,r) array
       array containing beta profile
     '''
-    m = m_x.shape[0]
+    m = np.shape(m_x)
 
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3. * beta / 2,
                                                        5./2, -(r_x / rc)**2))
 
-    rc = rc.reshape(m,1)
-    beta = beta.reshape(m,1)
-    r_x = r_x.reshape(m,1)
-    m_x = m_x.reshape(m,1)
-    rho_0 = rho_0.reshape(m,1)
+    rc = np.reshape(rc, (m + (1,)))
+    beta = np.reshape(beta, (m + (1,)))
+    r_x = np.reshape(r_x, (m + (1,)))
+    m_x = np.reshape(m_x, (m + (1,)))
+    rho_0 = np.reshape(rho_0, (m + (1,)))
+    r_range = np.reshape(r_range, (m + (-1,)))
 
     profile = rho_0 / (1 + (r_range / rc)**2)**(3*beta/2)
 
@@ -527,53 +528,6 @@ def profile_beta(r_range, m_x, r_x, rc, beta):
 # ------------------------------------------------------------------------------
 # End of profile_beta()
 # ------------------------------------------------------------------------------
-
-# def profile_beta(r_range, m_x, r_x, rc, beta):
-#     '''
-#     Return a beta profile with mass m_x inside r_range <= r_x
-
-#         rho[r] =  rho_c[m_range, rc, r_x] / (1 + ((r/r_x)/rc)^2)^(beta / 2)
-
-#     rho_c is determined by the mass of the profile.
-
-#     Parameters
-#     ----------
-#     r_range : (m,r) array
-#       array containing r_range for each m
-#     m_x : (m,) array
-#       array containing masses to match at r_x
-#     r_x : (m,) array
-#       x overdensity radius to match m_x at, in units of r_range
-#     beta : (m,) array
-#       power law slope of profile
-#     rc : (m,) array
-#       physical core radius of beta profile in as a fraction
-
-#     Returns
-#     -------
-#     profile : (m,r) array
-#       array containing beta profile
-#     '''
-#     m = m_x.shape[0]
-#     r = r_range.shape[-1]
-
-#     rc = rc.reshape(m,1)
-#     beta = beta.reshape(m,1)
-#     r_x = r_x.reshape(m,1)
-#     m_x = m_x.reshape(m,1)
-
-#     profile = 1. / (1 + (r_range / rc)**2)**(3*beta/2)
-#     masses = np.array([tools.m_h(profile[idx][tools.lte(r, r_x[idx])],
-#                                  r[tools.lte(r, r_x[idx])])
-#                        for idx, r in enumerate(r_range)]).reshape(m,1)
-#     norm =  m_x/masses
-#     profile *= norm
-
-#     return profile
-
-# # ------------------------------------------------------------------------------
-# # End of profile_beta()
-# # ------------------------------------------------------------------------------
 
 @np.vectorize
 def m_beta(r, m_x, r_x, rc, beta, **kwargs):

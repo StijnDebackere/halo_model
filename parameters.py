@@ -1,16 +1,11 @@
-'''Main definitions to ease use of the package
-
-TODO
-----
-add methods to Parameters docstring
+'''Main definitions for ease of use of the package
 
 '''
 import numpy as np
-import scipy.interpolate as interp
-import halo.hmf as hmf
 
 import halo.tools as tools
 import halo.cosmo as cosmo
+import halo.input.interpolators as inp_interp
 
 import pdb
 
@@ -20,66 +15,68 @@ class Parameters(object):
 
     Parameters
     ----------
-    m_range : (m,) array
+    m500c : (m,) array
       Halo mass range [units Msun h^-1]
     r_min : float
       Minimum log radius [units h^-1 Mpc]
     r_bins : int
       Number of r bins
-    k_min : float
+    logk_min : float
       Minimum log wavenumber [units h Mpc^-1]
-    k_max : float
+    logk_max : float
       Maximum log wavenumber [units h Mpc^-1]
     k_bins : int
       Number of k bins to compute tranfer function for
-    sigma_8 : float
-      sigma_8 normalization of power spectrum
-    H0 : float
-      Hubble constant at present
-    omegab : float
-      Baryon matter density
-    omegac : float
-      CDM matter density
-    omegav : float
-      Vacuum density
-    n : float
-      Spectral index
-    tranfer_fit : string (accepted by hmf.Transfer)
-      Transfer function fit
-    transfer_options : string (accepted by hmf.Transfer)
-      Extra Transfer options
-    z : float
+    cosmo : hmf.Cosmology object
+      cosmological parameters to compute for
+    z : float or array
       Redshift to compute for
-    mf_fit : string (accepted by hmf.MassFunction)
-      Fitting function for halo mass function
-    cut_fit : bool
-      Whether to forcibly cut f(sigma) at bounds in literature. If false,
-      will use whole range of M.
-    delta_h : float
-      Overdensity for halo definition
-    delta_wrt : str (accpected by hmf.MassFunction)
-      With respect to which density is delta_h
-    delta_c : float
-      Linear critical overdensity for collapse
-    rho_crit : float [units Msun h^2 / Mpc^3]
-      Critical density of the universe
+    fgas500c_prms : dict
+      "log10mt" : turnover mass for the fgas500c-m500c relation
+      "a" : sharpness of turnover
+      "fstar500c_max" : interpolator for the maximum stellar fraction at 
+                        r500c as function of z and m500c
+    f_c : float
+      ratio between satellite concentration and DM concentration
+    sigma_lnc : float
+      logarithmic offset to take the c(m) relation at
 
     Methods
     -------
-    dlog10m : float
-      log10m mass interval for mass function
-
-    rho_m : float [units Msun h^2 / Mpc^3]
-      mean matter density of the universe
+    r500c : (m,) array
+      Radius range corresponding to m500c and cosmo
+    f_bar : float
+      cosmic baryon fraction corresponding to cosmo
+    fgas500c : (z,m) array
+      gas fractions corresponding to fgas500c_prms
+    fcen500c : (z,m) array
+      central fractions corresponding to fgas500c_prms
+    fsat500c : (z,m) array
+      satellite fractions corresponding to fgas500c_prms
+    m200m_dmo : (z,m) array
+      DMO equivalent halo masses corresponding to m500c and fgas500c
+    c200m_dmo : (z,m) array
+      concentrations for the DMO equivalent haloes
+    r200m_dmo : (z,m) array
+      virial radii for the DMO equivalent haloes
+    dlnk : float
+      lnk k_range interval for mass function
+    k_range : (k_bins,) array
+      wavevector range corresponding to given k_min, k_max and k_bins
+    cosmo_prms : dict
+      cosmological parameters from cosmo
+    rho_crit : (z_range,) [units Msun h^2 / Mpc^3]
+      critical density of the universe for z_range
+    rho_m : (z_range,) [units Msun h^2 / Mpc^3]
+      mean matter density of the universe for z_range
 
     '''
     def __init__(self,
                  m500c,
-                 m200m_dmo=None,
                  # r_min needs to be low in order to get correct masses from
                  # integration
                  r_min=-4, r_bins=100,
-                 k_min=-1.8, k_max=2., k_bins=200,
+                 logk_min=-1.8, logk_max=2., k_bins=200,
                  cosmo=cosmo.Cosmology(**{'sigma_8': 0.821,
                                           'H0': 70.0,
                                           'omegab': 0.0463,
@@ -87,81 +84,165 @@ class Parameters(object):
                                           'omegam': 0.0463 + 0.233,
                                           'omegav': 0.7207,
                                           'n': 0.972}),
-                 z=0.):
+                 z_range=0.,
+                 fgas500c_prms={"log10mt": 13.94,
+                                "a": 1.35,
+                                "fstar500c_max": inp_interp.fstar_500c_max_interp(f_c=0.86,
+                                                                                  sigma_lnc=0.0)},
+                 f_c=0.86,
+                 sigma_lnc=0.0,
+                 # gamma=np.linspace(0., 3., 9)
+                 **kwargs):
+
         super(Parameters, self).__init__()
         self.m500c = m500c
         # self.m200m_dmo = m200m_dmo
         self.r_min = r_min
         self.r_bins = r_bins
-        self.k_min = k_min
-        self.k_max = k_max
+        self.logk_min = logk_min
+        self.logk_max = logk_max
         self.k_bins = k_bins
         self.cosmo = cosmo
-        self.z = z
+        if np.size(z_range) > 1:
+            raise ValueError("redshift dependence not yet implemented")
+        self.z_range = z_range
+        self.fgas500c_prms = fgas500c_prms
+        self.f_c = f_c
+        self.sigma_lnc = sigma_lnc
+        # self.gamma = gamma
 
     @property
     def r500c(self):
         return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
 
-    # @property
-    # def r200m_dmo(self):
-    #     return tools.mass_to_radius(self.m200m_dmo, self.cosmo.rho_m * 200)
+    @property
+    def f_bar(self):
+        return (self.cosmo.omegab/self.cosmo.omegam)
 
+    @property
+    def fgas500c(self):
+        '''
+        Return the f_gas(m500c) relation for m. The relation cannot exceed f_b
 
-    # @property
-    # def m200m(self):
-    #     return tools.m500c_to_m200m_duffy(self.m500c, self.cosmo.rho_crit,
-    #                                       self.cosmo.rho_m)
+        This function assumes h=0.7 for everything!
 
-    # @property
-    # def c200m(self):
-    #     '''
-    #     The density profiles always assume cosmology dependent variables
-    #     '''
-    #     return tools.c_duffy(self.m200m).reshape(-1)
+        Parameters
+        ----------
+        m : array [M_sun / h_70]
+        values of m500c to compute f_gas for
+        log10mc : float
+        the turnover mass for the relation in log10([M_sun/h_70])
+        a : float
+        the strength of the transition
+        fstar_500c : interpolator or function of z and m
+        asymptotic stellar fraction at r500c for each m500c
+        cosmo : hmf.cosmo.Cosmology object
+        relevant cosmological parameters
 
-    # @property
-    # def r200m(self):
-    #     return tools.mass_to_radius(self.m200m, self.cosmo.rho_m * 200)
+        Returns
+        -------
+        f_gas : array [h_70^(-3/2)]
+        gas fraction at r500c for m
+        '''
+        log10mt = self.fgas500c_prms["log10mt"]
+        a = self.fgas500c_prms["a"]
+        fstar500c_max_intrp = self.fgas500c_prms["fstar500c_max"]
 
-    # @property
-    # def m200c(self):
-    #     return np.array([tools.m200m_to_m200c_correa(m, self.cosmo.rho_crit,
-    #                                                  self.cosmo.rho_m,
-    #                                                  self.cosmo.h)
-    #                      for m in self.m200m])
+        x = np.log10(self.m500c / 0.7) - log10mt
 
-    # @property
-    # def r200c(self):
-    #     return tools.mass_to_radius(self.m200c, 200 * self.cosmo.rho_crit)
+        f_bar = self.f_bar
+        # gas fractions without adjustment for stellar fraction
+        fgas_fit = f_bar * (0.5 * (1 + np.tanh(x / a)))
 
-    # @property
-    # def m500c(self):
-    #     return np.array([tools.m200m_to_m500c_correa(mm, self.cosmo.rho_crit,
-    #                                                  self.cosmo.rho_m,
-    #                                                  self.cosmo.h, mc)
-    #                      for mm, mc in zip(self.m200m, self.m200c)])
+        # interpolate stellar fractions
+        coords = inp_interp.arrays_to_coords(self.z_range, np.log10(self.m500c))
+        fstar500c_max = fstar500c_max_intrp(coords).reshape(np.shape(self.z_range) +
+                                                            np.shape(self.m500c))
+    
+        # gas fractions that will cause halo to exceed cosmic baryon fraction
+        cb_exceeded = (fgas_fit >= (f_bar - fstar500c_max))
 
-    # @property
-    # def r500c(self):
-    #     return tools.mass_to_radius(self.m500c, 500 * self.cosmo.rho_crit)
+        # if fgas is simply an (m,) array, we need to tile it along the z-axis
+        if not fgas_fit.shape == cb_exceeded.shape:
+            fgas_fit = np.tile(fgas_fit.reshape(1,-1), (cb_exceeded.shape[0], 1))
 
-    # @property
-    # def c200m(self):
-    #     '''
-    #     The density profiles always assume cosmology dependent variables
-    #     '''
-    #     return (np.array([tools.c_correa(m, h=self.cosmo.h)
-    #                      for m in self.m200c]).reshape(-1)
-    #             * self.r200m / self.r200c)
+            fgas_fit[cb_exceeded] = (f_bar - fstar500c_max[cb_exceeded])
+
+        return fgas_fit
+
+    @property
+    def fsat_500c(self):
+        fsat_500c_interp = inp_interp.fsat500c_interp(f_c=self.f_c,
+                                                      sigma_lnc=self.sigma_lnc)
+        
+        # reshape z and m500c
+        z = np.tile(np.reshape(self.z_range, (-1,1)),
+                    (1, np.shape(self.m500c)[0]))
+        m500c = np.tile(np.reshape(self.m500c, (1,-1)),
+                        (np.shape(z)[0], 1))
+        fgas500c = self.fgas500c
+
+        coords = np.vstack([z.flatten(), np.log10(m500c).flatten(),
+                            fgas500c.flatten()]).T
+        fsat_500c = fsat_500c_interp(coords).reshape(fgas500c.shape)
+        return fsat_500c
+        
+    @property
+    def fcen_500c(self):
+        fcen_500c_interp = inp_interp.fcen500c_interp(f_c=self.f_c,
+                                                      sigma_lnc=self.sigma_lnc)
+        
+        # reshape z and m500c
+        z = np.tile(np.reshape(self.z_range, (-1,1)),
+                    (1, np.shape(self.m500c)[0]))
+        m500c = np.tile(np.reshape(self.m500c, (1,-1)),
+                        (np.shape(z)[0], 1))
+        fgas500c = self.fgas500c
+
+        coords = np.vstack([z.flatten(), np.log10(m500c).flatten(),
+                            fgas500c.flatten()]).T
+        fcen_500c = fcen_500c_interp(coords).reshape(fgas500c.shape)
+        return fcen_500c
+
+    @property
+    def m200m_dmo(self):
+        m200m_dmo_interp = inp_interp.m200m_dmo_interp(f_c=self.f_c,
+                                                       sigma_lnc=self.sigma_lnc)
+
+        # reshape z and m500c
+        z = np.tile(np.reshape(self.z_range, (-1,1)), (1, np.shape(self.m500c)[0]))
+        m500c = np.tile(np.reshape(self.m500c, (1,-1)), (np.shape(z)[0], 1))
+        fgas500c = self.fgas500c
+        
+        coords = np.vstack([z.flatten(), np.log10(m500c).flatten(),
+                            fgas500c.flatten()]).T
+        m200m_dmo = m200m_dmo_interp(coords).reshape(fgas500c.shape)
+        return m200m_dmo
+
+    @property
+    def c200m_dmo(self):
+        c200m_interp = inp_interp.c200m_interp()
+
+        # reshape z and m500c
+        z = np.tile(np.reshape(self.z_range, (-1,1)), (1, np.shape(self.m500c)[0]))
+        m200m_dmo = self.m200m_dmo
+        
+        coords = np.vstack([z.flatten(), np.log10(m200m_dmo).flatten()]).T
+        c200m_dmo = c200m_interp(coords).reshape(m200m_dmo.shape)
+        return c200m_dmo
+
+    @property
+    def r200m_dmo(self):
+        rho_mz = 200 * np.reshape(self.rho_m, (np.shape(self.z_range) + (1,)))
+        return tools.mass_to_radius(self.m200m_dmo, rho_mz)
 
     @property
     def dlnk(self):
-        return np.log(10) * (self.k_max - self.k_min)/np.float(self.k_bins)
+        return np.log(10) * (self.logk_max - self.logk_min)/np.float(self.k_bins)
 
     @property
     def k_range(self):
-        return np.logspace(self.k_min, self.k_max, self.k_bins)
+        return np.logspace(self.logk_min, self.logk_max, self.k_bins)
 
     @property
     def cosmo_prms(self):
@@ -173,6 +254,15 @@ class Parameters(object):
             "omegav": self.omegav,
             "n": self.n}
 
+    @property
+    def rho_crit(self):
+        return self.cosmo.rho_crit * (1 + self.z_range)**3
+
+    @property
+    def rho_m(self):
+        rho_critz = self.cosmo.rho_crit * (1 + self.z_range)**3
+        return self.cosmo.omegam * rho_critz
+
 # ------------------------------------------------------------------------------
 # End of Parameters()
 # ------------------------------------------------------------------------------
@@ -180,9 +270,41 @@ class Parameters(object):
 # ------------------------------------------------------------------------------
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
-prms1 = Parameters(m500c=np.logspace(11,12,101), k_min=-1.)
-prms2 = Parameters(m500c=np.logspace(12,13,101), k_min=-1.)
-prms3 = Parameters(m500c=np.logspace(13,14,101), k_min=-1.)
-prms4 = Parameters(m500c=np.logspace(14,15,101), k_min=-1.)
-
+# fiducial parameters
 prms = Parameters(m500c=np.logspace(11,15,101), k_min=-1.)
+
+# get different mass ranges
+prms_m1 = Parameters(m500c=np.logspace(11,12,101), k_min=-1.)
+prms_m2 = Parameters(m500c=np.logspace(12,13,101), k_min=-1.)
+prms_m3 = Parameters(m500c=np.logspace(13,14,101), k_min=-1.)
+prms_m4 = Parameters(m500c=np.logspace(14,15,101), k_min=-1.)
+
+prms_mmin = Parameters(m500c=np.logspace(7,15,201), k_min=-1.)
+prms_mmax = Parameters(m500c=np.logspace(11,16,101), k_min=-1.)
+prms_mbins = Parameters(m500c=np.logspace(11,15,501), k_min=-1.)
+
+# get different gas fractions
+prms_l10mt1 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                         fgas500c_prms={"log10mt": 13,
+                                        "a": 1.35,
+                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+prms_l10mt2 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                         fgas500c_prms={"log10mt": 13.5,
+                                        "a": 1.35,
+                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+prms_l10mt3 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                         fgas500c_prms={"log10mt": 14,
+                                        "a": 1.35,
+                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+prms_l10mt4 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                         fgas500c_prms={"log10mt": 14.5,
+                                        "a": 1.35,
+                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+prms_l10mt5 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                         fgas500c_prms={"log10mt": 15,
+                                        "a": 1.35,
+                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+
+
+
+

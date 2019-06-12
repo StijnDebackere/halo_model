@@ -21,6 +21,7 @@ import plot as pl
 
 import halo.parameters as p
 import halo.tools as tools
+import halo.input.interpolators as inp_interp
 
 import pdb
 
@@ -591,7 +592,7 @@ def convert_hm(r200m=True):
 # End of convert_hm()
 # ------------------------------------------------------------------------------
 
-def f_gas(m, log10mc, a, cosmo):
+def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0.):
     '''
     Return the f_gas(m500c) relation for m. The relation cannot exceed f_b
 
@@ -605,6 +606,8 @@ def f_gas(m, log10mc, a, cosmo):
       the turnover mass for the relation in log10([M_sun/h_70])
     a : float
       the strength of the transition
+    fstar_500c : interpolator or function of z and m
+      asymptotic stellar fraction at r500c for each m500c
     cosmo : hmf.cosmo.Cosmology object
       relevant cosmological parameters
 
@@ -614,36 +617,50 @@ def f_gas(m, log10mc, a, cosmo):
       gas fraction at r500c for m
     '''
     x = np.log10(m) - log10mc
-    # stellar fractions at r500c in clusters are ~1%
-    return (cosmo.omegab/cosmo.omegam - 0.015) * (0.5 * (1 + np.tanh(x / a)))
+
+    # gas fractions
+    fgas_fit = (cosmo.omegab/cosmo.omegam) * (0.5 * (1 + np.tanh(x / a)))
+
+    coords = inp_interp.arrays_to_coords(z, np.log10(m))
+    if np.size(z) > 1:
+        raise ValueError("redshift dependence not yet implemented")
+    fstar_500c_max = fstar_500c(coords).reshape(m.shape)
+    
+    # gas fractions that will cause halo to exceed cosmic baryon fraction
+    cb_exceeded = (fgas_fit >= (cosmo.omegab/cosmo.omegam - fstar_500c_max))
+    fgas_fit[cb_exceeded] = (cosmo.omegab/cosmo.omegam -
+                             fstar_500c_max[cb_exceeded])
+
+    return fgas_fit
 
 # ------------------------------------------------------------------------------
 # End of f_gas()
 # ------------------------------------------------------------------------------
 
-def logmgas(logm500c, cosmo, q=50, bias=False):
-    return np.log10(np.power(10, logm500c) * f_gas(np.power(10, logm500c),
-                                                   cosmo=cosmo,
-                                                   **f_gas_prms(cosmo, q=q, bias=bias)))
+# def logmgas(logm500c, cosmo, q=50, bias=False, fstar_500c=0.):
+#     return np.log10(np.power(10, logm500c) * f_gas(np.power(10, logm500c),
+#                                                    cosmo=cosmo,
+#                                                    fstar_500c=fstar_500c,
+#                                                    **f_gas_prms(cosmo, q=q, bias=bias)))
 
-def mgas_to_m500c(mgas500, cosmo, q=50):
-    '''
-    Invert f_gas relation to find m500c belonging to mgas
-    '''
-    logmgas_prms = {'cosmo': cosmo, 'q': q}
-    f1 = tools.inverse(logmgas, start=1., **logmgas_prms)
-    m500c = np.ones_like(mgas500)
-    # do everything logarithmically for speed, results in errors at .01% level
-    for idx, m in enumerate(mgas500):
-        m500c[idx] = np.power(10, f1(np.log10(m), **logmgas_prms))
+# def mgas_to_m500c(mgas500, cosmo, q=50, fstar_500c=0.):
+#     '''
+#     Invert f_gas relation to find m500c belonging to mgas
+#     '''
+#     logmgas_prms = {'cosmo': cosmo, 'q': q}
+#     f1 = tools.inverse(logmgas, start=1., **logmgas_prms)
+#     m500c = np.ones_like(mgas500)
+#     # do everything logarithmically for speed, results in errors at .01% level
+#     for idx, m in enumerate(mgas500):
+#         m500c[idx] = np.power(10, f1(np.log10(m), fstar_500c=f_star500c, **logmgas_prms))
 
-    return m500c
+#     return m500c
 
-# ------------------------------------------------------------------------------
-# End of mgas_to_m500c()
-# ------------------------------------------------------------------------------
+# # ------------------------------------------------------------------------------
+# # End of mgas_to_m500c()
+# # ------------------------------------------------------------------------------
     
-def f_gas_prms(cosmo, q=50, bias=False):
+def f_gas_prms(cosmo, z=0., q=50, bias=False):
     '''
     Compute best fit parameters to the f_gas(m500c) relation with both f_gas and
     m500c assuming h=0.7
@@ -668,19 +685,29 @@ def f_gas_prms(cosmo, q=50, bias=False):
     m_bins = np.logspace(m500_obs.min(), m500_obs.max(), n_m)
     m = tools.bins2center(m_bins)
 
+    if np.size(z) > 1:
+        raise ValueError("redshift dependence not yet implemented")
+    # get the coordinate arrays for interpolation of the maximum stellar fractions
+    coords = inp_interp.arrays_to_coords(z, np.log10(m))
+    fstar_500c_max = inp_interp.fstar_500c_max_interp()
+
     # m_bins is in Hubble units
     m_bin_idx = np.digitize(10**(m500_obs), m_bins)
 
     f_q = np.array([np.percentile(f_obs[m_bin_idx == m_bin], q)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    fqopt, fqcov = opt.curve_fit(lambda m, log10mc, a: f_gas(m, log10mc, a, cosmo),
-                                 m[m>1e14], f_q[m>1e14],
+    f_gas_fit = lambda m, log10mc, a: f_gas(m=m, log10mc=log10mc,
+                                            a=a, cosmo=cosmo,
+                                            fstar_500c=fstar_500c_max)
+
+    fqopt, fqcov = opt.curve_fit(f_gas_fit, m[m>1e14], f_q[m>1e14],
                                  bounds=([10, 0],
-                                         [100, 20]))
+                                         [20, 20]))
 
     fq_prms = {"log10mc": fqopt[0],
-               "a": fqopt[1]}
+               "a": fqopt[1],
+               "fstar_500c_max": fstar_500c_max}
 
     return fq_prms
 
@@ -715,8 +742,8 @@ def f_stars(m200m, comp='all'):
     # m_h is in Hubble units
     # all the fractions have assumed h=0.7
     m_h, f_stars, f_cen, f_sat = np.loadtxt(ddir +
-                                              'data_mccarthy/stars/StellarFraction-Mh.txt',
-                                              unpack=True)
+                                            'data_mccarthy/stars/StellarFraction-Mh.txt',
+                                            unpack=True)
 
     # we need to convert the halo mass to h=0.7 as well
     m_h = m_h / 0.7
