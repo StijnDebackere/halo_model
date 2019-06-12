@@ -56,13 +56,12 @@ def optimize(func, a, b, fill, *args):
 
     If no optimum can be found, assume fill
     """
-    t1 = time.time()
+    # t1 = time.time()
     try:
         result = opt.brentq(func, a, b, args=args)
     except ValueError:
         result = fill
-    t2 = time.time()
-    print(t2 - t1)
+    # t2 = time.time()
     return result
 
 def convert_cosmo_commah(cosmo):
@@ -1212,7 +1211,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
     }
 
     af = asdf.AsdfFile(result_info)
-    fname_append = "_fc_{}_slnc_{}_rc_{}_beta_{}_rflat_{}.asdf".format(fc, sigma_lnc,
+    fname_append = "_fc_{}_slnc_{}_rc_{}_beta_{}_rflat_{}.asdf".format(f_c, sigma_lnc,
                                                                        r_c, beta, r_flat)
     af.write_to(table_dir + fname + fname_append)
     af.close()
