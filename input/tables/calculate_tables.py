@@ -49,10 +49,9 @@ h = np.linspace(cosmo.h - 0.02, cosmo.h + 0.02, 3)
 # Tools for table and interpolation functions #
 ###############################################
 
-@np.vectorize
 def optimize(func, a, b, fill, *args):
     """
-    Helper function to allow for vectorized calls to brentq
+    Helper function to brentq
 
     If no optimum can be found, assume fill
     """
@@ -564,7 +563,6 @@ def table_c200m_correa(m200m=m200m,
         # need to tile redshifts to match the masses
         coords = np.vstack([np.tile(z_t.reshape(-1,1), (1, m200m_t.shape[1])).flatten(),
                             np.log10(m200m_t).flatten()]).T
-        print(coords)
         c_interp = interpolate.LinearNDInterpolator(coords, c200m_t.flatten())
 
         # now interpolate to a regular and fixed grid in m200m
@@ -877,9 +875,9 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # --------------------------------------------------
     def calc_m_diff(procn, m500c, r500c, fg500c, fs200m,
                     fc200m, c200m, z, out_q):
-        m200m_dmo = optimize(m_diff, m500c, 5. * m500c, -1.,
-                             *(m500c, r500c, fg500c, fs200m,
-                               fc200m, c200m, z))
+        m200m_dmo = np.vectorize(optimize, otypes=[np.float64])(m_diff, m500c, 5. * m500c, -1.,
+                                                                *(m500c, r500c, fg500c, fs200m,
+                                                                  fc200m, c200m, z))
         # now we have m200m_dmo, so we calculate again all the other
         # resulting variables
 
@@ -1053,7 +1051,6 @@ def table_m500c_to_gamma_max(m500c=m500c,
             m_diff = m_f(r, **kwargs) - m200m
             return m_diff
 
-        # print(r200m_dmo, diff_m200m(0.2 * r200m_dmo), diff_m200m(2 * r200m_dmo))
         r200m = opt.brentq(diff_m200m, 0.2 * r200m_dmo, 2 * r200m_dmo)
         return r200m
 
@@ -1141,12 +1138,12 @@ def table_m500c_to_gamma_max(m500c=m500c,
         # Then we iterate over gamma for each m200m_dmo to determine which
         # values of gamma keep the total mass in the baryonic component
         # below the cosmic baryon fraction at their r200m_obs
-        gamma = optimize(fb_diff, 0, 1000, 0, *(z, m500c, fg500c, r500c,
-                                                fc500c, fs500c, m200m_dmo,
-                                                c200m_dmo))
-            
+        gamma = np.vectorize(optimize, otypes=[np.float64])(fb_diff, 0., 1000., 0,
+                                                            *(z, m500c, fg500c, r500c,
+                                                              fc500c, fs500c, m200m_dmo,
+                                                              c200m_dmo))
+                             
         out_q.put([procn, gamma])
-        return gamma
         # --------------------------------------------------
     if cpus == None:
         cpus = multi.cpu_count()
@@ -1192,7 +1189,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 
     # need to sort results
     results.sort()
-    gamma_max = np.concatenate([item[1] for item in results], axis=-2)
+    gamma_max = np.concatenate([item[1] for item in results], axis=1)
 
     result_info = {
         "dims": np.array(["z", "m500c", "fgas_500c"]),
