@@ -239,6 +239,36 @@ def fsat500c_interp(f_c, sigma_lnc, m_file=None):
 # End of fsat_500c_interp()
 # ------------------------------------------------------------------------------
 
+def fbar500c_interp(f_c, sigma_lnc, m_file=None):
+    '''
+    Return the interpolator for the c200m(m200m) relation
+    '''
+    if m_file is None:
+        m_file = table_dir + "m500c_to_m200m_dmo_fc_{}_slnc_{}.asdf".format(f_c,
+                                                                            sigma_lnc)
+
+    af = asdf.open(m_file)
+
+    if f_c != af.tree["f_c"]:
+        raise ValueError("f_c in {} is not {}".format(m_file, f_c))
+    if sigma_lnc != af.tree["sigma_lnc"]:
+        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
+
+    z = af.tree["z"][:]
+    m = af.tree["m500c"][:]
+    f = af.tree["fgas_500c"][:]
+    fbar_500c = af.tree["fbar_500c"][:]
+    
+    coords = (z, np.log10(m), f)
+
+    fbar_500c_interp = interpolate.RegularGridInterpolator(coords, fbar_500c)
+
+    return fbar_500c_interp
+    
+# ------------------------------------------------------------------------------
+# End of fbar_500c_interp()
+# ------------------------------------------------------------------------------
+
 def fstar_500c_max_interp(f_c, sigma_lnc, m_file=None):
     '''
     Return the interpolator for the c200m(m200m) relation

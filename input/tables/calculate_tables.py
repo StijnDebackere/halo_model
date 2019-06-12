@@ -971,6 +971,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         "fcen_500c": fcen_500c,
         "fsat_500c": fsat_500c,
         "fbar_500c": fbar_500c,
+        "mask": mask,
         "m200m_dmo": m200m_dmo
     }
 
@@ -1190,6 +1191,10 @@ def table_m500c_to_gamma_max(m500c=m500c,
     # need to sort results
     results.sort()
     gamma_max = np.concatenate([item[1] for item in results], axis=1)
+
+    # we still need to get our mask
+    fbar_500c = inp_interp.fbar500c_interp(f_c=f_c, sigma_lnc=sigma_lnc)(z_r, m500c_r, fgas500c_r)
+    mask = (fbar_500c == np.nan)
 
     result_info = {
         "dims": np.array(["z", "m500c", "fgas_500c"]),
