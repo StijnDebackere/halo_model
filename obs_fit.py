@@ -814,7 +814,11 @@ def m200m_dmo(m500c, r500c, f_gas500c, f_c, cosmo):
     pass
 
 # @do_cprofile
-def load_gamma(prms, r_max,
+def load_gamma(prms=p.prms,
+               # this needs to match maximum radius in dp.r_fb_from_f
+               # since that's the range over which we will assume r_fb
+               # can be reached
+               r_max=100*p.prms.r500c,
                gamma=np.array([2.]),
                r_flat=np.array([None]),
                f_c=0.86,
@@ -836,8 +840,8 @@ def load_gamma(prms, r_max,
     ----------
     prms : p.Parameters object
       model parameters
-    r_max : float
-      maximum radius to extend our profiles upto
+    r_max : array
+      maximum radius to extend our profiles up to for each mass
     gamma : array
       values of the slope to compute for
     r_flat : array
