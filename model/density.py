@@ -73,7 +73,7 @@ class Profile(object):
                  # r_h=p.prms.r200m_dmo,
                  r_bins=p.prms.r_bins,
                  k_range=p.prms.k_range,
-                 z=p.prms.z,
+                 z=p.prms.z_range,
                  # profile=profs.profile_NFW,
                  profile_args=None,
                  # profile_mass=tools.m_NFW,
@@ -146,40 +146,6 @@ class Profile(object):
                        extrap=self.extrap,
                        cpus=self.cpus)
 
-    # def __sub__(self, other):
-    #     if not np.allclose(self.r_min, other.r_min):
-    #         raise AttributeError('Profiles need same r_min')
-    #     if not np.allclose(self.r_h, other.r_h):
-    #         raise AttributeError('Profiles need same r_h')
-    #     if not np.allclose(self.r_bins, other.r_bins):
-    #         raise AttributeError('Profiles need same r_bins')
-    #     if not np.allclose(self.k_range, other.k_range):
-    #         raise AttributeError('Profiles need same k_range')
-    #     if not np.allclose(self.z, other.z):
-    #         raise AttributeError('Profiles need same z')
-
-    #     profile_args = tools.merge_dicts(self.profile_args, other.profile_args)
-    #     profile_mass = (lambda r, **kwargs: self.profile_mass(r, **self.profile_args) -
-    #                     other.profile_mass(r, **other.profile_args))
-    #     profile = self.rho_r - other.rho_r
-    #     profile_f = self.rho_k - other.rho_k
-
-    #     return Profile(cosmo=self.cosmo,
-    #                    r_min=self.r_min,
-    #                    r_h=self.r_h,
-    #                    r_bins=self.r_bins,
-    #                    k_range=self.k_range,
-    #                    z=self.z,
-    #                    profile=profile,
-    #                    profile_args=profile_args,
-    #                    profile_mass=profile_mass,
-    #                    profile_f=profile_f,
-    #                    profile_f_args=None,
-    #                    n=self.n,
-    #                    taylor_err=self.taylor_err,
-    #                    extrap=self.extrap,
-    #                    cpus=self.cpus)
-
     #===========================================================================
     # Methods
     #===========================================================================
@@ -225,22 +191,19 @@ class Profile(object):
         else:
             dens_profile = self.profile
 
-        # we do this roundabout inequality because there is a different roundoff
-        # in the logspace for r_range to r_max
-        m_in_prof = np.array([tools.m_h(dens_profile[idx][tools.lte(r, self.r_h[idx])],
-                                        r[tools.lte(r, self.r_h[idx])])
-                              for idx, r in enumerate(self.r_range)])
+        # # we do this roundabout inequality because there is a different roundoff
+        # # in the logspace for r_range to r_max
+        # m_in_prof = np.array([tools.m_h(dens_profile[idx][tools.lte(r, self.r_h[idx])],
+        #                                 r[tools.lte(r, self.r_h[idx])])
+        #                       for idx, r in enumerate(self.r_range)])
 
-        # m_in_prof1 = self.m_r(self.r_h)
-        # print m_in_prof / m_in_prof1
+        # frac_diff = np.max(np.abs(m_in_prof / self.m_h - 1))
 
-        frac_diff = np.max(np.abs(m_in_prof / self.m_h - 1))
-
-        # only raise a warning in this case, since otherwise you have to keep
-        # tweaking r_min and r_bins. Warning is sufficient, user decides whether
-        # the level is acceptable...
-        if frac_diff > 5e-3:
-            warnings.warn('the mass in rho_r and m_h differ at 5x10^-3 level ({:.3e})'.format(frac_diff))
+        # # only raise a warning in this case, since otherwise you have to keep
+        # # tweaking r_min and r_bins. Warning is sufficient, user decides whether
+        # # the level is acceptable...
+        # if frac_diff > 5e-3:
+        #     warnings.warn('the mass in rho_r and m_h differ at 5x10^-3 level ({:.3e})'.format(frac_diff))
 
         if len(dens_profile.shape) != 2:
             raise ValueError('profile should be an (m,r) array. ')

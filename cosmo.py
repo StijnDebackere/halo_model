@@ -84,7 +84,12 @@ class Cosmology(object):
         # Set some simple parameters
         self.force_flat = force_flat
 
-        self.cosmo_update(**kwargs)
+        # if no kwargs are given, assume the default cosmology
+        if not any(kwargs):
+            if default == "wmap9_nobao":
+                self.cosmo_update(**dict(wmap9_nobao, **extras))
+        else:
+            self.cosmo_update(**kwargs)
 
     def __update_base(self):
         """
@@ -138,8 +143,6 @@ class Cosmology(object):
         if "omegab" in kwargs and "omegab_h2" in kwargs:
             if kwargs["omegab"] != kwargs["omegab_h2"] * self.h ** 2:
                 raise ValueError("Inconsistent arguments: omegab and omegab_h2")
-            else:
-                del kwargs["omegab"]
 
         if "omegac" in kwargs and "omegac_h2" in kwargs:
             if kwargs["omegac"] != kwargs["omegac_h2"] * self.h ** 2:
@@ -425,6 +428,6 @@ wmap9_nobao = {'sigma_8': 0.821,
                'tau': 0.089,
                'omegab': 0.0463,
                'omegac': 0.233,
-               'omegam': 0.0463 + 0.233,
+               'omegam': 0.2793,
                'omegav': 0.7207,
                'n': 0.972}

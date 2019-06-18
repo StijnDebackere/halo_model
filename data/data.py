@@ -592,7 +592,7 @@ def convert_hm(r200m=True):
 # End of convert_hm()
 # ------------------------------------------------------------------------------
 
-def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0.):
+def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0., norm=None):
     '''
     Return the f_gas(m500c) relation for m. The relation cannot exceed f_b
 
@@ -618,8 +618,10 @@ def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0.):
     '''
     x = np.log10(m) - log10mc
 
+    if norm is None:
+        norm = (cosmo.omegab/cosmo.omegam)
     # gas fractions
-    fgas_fit = (cosmo.omegab/cosmo.omegam) * (0.5 * (1 + np.tanh(x / a)))
+    fgas_fit = norm * (0.5 * (1 + np.tanh(x / a)))
 
     coords = inp_interp.arrays_to_coords(z, np.log10(m))
     if np.size(z) > 1:
@@ -660,7 +662,7 @@ def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0.):
 # # End of mgas_to_m500c()
 # # ------------------------------------------------------------------------------
     
-def f_gas_prms(cosmo, z=0., q=50, bias=False):
+def f_gas_prms(cosmo, z=0., q=50, f_c=0.86, sigma_lnc=0.0, bias=False):
     '''
     Compute best fit parameters to the f_gas(m500c) relation with both f_gas and
     m500c assuming h=0.7
@@ -689,7 +691,7 @@ def f_gas_prms(cosmo, z=0., q=50, bias=False):
         raise ValueError("redshift dependence not yet implemented")
     # get the coordinate arrays for interpolation of the maximum stellar fractions
     coords = inp_interp.arrays_to_coords(z, np.log10(m))
-    fstar_500c_max = inp_interp.fstar_500c_max_interp()
+    fstar_500c_max = inp_interp.fstar_500c_max_interp
 
     # m_bins is in Hubble units
     m_bin_idx = np.digitize(10**(m500_obs), m_bins)
@@ -699,7 +701,8 @@ def f_gas_prms(cosmo, z=0., q=50, bias=False):
 
     f_gas_fit = lambda m, log10mc, a: f_gas(m=m, log10mc=log10mc,
                                             a=a, cosmo=cosmo,
-                                            fstar_500c=fstar_500c_max)
+                                            fstar_500c=fstar_500c_max(f_c=f_c,
+                                                                      sigma_lnc=sigma_lnc))
 
     fqopt, fqcov = opt.curve_fit(f_gas_fit, m[m>1e14], f_q[m>1e14],
                                  bounds=([10, 0],

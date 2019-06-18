@@ -13,6 +13,7 @@ import halo.tools as tools
 import halo.input.initialize as init
 import halo.input.interpolators as inp_interp
 import halo.density_profiles as dp
+import halo.cosmo as cosmo
 
 import sys
 if sys.version_info[0] >= 3:
@@ -37,7 +38,7 @@ m500c = np.logspace(6, 16, 200)
 
 z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
 
-cosmo = init.default["cosmo"]
+cosmo=cosmo.Cosmology()
 sigma8 = np.linspace(cosmo.sigma_8 - 0.02, cosmo.sigma_8 + 0.02, 3)
 omegam = np.linspace(cosmo.omegam - 0.02, cosmo.omegam + 0.02, 3)
 omegab = cosmo.omegab
@@ -56,9 +57,19 @@ def optimize(func, a, b, fill, *args):
     If no optimum can be found, assume fill
     """
     # t1 = time.time()
+    # lb = func(a, *args)
+    # ub = func(b, *args)
+    # if np.isnan(lb) or np.isnan(ub):
+    #     print(ub, lb)
     try:
         result = opt.brentq(func, a, b, args=args)
     except ValueError:
+        print("log10(m500c)     : ", np.log10(args[1]))
+        print("fg500c           : ", args[2])
+        print("log10(m200m_dmo) : ", np.log10(args[6]((args[0], np.log10(args[1]), args[2]))))
+        print("lb: ",func(a, *args))
+        print("ub: ",func(b, *args))
+        print("===============================")
         result = fill
     # t2 = time.time()
     return result
@@ -946,10 +957,14 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
 
     # we cannot halo baryon fractions greater than cosmic
     mask = (fbar_500c > omegab / omegam)
-    m200m_dmo = np.ma.masked_array(m200m_dmo, mask=mask)
-    fcen_500c = np.ma.masked_array(fcen_500c, mask=mask)
-    fsat_500c = np.ma.masked_array(fsat_500c, mask=mask)
-    fbar_500c = np.ma.masked_array(fbar_500c, mask=mask)
+    # m200m_dmo = np.ma.masked_array(m200m_dmo, mask=mask)
+    # fcen_500c = np.ma.masked_array(fcen_500c, mask=mask)
+    # fsat_500c = np.ma.masked_array(fsat_500c, mask=mask)
+    # fbar_500c = np.ma.masked_array(fbar_500c, mask=mask)
+    m200m_dmo[mask] = np.nan
+    fcen_500c[mask] = np.nan
+    fsat_500c[mask] = np.nan
+    fbar_500c[mask] = np.nan
 
     # get the asymptotic stellar fractions for each redshift and halo mass
     fstar_500c_max = np.nanmax((fcen_500c + fsat_500c), axis=-1)
@@ -1125,6 +1140,9 @@ def table_m500c_to_gamma_max(m500c=m500c,
         m_gas = m_gas_from_m500c(gamma=gamma, z=z, m500c=m500c, fg500c=fg500c,
                                  r500c=r500c)
         m_tot = lambda r: m_dm(r) + m_stars(r) + m_gas(r)
+        # print(m_gas(r500c), m_stars(r500c), m_dm(r500c))
+        if fg500c == f_b:
+            print(fg500c, m200m_dmo((z, np.log10(m500c), fg500c)))
         m200m = m200m_dmo((z, np.log10(m500c), fg500c))
         r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
         r200m_obs = r200m_from_m(m_tot, r200m)
@@ -1133,12 +1151,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
     def gamma_from_m500c(procn, z, m500c, fg500c, r500c,
                          fc500c, fs500c, m200m_dmo, c200m_dmo,
                          out_q):
-        # First, we need to calculate the mass profiles for the stars & DM
-        # that don't change.
-        #
-        # Then we iterate over gamma for each m200m_dmo to determine which
-        # values of gamma keep the total mass in the baryonic component
-        # below the cosmic baryon fraction at their r200m_obs
+        # 
         gamma = np.vectorize(optimize, otypes=[np.float64])(fb_diff, 0., 1000., 0,
                                                             *(z, m500c, fg500c, r500c,
                                                               fc500c, fs500c, m200m_dmo,
@@ -1193,7 +1206,8 @@ def table_m500c_to_gamma_max(m500c=m500c,
     gamma_max = np.concatenate([item[1] for item in results], axis=1)
 
     # we still need to get our mask
-    fbar_500c = inp_interp.fbar500c_interp(f_c=f_c, sigma_lnc=sigma_lnc)(z_r, m500c_r, fgas500c_r)
+    fbar_500c = inp_interp.fbar500c_interp(f_c=f_c, sigma_lnc=sigma_lnc)((z_r, np.log10(m500c_r),
+                                                                          fgas500c_r))
     mask = (fbar_500c == np.nan)
 
     result_info = {

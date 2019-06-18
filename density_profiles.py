@@ -1225,7 +1225,7 @@ def r_fb_from_f(f_b, cosmo, **kwargs):
         r500c = kwargs['r500c']
 
     try:
-        r_fb = opt.brentq(diff_fb, 0.5 * r500c, 30 * r500c)
+        r_fb = opt.brentq(diff_fb, 0.5 * r500c, 100 * r500c)
     except ValueError:
         r_fb = np.inf
 

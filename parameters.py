@@ -29,7 +29,7 @@ class Parameters(object):
       Number of k bins to compute tranfer function for
     cosmo : hmf.Cosmology object
       cosmological parameters to compute for
-    z : float or array
+    z_range : float or array
       Redshift to compute for
     fgas500c_prms : dict
       "log10mt" : turnover mass for the fgas500c-m500c relation
@@ -77,18 +77,12 @@ class Parameters(object):
                  # integration
                  r_min=-4, r_bins=100,
                  logk_min=-1.8, logk_max=2., k_bins=200,
-                 cosmo=cosmo.Cosmology(**{'sigma_8': 0.821,
-                                          'H0': 70.0,
-                                          'omegab': 0.0463,
-                                          'omegac': 0.233,
-                                          'omegam': 0.0463 + 0.233,
-                                          'omegav': 0.7207,
-                                          'n': 0.972}),
+                 cosmo=cosmo.Cosmology(),
                  z_range=0.,
-                 fgas500c_prms={"log10mt": 13.94,
-                                "a": 1.35,
-                                "fstar500c_max": inp_interp.fstar_500c_max_interp(f_c=0.86,
-                                                                                  sigma_lnc=0.0)},
+                 fgas_500c_prms={"log10mt": 13.94,
+                                 "a": 1.35,
+                                 "norm": None,
+                                 "fstar500c_max": inp_interp.fstar_500c_max_interp},
                  f_c=0.86,
                  sigma_lnc=0.0,
                  # gamma=np.linspace(0., 3., 9)
@@ -106,7 +100,7 @@ class Parameters(object):
         if np.size(z_range) > 1:
             raise ValueError("redshift dependence not yet implemented")
         self.z_range = z_range
-        self.fgas500c_prms = fgas500c_prms
+        self.fgas_500c_prms = fgas_500c_prms
         self.f_c = f_c
         self.sigma_lnc = sigma_lnc
         # self.gamma = gamma
@@ -120,7 +114,7 @@ class Parameters(object):
         return (self.cosmo.omegab/self.cosmo.omegam)
 
     @property
-    def fgas500c(self):
+    def fgas_500c(self):
         '''
         Return the f_gas(m500c) relation for m. The relation cannot exceed f_b
 
@@ -144,15 +138,22 @@ class Parameters(object):
         f_gas : array [h_70^(-3/2)]
         gas fraction at r500c for m
         '''
-        log10mt = self.fgas500c_prms["log10mt"]
-        a = self.fgas500c_prms["a"]
-        fstar500c_max_intrp = self.fgas500c_prms["fstar500c_max"]
+        log10mt = self.fgas_500c_prms["log10mt"]
+        a = self.fgas_500c_prms["a"]
+        fstar500c_max_intrp = self.fgas_500c_prms["fstar500c_max"](f_c=self.f_c,
+                                                                   sigma_lnc=self.sigma_lnc)
+        # allow for non-standard normalisations of the baryon fraction
+        norm = self.fgas_500c_prms.get("norm", None)
+
+        f_bar = self.f_bar
+
+        if norm is None:
+            norm = f_bar
 
         x = np.log10(self.m500c / 0.7) - log10mt
 
-        f_bar = self.f_bar
         # gas fractions without adjustment for stellar fraction
-        fgas_fit = f_bar * (0.5 * (1 + np.tanh(x / a)))
+        fgas_fit = norm * (0.5 * (1 + np.tanh(x / a)))
 
         # interpolate stellar fractions
         coords = inp_interp.arrays_to_coords(self.z_range, np.log10(self.m500c))
@@ -166,7 +167,7 @@ class Parameters(object):
         if not fgas_fit.shape == cb_exceeded.shape:
             fgas_fit = np.tile(fgas_fit.reshape(1,-1), (cb_exceeded.shape[0], 1))
 
-            fgas_fit[cb_exceeded] = (f_bar - fstar500c_max[cb_exceeded])
+        fgas_fit[cb_exceeded] = (f_bar - fstar500c_max[cb_exceeded])
 
         return fgas_fit
 
@@ -180,11 +181,11 @@ class Parameters(object):
                     (1, np.shape(self.m500c)[0]))
         m500c = np.tile(np.reshape(self.m500c, (1,-1)),
                         (np.shape(z)[0], 1))
-        fgas500c = self.fgas500c
+        fgas_500c = self.fgas_500c
 
         coords = np.vstack([z.flatten(), np.log10(m500c).flatten(),
-                            fgas500c.flatten()]).T
-        fsat_500c = fsat_500c_interp(coords).reshape(fgas500c.shape)
+                            fgas_500c.flatten()]).T
+        fsat_500c = fsat_500c_interp(coords).reshape(fgas_500c.shape)
         return fsat_500c
         
     @property
@@ -197,11 +198,11 @@ class Parameters(object):
                     (1, np.shape(self.m500c)[0]))
         m500c = np.tile(np.reshape(self.m500c, (1,-1)),
                         (np.shape(z)[0], 1))
-        fgas500c = self.fgas500c
+        fgas_500c = self.fgas_500c
 
         coords = np.vstack([z.flatten(), np.log10(m500c).flatten(),
-                            fgas500c.flatten()]).T
-        fcen_500c = fcen_500c_interp(coords).reshape(fgas500c.shape)
+                            fgas_500c.flatten()]).T
+        fcen_500c = fcen_500c_interp(coords).reshape(fgas_500c.shape)
         return fcen_500c
 
     @property
@@ -212,11 +213,11 @@ class Parameters(object):
         # reshape z and m500c
         z = np.tile(np.reshape(self.z_range, (-1,1)), (1, np.shape(self.m500c)[0]))
         m500c = np.tile(np.reshape(self.m500c, (1,-1)), (np.shape(z)[0], 1))
-        fgas500c = self.fgas500c
+        fgas_500c = self.fgas_500c
         
         coords = np.vstack([z.flatten(), np.log10(m500c).flatten(),
-                            fgas500c.flatten()]).T
-        m200m_dmo = m200m_dmo_interp(coords).reshape(fgas500c.shape)
+                            fgas_500c.flatten()]).T
+        m200m_dmo = m200m_dmo_interp(coords).reshape(fgas_500c.shape)
         return m200m_dmo
 
     @property
@@ -228,7 +229,8 @@ class Parameters(object):
         m200m_dmo = self.m200m_dmo
         
         coords = np.vstack([z.flatten(), np.log10(m200m_dmo).flatten()]).T
-        c200m_dmo = c200m_interp(coords).reshape(m200m_dmo.shape)
+        c200m_dmo = (c200m_interp(coords).reshape(m200m_dmo.shape) *
+                     np.e**self.sigma_lnc)
         return c200m_dmo
 
     @property
@@ -278,6 +280,10 @@ prms_m1 = Parameters(m500c=np.logspace(11,12,101), k_min=-1.)
 prms_m2 = Parameters(m500c=np.logspace(12,13,101), k_min=-1.)
 prms_m3 = Parameters(m500c=np.logspace(13,14,101), k_min=-1.)
 prms_m4 = Parameters(m500c=np.logspace(14,15,101), k_min=-1.)
+prms_m = [prms_m1,
+          prms_m2,
+          prms_m3,
+          prms_m4]
 
 prms_mmin = Parameters(m500c=np.logspace(7,15,201), k_min=-1.)
 prms_mmax = Parameters(m500c=np.logspace(11,16,101), k_min=-1.)
@@ -285,26 +291,34 @@ prms_mbins = Parameters(m500c=np.logspace(11,15,501), k_min=-1.)
 
 # get different gas fractions
 prms_l10mt1 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
-                         fgas500c_prms={"log10mt": 13,
-                                        "a": 1.35,
-                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+                         fgas_500c_prms={"log10mt": 13,
+                                         "a": 1.35,
+                                         "fstar500c_max": inp_interp.fstar_500c_max_interp})
 prms_l10mt2 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
-                         fgas500c_prms={"log10mt": 13.5,
-                                        "a": 1.35,
-                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+                         fgas_500c_prms={"log10mt": 13.5,
+                                         "a": 1.35,
+                                         "fstar500c_max": inp_interp.fstar_500c_max_interp})
 prms_l10mt3 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
-                         fgas500c_prms={"log10mt": 14,
-                                        "a": 1.35,
-                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+                         fgas_500c_prms={"log10mt": 14,
+                                         "a": 1.35,
+                                         "fstar500c_max": inp_interp.fstar_500c_max_interp})
 prms_l10mt4 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
-                         fgas500c_prms={"log10mt": 14.5,
-                                        "a": 1.35,
-                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+                         fgas_500c_prms={"log10mt": 14.5,
+                                         "a": 1.35,
+                                         "fstar500c_max": inp_interp.fstar_500c_max_interp})
 prms_l10mt5 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
-                         fgas500c_prms={"log10mt": 15,
-                                        "a": 1.35,
-                                        "fstar500c_max": inp_interp.fstar_500c_max_interp(0.86, 0.0)})
+                         fgas_500c_prms={"log10mt": 15,
+                                         "a": 1.35,
+                                         "fstar500c_max": inp_interp.fstar_500c_max_interp})
+prms_l10mt = [prms_l10mt1,
+              prms_l10mt2,
+              prms_l10mt3,
+              prms_l10mt4,
+              prms_l10mt5]
 
-
-
-
+# get constant fgas_500c at f_bar
+prms_fconst = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                         fgas_500c_prms={"log10mt": 0,
+                                         "a": np.inf,
+                                         "norm": 2*prms.f_bar,
+                                         "fstar500c_max": inp_interp.fstar_500c_max_interp})
