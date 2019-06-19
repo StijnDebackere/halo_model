@@ -753,7 +753,6 @@ def load_gamma(prms=p.prms,
         gamma_max = gamma_mx(coords).reshape(np.shape(z_range) +
                                              np.shape(prms.m500c))
 
-        print(gamma_max)
         for idx_g, g in enumerate(gamma):
             g = np.where(gamma_max > g, gamma_max, g)
 
@@ -778,9 +777,8 @@ def load_gamma(prms=p.prms,
                                                sl=i)
                                   for i in np.arange(0, prms.r500c.shape[0])])
 
-            print(r200m_obs / r200m_dmo)
             m200m_obs = tools.radius_to_mass(r200m_obs, 200 * prms.cosmo.rho_m)
-
+            
             # now we need to correct the gas, baryonic and total masses in case
             # r_flat is None, since then we will MAKE r_flat = r200m_obs
             if r_fl is None:

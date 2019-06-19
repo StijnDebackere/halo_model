@@ -1088,7 +1088,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
         r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
         c200m = c200m_dmo((z, np.log10(m200m)))
         fcen500c = fc500c((z, np.log10(m500c), fg500c))
-        fsat500c = fc500c((z, np.log10(m500c), fg500c))
+        fsat500c = fs500c((z, np.log10(m500c), fg500c))
         fstars500c = fsat500c + fcen500c
 
         # convert c200m to c500c_sat
@@ -1159,7 +1159,6 @@ def table_m500c_to_gamma_max(m500c=m500c,
         r200m_obs = np.vectorize(r200m_from_m, otypes=[np.float64])(m_tot, r200m)
         return (m_gas(r200m_obs) + m_stars(r200m_obs)) / m_tot(r200m_obs) - f_b
 
-
     @np.vectorize
     def compute_fbar_diff_gamma(gamma, z, m500c, fg500c, r500c, fc500c, fs500c, m200m_dmo, c200m_dmo):
         m_dm, m_stars = m_dm_stars_from_m500c(z=z, m500c=m500c, fg500c=fg500c,
@@ -1175,6 +1174,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
         r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
         r200m_obs = np.vectorize(r200m_from_m, otypes=[np.float64])(m_tot, r200m)
         fb_diff = ((m_gas(r200m_obs) + m_stars(r200m_obs)) / m_tot(r200m_obs)) - f_b
+
         if np.abs(fb_diff) > 1e-4 and fg500c > 0 and fg500c < f_b:
             print("z          :", z)
             print("m500c      :", np.log10(m500c))
