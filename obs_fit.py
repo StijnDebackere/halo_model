@@ -461,6 +461,41 @@ def r200m_from_m(m_f, r200m_dmo, cosmo, **kwargs):
 # End of r200m_from_m()
 # ----------------------------------------------------------------------
 
+def r_fb_from_f(f_b, cosmo, r500c, r_max, **kwargs):
+    '''
+    For a given cumulative mass profile m_f that takes the radius as its first
+    argument, compute the radius where the mean enclosed density is 200 rho_m
+
+    Parameters
+    ----------
+    m_f : function
+      function to compute cumulative mass profile, radius is its first arg
+    cosmo : cosmo.Cosmology object
+      cosmology information
+    r500c : float
+      radius to start search at
+    r_max : float
+      radius to finish search at
+    kwargs : dict
+      arguments for m_f
+
+    Returns
+    -------
+    r200m : float
+      radius where mean enclosed density is 200 rho_m
+    '''
+    def diff_fb(r):
+        fb = cosmo.omegab / cosmo.omegam
+        f_diff = f_b(r, **kwargs) - fb
+        return f_diff
+
+    try:
+        r_fb = opt.brentq(diff_fb, r500c, r_max)
+    except ValueError:
+        r_fb = np.inf
+
+    return r_fb
+
 # @np.vectorize
 # def gamma_from_m500c(m500c, cosmo, f_c=0.86, r_flat=None, q_f=50,
 #                      q_rc=50, q_beta=50, f_prms=None, sigma_lnc=0.,
@@ -598,9 +633,6 @@ def r200m_from_m(m_f, r200m_dmo, cosmo, **kwargs):
 
 # @do_cprofile
 def load_gamma(prms=p.prms,
-               # this needs to match maximum radius in dp.r_fb_from_f
-               # since that's the range over which we will assume r_fb
-               # can be reached
                r_max=100*p.prms.r500c,
                gamma=np.array([2.]),
                r_flat=np.array([None]),
@@ -609,7 +641,6 @@ def load_gamma(prms=p.prms,
                # delta=False,
                bar2dmo=True,
                f_b=True,
-               # bias=False,
                comps=False):
     '''
     Load all of our different models, the ones upto r200m and the ones upto
@@ -722,8 +753,10 @@ def load_gamma(prms=p.prms,
         gamma_max = gamma_mx(coords).reshape(np.shape(z_range) +
                                              np.shape(prms.m500c))
 
+        print(gamma_max)
         for idx_g, g in enumerate(gamma):
             g = np.where(gamma_max > g, gamma_max, g)
+
             # First get the enclosed mass profiles to determine r200m
             m_gas_200m = m_gas_model(m500c=prms.m500c,
                                      r500c=prms.r500c,
@@ -745,9 +778,8 @@ def load_gamma(prms=p.prms,
                                                sl=i)
                                   for i in np.arange(0, prms.r500c.shape[0])])
 
+            print(r200m_obs / r200m_dmo)
             m200m_obs = tools.radius_to_mass(r200m_obs, 200 * prms.cosmo.rho_m)
-            print(m_b_200m(r200m_obs, np.arange(prms.r500c.shape[0])) /
-                  m_tot_200m(r200m_obs, np.arange(prms.r500c.shape[0])))
 
             # now we need to correct the gas, baryonic and total masses in case
             # r_flat is None, since then we will MAKE r_flat = r200m_obs
@@ -774,18 +806,14 @@ def load_gamma(prms=p.prms,
                 fb = lambda r, sl, **kwargs: m_b_fb(r, sl, **kwargs) / m_tot_fb(r, sl, **kwargs)
 
                 # now we determine radius at which plaw + uniform gives fb_universal
-                r_max_fb = np.array([dp.r_fb_from_f(fb, cosmo=prms.cosmo, sl=sl,
-                                                    r500c=r)
+                r_max_fb = np.array([r_fb_from_f(fb, cosmo=prms.cosmo, sl=sl,
+                                                 r500c=r, r_max=r_max[sl])
                                      for sl, r in enumerate(prms.r500c)])
 
                 # sometimes, there are multiple values where f_b is reached. We
                 # know that r200m_obs will also have f_b, since we determined
                 # gamma_max this way so if r_max < r200m_obs, force r_max = r_200m_obs
                 r_max_fb = np.where(r_max_fb < r200m_obs, r200m_obs, r_max_fb)
-
-                print(fb(r_max_fb, np.arange(prms.r500c.shape[0])))
-                print(fb(r200m_obs, np.arange(prms.r500c.shape[0])))
-                print("++++++++++++++++++++")
 
                 # not all profiles will be baryonically closed, cut off at r_max
                 r_max_fb[np.isinf(r_max_fb)] = r_max[np.isinf(r_max_fb)]
