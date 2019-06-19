@@ -269,7 +269,7 @@ def fbar500c_interp(f_c, sigma_lnc, m_file=None):
 # End of fbar_500c_interp()
 # ------------------------------------------------------------------------------
 
-def fstar_500c_max_interp(f_c, sigma_lnc, m_file=None):
+def fgas_500c_max_interp(f_c, sigma_lnc, m_file=None):
     '''
     Return the interpolator for the c200m(m200m) relation
     '''
@@ -286,15 +286,15 @@ def fstar_500c_max_interp(f_c, sigma_lnc, m_file=None):
 
     z = af.tree["z"][:]
     m = af.tree["m500c"][:]
-    fstar_500c_max = af.tree["fstar_500c_max"][:]
+    fgas_500c_max = af.tree["fgas_500c_max"][:]
 
     coords = (z, np.log10(m))
-    fstar_500c_max_interp = interpolate.RegularGridInterpolator(coords, fstar_500c_max)
+    fgas_500c_max_interp = interpolate.RegularGridInterpolator(coords, fgas_500c_max)
 
-    return fstar_500c_max_interp
+    return fgas_500c_max_interp
     
 # ------------------------------------------------------------------------------
-# End of fstar_500c_max_interp()
+# End of fgas_500c_max_interp()
 # ------------------------------------------------------------------------------
 
 def gamma_max_interp(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):

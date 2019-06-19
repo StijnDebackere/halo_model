@@ -50,27 +50,32 @@ h = np.linspace(cosmo.h - 0.02, cosmo.h + 0.02, 3)
 # Tools for table and interpolation functions #
 ###############################################
 
-def optimize(func, a, b, fill, *args):
+def optimize(func, a, b, cond, fill, *args):
     """
-    Helper function to brentq
+    Helper function to brentq which should be called wrapped by 
+    np.vectorize(optimize, otypes=[np.float64])
 
-    If no optimum can be found, assume fill
+    In the case cond is satisfied, return fill value
+
+    In the case of a ValueError, nan is returned
+
+    
     """
     # t1 = time.time()
-    # lb = func(a, *args)
-    # ub = func(b, *args)
-    # if np.isnan(lb) or np.isnan(ub):
-    #     print(ub, lb)
-    try:
-        result = opt.brentq(func, a, b, args=args)
-    except ValueError:
-        print("log10(m500c)     : ", np.log10(args[1]))
-        print("fg500c           : ", args[2])
-        print("log10(m200m_dmo) : ", np.log10(args[6]((args[0], np.log10(args[1]), args[2]))))
-        print("lb: ",func(a, *args))
-        print("ub: ",func(b, *args))
-        print("===============================")
+    if cond:
         result = fill
+    else:
+        try:
+            result = opt.brentq(func, a, b, args=args)
+        except ValueError:
+            print("===============================")
+            print("log10(m500c)     : ", np.log10(args[1]))
+            print("fg500c           : ", args[2])
+            print("log10(m200m_dmo) : ", np.log10(args[6]((args[0], np.log10(args[1]), args[2]))))
+            print("lb: ",func(a, *args))
+            print("ub: ",func(b, *args))
+            print("===============================")
+            result = np.nan
     # t2 = time.time()
     return result
 
@@ -886,7 +891,8 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # --------------------------------------------------
     def calc_m_diff(procn, m500c, r500c, fg500c, fs200m,
                     fc200m, c200m, z, out_q):
-        m200m_dmo = np.vectorize(optimize, otypes=[np.float64])(m_diff, m500c, 5. * m500c, -1.,
+        m200m_dmo = np.vectorize(optimize, otypes=[np.float64])(m_diff, m500c, 5. * m500c,
+                                                                cond=None, fill=np.nan,
                                                                 *(m500c, r500c, fg500c, fs200m,
                                                                   fc200m, c200m, z))
         # now we have m200m_dmo, so we calculate again all the other
@@ -961,13 +967,15 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # fcen_500c = np.ma.masked_array(fcen_500c, mask=mask)
     # fsat_500c = np.ma.masked_array(fsat_500c, mask=mask)
     # fbar_500c = np.ma.masked_array(fbar_500c, mask=mask)
-    m200m_dmo[mask] = np.nan
-    fcen_500c[mask] = np.nan
-    fsat_500c[mask] = np.nan
-    fbar_500c[mask] = np.nan
+    # m200m_dmo[mask] = np.nan
+    # fcen_500c[mask] = np.nan
+    # fsat_500c[mask] = np.nan
+    # fbar_500c[mask] = np.nan
 
-    # get the asymptotic stellar fractions for each redshift and halo mass
-    fstar_500c_max = np.nanmax((fcen_500c + fsat_500c), axis=-1)
+    # we need to get the asymptotic gas fraction where fbar500c = fbar
+    fgas_500c_r = np.tile(fgas_500c, (np.shape(z)[0], np.shape(m500c)[0], 1))
+    fgas_500c_r[mask] = np.nan
+    fgas_500c_max = np.nanmax(fgas_500c_r, axis=-1)
 
     result_info = {
         "dims": np.array(["z", "m500c", "fgas_500c", "m200m_dmo"]),
@@ -981,7 +989,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         "f_c": f_c,
         "sigma_lnc": sigma_lnc,
         "m500c": m500c,
-        "fstar_500c_max": fstar_500c_max,
+        "fgas_500c_max": fgas_500c_max,
         "fgas_500c": fg500c * omegab / omegam,
         "fcen_500c": fcen_500c,
         "fsat_500c": fsat_500c,
@@ -1141,18 +1149,20 @@ def table_m500c_to_gamma_max(m500c=m500c,
                                  r500c=r500c)
         m_tot = lambda r: m_dm(r) + m_stars(r) + m_gas(r)
         # print(m_gas(r500c), m_stars(r500c), m_dm(r500c))
-        if fg500c == f_b:
-            print(fg500c, m200m_dmo((z, np.log10(m500c), fg500c)))
+        # if fg500c == f_b:
+        #     print(fg500c, m200m_dmo((z, np.log10(m500c), fg500c)))
         m200m = m200m_dmo((z, np.log10(m500c), fg500c))
         r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
         r200m_obs = r200m_from_m(m_tot, r200m)
+        # print(r200m_obs/r200m)
         return (m_gas(r200m_obs) + m_stars(r200m_obs)) / m_tot(r200m_obs) - f_b
     # ----------------------------------------------------------------------------
     def gamma_from_m500c(procn, z, m500c, fg500c, r500c,
                          fc500c, fs500c, m200m_dmo, c200m_dmo,
                          out_q):
         # 
-        gamma = np.vectorize(optimize, otypes=[np.float64])(fb_diff, 0., 1000., 0,
+        gamma = np.vectorize(optimize, otypes=[np.float64])(fb_diff, 0., 1000.,
+                                                            (fg500c == 0), 0,
                                                             *(z, m500c, fg500c, r500c,
                                                               fc500c, fs500c, m200m_dmo,
                                                               c200m_dmo))

@@ -592,9 +592,10 @@ def convert_hm(r200m=True):
 # End of convert_hm()
 # ------------------------------------------------------------------------------
 
-def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0., norm=None):
+def f_gas(m, log10mc, a, fgas_500c, cosmo, z=0., norm=None):
     '''
-    Return the f_gas(m500c) relation for m. The relation cannot exceed f_b
+    Return the f_gas(m500c) relation for m. The relation cannot exceed 
+    f_b,500c - f_stars,500c
 
     This function assumes h=0.7 for everything!
 
@@ -606,8 +607,8 @@ def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0., norm=None):
       the turnover mass for the relation in log10([M_sun/h_70])
     a : float
       the strength of the transition
-    fstar_500c : interpolator or function of z and m
-      asymptotic stellar fraction at r500c for each m500c
+    fgas_500c : interpolator or function of z and m
+      maximum gas fraction for which fgas_500c + fstars_500c = f_bar
     cosmo : hmf.cosmo.Cosmology object
       relevant cosmological parameters
 
@@ -626,12 +627,11 @@ def f_gas(m, log10mc, a, fstar_500c, cosmo, z=0., norm=None):
     coords = inp_interp.arrays_to_coords(z, np.log10(m))
     if np.size(z) > 1:
         raise ValueError("redshift dependence not yet implemented")
-    fstar_500c_max = fstar_500c(coords).reshape(m.shape)
+    fgas_500c_max = fgas_500c(coords).reshape(m.shape)
     
     # gas fractions that will cause halo to exceed cosmic baryon fraction
-    cb_exceeded = (fgas_fit >= (cosmo.omegab/cosmo.omegam - fstar_500c_max))
-    fgas_fit[cb_exceeded] = (cosmo.omegab/cosmo.omegam -
-                             fstar_500c_max[cb_exceeded])
+    cb_exceeded = (fgas_fit >= fgas_500c_max)
+    fgas_fit[cb_exceeded] = fstar_500c_max[cb_exceeded]
 
     return fgas_fit
 
