@@ -34,7 +34,7 @@ class Parameters(object):
     fgas500c_prms : dict
       "log10mt" : turnover mass for the fgas500c-m500c relation
       "a" : sharpness of turnover
-      "fgas500c_max" : interpolator for the maximum gas fraction at 
+      "fgas_500c_max" : interpolator for the maximum gas fraction at 
                         r500c as function of z and m500c
     f_c : float
       ratio between satellite concentration and DM concentration
@@ -82,7 +82,7 @@ class Parameters(object):
                  fgas_500c_prms={"log10mt": 13.94,
                                  "a": 1.35,
                                  "norm": None,
-                                 "fgas500c_max": inp_interp.fgas_500c_max_interp},
+                                 "fgas_500c_max": inp_interp.fgas_500c_max_interp},
                  f_c=0.86,
                  sigma_lnc=0.0,
                  # gamma=np.linspace(0., 3., 9)
@@ -140,8 +140,8 @@ class Parameters(object):
         '''
         log10mt = self.fgas_500c_prms["log10mt"]
         a = self.fgas_500c_prms["a"]
-        fgas500c_max_intrp = self.fgas_500c_prms["fgas500c_max"](f_c=self.f_c,
-                                                                 sigma_lnc=self.sigma_lnc)
+        fgas_500c_max_intrp = self.fgas_500c_prms["fgas_500c_max"](f_c=self.f_c,
+                                                                   sigma_lnc=self.sigma_lnc)
         # allow for non-standard normalisations of the baryon fraction
         norm = self.fgas_500c_prms.get("norm", None)
 
@@ -157,17 +157,17 @@ class Parameters(object):
 
         # interpolate stellar fractions
         coords = inp_interp.arrays_to_coords(self.z_range, np.log10(self.m500c))
-        fgas500c_max = fgas500c_max_intrp(coords).reshape(np.shape(self.z_range) +
+        fgas_500c_max = fgas_500c_max_intrp(coords).reshape(np.shape(self.z_range) +
                                                             np.shape(self.m500c))
     
         # gas fractions that will cause halo to exceed cosmic baryon fraction
-        cb_exceeded = (fgas_fit >= fgas500c_max)
+        cb_exceeded = (fgas_fit >= fgas_500c_max)
 
         # if fgas is simply an (m,) array, we need to tile it along the z-axis
         if not fgas_fit.shape == cb_exceeded.shape:
             fgas_fit = np.tile(fgas_fit.reshape(1,-1), (cb_exceeded.shape[0], 1))
 
-        fgas_fit[cb_exceeded] = fgas500c_max[cb_exceeded]
+        fgas_fit[cb_exceeded] = fgas_500c_max[cb_exceeded]
 
         return fgas_fit
 
@@ -273,43 +273,43 @@ class Parameters(object):
 # Typical parameters for our simulations
 # ------------------------------------------------------------------------------
 # fiducial parameters
-prms = Parameters(m500c=np.logspace(11,15,101), k_min=-1.)
+prms = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.)
 
 # get different mass ranges
-prms_m1 = Parameters(m500c=np.logspace(11,12,101), k_min=-1.)
-prms_m2 = Parameters(m500c=np.logspace(12,13,101), k_min=-1.)
-prms_m3 = Parameters(m500c=np.logspace(13,14,101), k_min=-1.)
-prms_m4 = Parameters(m500c=np.logspace(14,15,101), k_min=-1.)
+prms_m1 = Parameters(m500c=np.logspace(11,12,101), logk_min=-1.)
+prms_m2 = Parameters(m500c=np.logspace(12,13,101), logk_min=-1.)
+prms_m3 = Parameters(m500c=np.logspace(13,14,101), logk_min=-1.)
+prms_m4 = Parameters(m500c=np.logspace(14,15,101), logk_min=-1.)
 prms_m = [prms_m1,
           prms_m2,
           prms_m3,
           prms_m4]
 
-prms_mmin = Parameters(m500c=np.logspace(7,15,201), k_min=-1.)
-prms_mmax = Parameters(m500c=np.logspace(11,16,101), k_min=-1.)
-prms_mbins = Parameters(m500c=np.logspace(11,15,501), k_min=-1.)
+prms_mmin = Parameters(m500c=np.logspace(7,15,201), logk_min=-1.)
+prms_mmax = Parameters(m500c=np.logspace(11,16,101), logk_min=-1.)
+prms_mbins = Parameters(m500c=np.logspace(11,15,501), logk_min=-1.)
 
 # get different gas fractions
-prms_l10mt1 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+prms_l10mt1 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 13,
                                          "a": 1.35,
-                                         "fgas500c_max": inp_interp.fgas_500c_max_interp})
-prms_l10mt2 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_l10mt2 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 13.5,
                                          "a": 1.35,
-                                         "fgas500c_max": inp_interp.fgas_500c_max_interp})
-prms_l10mt3 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_l10mt3 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 14,
                                          "a": 1.35,
-                                         "fgas500c_max": inp_interp.fgas_500c_max_interp})
-prms_l10mt4 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_l10mt4 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 14.5,
                                          "a": 1.35,
-                                         "fgas500c_max": inp_interp.fgas_500c_max_interp})
-prms_l10mt5 = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_l10mt5 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 15,
                                          "a": 1.35,
-                                         "fgas500c_max": inp_interp.fgas_500c_max_interp})
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
 prms_l10mt = [prms_l10mt1,
               prms_l10mt2,
               prms_l10mt3,
@@ -317,8 +317,9 @@ prms_l10mt = [prms_l10mt1,
               prms_l10mt5]
 
 # get constant fgas_500c at f_bar
-prms_fconst = Parameters(m500c=np.logspace(11,15,101), k_min=-1.,
+prms_fconst = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 0,
                                          "a": np.inf,
                                          "norm": 2*prms.f_bar,
-                                         "fgas500c_max": inp_interp.fgas_500c_max_interp})
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+

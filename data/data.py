@@ -592,7 +592,8 @@ def convert_hm(r200m=True):
 # End of convert_hm()
 # ------------------------------------------------------------------------------
 
-def f_gas(m, log10mc, a, fgas_500c, cosmo, z=0., norm=None):
+def f_gas(m, log10mt, a, fgas_500c_max, cosmo, f_c=0.86, sigma_lnc=0.0,
+          z=0., norm=None, **kwargs):
     '''
     Return the f_gas(m500c) relation for m. The relation cannot exceed 
     f_b,500c - f_stars,500c
@@ -603,11 +604,11 @@ def f_gas(m, log10mc, a, fgas_500c, cosmo, z=0., norm=None):
     ----------
     m : array [M_sun / h_70]
       values of m500c to compute f_gas for
-    log10mc : float
+    log10mt : float
       the turnover mass for the relation in log10([M_sun/h_70])
     a : float
       the strength of the transition
-    fgas_500c : interpolator or function of z and m
+    fgas_500c_max : interpolator or function of z and m
       maximum gas fraction for which fgas_500c + fstars_500c = f_bar
     cosmo : hmf.cosmo.Cosmology object
       relevant cosmological parameters
@@ -617,7 +618,7 @@ def f_gas(m, log10mc, a, fgas_500c, cosmo, z=0., norm=None):
     f_gas : array [h_70^(-3/2)]
       gas fraction at r500c for m
     '''
-    x = np.log10(m) - log10mc
+    x = np.log10(m) - log10mt
 
     if norm is None:
         norm = (cosmo.omegab/cosmo.omegam)
@@ -627,11 +628,11 @@ def f_gas(m, log10mc, a, fgas_500c, cosmo, z=0., norm=None):
     coords = inp_interp.arrays_to_coords(z, np.log10(m))
     if np.size(z) > 1:
         raise ValueError("redshift dependence not yet implemented")
-    fgas_500c_max = fgas_500c(coords).reshape(m.shape)
+    fgas_500c_mx = fgas_500c_max(f_c=f_c, sigma_lnc=sigma_lnc)(coords).reshape(m.shape)
     
     # gas fractions that will cause halo to exceed cosmic baryon fraction
-    cb_exceeded = (fgas_fit >= fgas_500c_max)
-    fgas_fit[cb_exceeded] = fstar_500c_max[cb_exceeded]
+    cb_exceeded = (fgas_fit >= fgas_500c_mx)
+    fgas_fit[cb_exceeded] = fgas_500c_mx[cb_exceeded]
 
     return fgas_fit
 
@@ -691,7 +692,7 @@ def f_gas_prms(cosmo, z=0., q=50, f_c=0.86, sigma_lnc=0.0, bias=False):
         raise ValueError("redshift dependence not yet implemented")
     # get the coordinate arrays for interpolation of the maximum stellar fractions
     coords = inp_interp.arrays_to_coords(z, np.log10(m))
-    fstar_500c_max = inp_interp.fstar_500c_max_interp
+    fgas_500c_max = inp_interp.fgas_500c_max_interp
 
     # m_bins is in Hubble units
     m_bin_idx = np.digitize(10**(m500_obs), m_bins)
@@ -699,18 +700,18 @@ def f_gas_prms(cosmo, z=0., q=50, f_c=0.86, sigma_lnc=0.0, bias=False):
     f_q = np.array([np.percentile(f_obs[m_bin_idx == m_bin], q)
                       for m_bin in np.arange(1, len(m_bins))])
 
-    f_gas_fit = lambda m, log10mc, a: f_gas(m=m, log10mc=log10mc,
+    f_gas_fit = lambda m, log10mt, a: f_gas(m=m, log10mt=log10mt,
                                             a=a, cosmo=cosmo,
-                                            fstar_500c=fstar_500c_max(f_c=f_c,
-                                                                      sigma_lnc=sigma_lnc))
+                                            f_c=f_c, sigma_lnc=sigma_lnc,
+                                            fgas_500c_max=fgas_500c_max)
 
     fqopt, fqcov = opt.curve_fit(f_gas_fit, m[m>1e14], f_q[m>1e14],
                                  bounds=([10, 0],
                                          [20, 20]))
 
-    fq_prms = {"log10mc": fqopt[0],
+    fq_prms = {"log10mt": fqopt[0],
                "a": fqopt[1],
-               "fstar_500c_max": fstar_500c_max}
+               "fgas_500c_max": fgas_500c_max}
 
     return fq_prms
 
