@@ -50,7 +50,8 @@ h = np.linspace(cosmo.h - 0.02, cosmo.h + 0.02, 3)
 # Tools for table and interpolation functions #
 ###############################################
 
-def optimize(func, a, b, cond, fill, *args):
+def optimize(func, a, b, *args, cond=None, fill=None,
+             fill_low=np.nan, fill_hi=np.nan):
     """
     Helper function to brentq which should be called wrapped by 
     np.vectorize(optimize, otypes=[np.float64])
@@ -68,14 +69,20 @@ def optimize(func, a, b, cond, fill, *args):
         try:
             result = opt.brentq(func, a, b, args=args)
         except ValueError:
-            print("===============================")
-            print("log10(m500c)     : ", np.log10(args[1]))
-            print("fg500c           : ", args[2])
-            print("log10(m200m_dmo) : ", np.log10(args[6]((args[0], np.log10(args[1]), args[2]))))
-            print("lb: ",func(a, *args))
-            print("ub: ",func(b, *args))
-            print("===============================")
-            result = np.nan
+            if func(a, *args) < 0 and func(b, *args) < 0:
+                result = fill_low
+            elif func(a, *args) > 0 and func(b, *args) > 0:
+                result = fill_hi
+            else:
+                result = np.nan
+                print("===============================")
+                print("log10(m500c)     : ", np.log10(args[1]))
+                print("fg500c           : ", args[2])
+                print("log10(m200m_dmo) : ", np.log10(args[6]((args[0], np.log10(args[1]), args[2]))))
+                print("lb: ",func(a, *args))
+                print("ub: ",func(b, *args))
+                print("===============================")
+
     # t2 = time.time()
     return result
 
@@ -892,8 +899,8 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     def calc_m_diff(procn, m500c, r500c, fg500c, fs200m,
                     fc200m, c200m, z, out_q):
         m200m_dmo = np.vectorize(optimize, otypes=[np.float64])(m_diff, m500c, 5. * m500c,
-                                                                cond=None, fill=np.nan,
-                                                                *(m500c, r500c, fg500c, fs200m,
+                                                                *(m500c, r500c,
+                                                                  fg500c, fs200m,
                                                                   fc200m, c200m, z))
         # now we have m200m_dmo, so we calculate again all the other
         # resulting variables
@@ -1069,13 +1076,14 @@ def table_m500c_to_gamma_max(m500c=m500c,
 
         - this dict gets saved to fname
     '''
+    @np.vectorize
     def r200m_from_m(m_f, r200m_dmo, **kwargs):
         def diff_m200m(r):
             m200m = 4. /3 * np.pi * 200 * omegam * rhoc * r**3
             m_diff = m_f(r, **kwargs) - m200m
             return m_diff
 
-        r200m = opt.brentq(diff_m200m, 0.2 * r200m_dmo, 2 * r200m_dmo)
+        r200m = opt.brentq(diff_m200m, 0.2 * r200m_dmo, 100 * r200m_dmo)
         return r200m
 
     def m_dm_stars_from_m500c(z, m500c, fg500c, fc500c, fs500c, r500c,
@@ -1160,12 +1168,13 @@ def table_m500c_to_gamma_max(m500c=m500c,
     def gamma_from_m500c(procn, z, m500c, fg500c, r500c,
                          fc500c, fs500c, m200m_dmo, c200m_dmo,
                          out_q):
-        # 
         gamma = np.vectorize(optimize, otypes=[np.float64])(fb_diff, 0., 1000.,
-                                                            (fg500c == 0), 0,
                                                             *(z, m500c, fg500c, r500c,
                                                               fc500c, fs500c, m200m_dmo,
-                                                              c200m_dmo))
+                                                              c200m_dmo),
+                                                            cond=(fg500c == 0),
+                                                            fill=0, fill_low=0,
+                                                            fill_hi=np.nan)
                              
         out_q.put([procn, gamma])
         # --------------------------------------------------
