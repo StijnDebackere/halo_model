@@ -1013,7 +1013,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
 
 def table_m500c_to_gamma_max(m500c=m500c,
                              z=z,
-                             fg500c=np.linspace(0, 1, 1000),
+                             fg500c=np.linspace(0, 1, 100),
                              r_c=0.21,
                              beta=0.71,
                              r_flat=None,
