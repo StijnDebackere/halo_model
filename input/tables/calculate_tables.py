@@ -14,7 +14,6 @@ import halo.input.initialize as init
 import halo.input.interpolators as inp_interp
 import halo.density_profiles as dp
 import halo.cosmo as cosmo
-import halo.obs_fit as obs
 
 import sys
 if sys.version_info[0] >= 3:
