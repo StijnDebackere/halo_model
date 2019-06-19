@@ -58,9 +58,8 @@ def optimize(func, a, b, *args, cond=None, fill=None,
 
     In the case cond is satisfied, return fill value
 
-    In the case of a ValueError, nan is returned
-
-    
+    In the case of a ValueError, fill_low is returned if both bounds
+    are < 0, and fill_hi if both bounds > 0.
     """
     # t1 = time.time()
     if cond:
@@ -76,11 +75,7 @@ def optimize(func, a, b, *args, cond=None, fill=None,
             else:
                 result = np.nan
                 print("===============================")
-                print("log10(m500c)     : ", np.log10(args[1]))
-                print("fg500c           : ", args[2])
-                print("log10(m200m_dmo) : ", np.log10(args[6]((args[0], np.log10(args[1]), args[2]))))
-                print("lb: ",func(a, *args))
-                print("ub: ",func(b, *args))
+                print("args: ", *args)
                 print("===============================")
 
     # t2 = time.time()
@@ -1017,7 +1012,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
 
 def table_m500c_to_gamma_max(m500c=m500c,
                              z=z,
-                             fg500c=np.linspace(0, 1, 100),
+                             fg500c=np.linspace(0, 1, 1000),
                              r_c=0.21,
                              beta=0.71,
                              r_flat=None,
@@ -1130,7 +1125,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
                                    m_x=np.array([fg500c * m500c]),
                                    r_x=np.array([r500c]),
                                    rc=np.array([r_c * r500c]),
-                                   beta=np.array([beta]))
+                                   beta=np.array([beta])).reshape(-1)
         gas_args =  {'m_x': np.array([fg500c * m500c]),
                      'r_x': np.array([r500c]),
                      'rc': np.array([r_c * r500c]),
@@ -1175,7 +1170,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
                                                             cond=(fg500c == 0),
                                                             fill=0, fill_low=0,
                                                             fill_hi=np.nan)
-                             
+
         out_q.put([procn, gamma])
         # --------------------------------------------------
     if cpus == None:

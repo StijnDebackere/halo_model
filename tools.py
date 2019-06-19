@@ -554,21 +554,6 @@ def sigma_from_rho(R, r_range, rho):
 # End of sigma_from_rho()
 # ------------------------------------------------------------------------------
 
-def m500c_Xray_from_m500c(m500c, cosmo, f_stars):
-    '''
-    For a given m500c in the DMO case, determine the corresponding observed X-ray
-    result.
-
-    Parameters
-    ----------
-    m500c : array
-      DMO halo masses
-    cosmo : dict
-      cosmological parameters
-    f_stars : array
-      stellar fraction
-    '''
-
 def massdiff_2m5c_correa(m200m, m500c, rhoc, rhom, h, z):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
