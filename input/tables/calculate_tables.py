@@ -1085,14 +1085,13 @@ def table_m500c_to_gamma_max(m500c=m500c,
         # load the interpolated quantities
         m200m = m200m_dmo((z, np.log10(m500c), fg500c))
         r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
-        c200m = c200m_dmo((z, np.log10(m200m)))
+        c200m = c200m_dmo((z, np.log10(m200m))) * np.e**sigma_lnc
         fcen500c = fc500c((z, np.log10(m500c), fg500c))
         fsat500c = fs500c((z, np.log10(m500c), fg500c))
         fstars500c = fsat500c + fcen500c
 
         # convert c200m to c500c_sat
-        c500c_sat = (f_c * c200m * r500c / r200m
-                     * np.e**sigma_lnc)
+        c500c_sat = (f_c * c200m * r500c / r200m)
 
         # get dm mass and DMO mass at r500c
         m500c_dm = m500c * (1 - fg500c - fstars500c)
