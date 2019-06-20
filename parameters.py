@@ -337,6 +337,11 @@ prms_bias84 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 14.15,
                                          "a": 1.70,
                                          "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+
+# get sigma_lnc variations
+prms_slnc_p = Parameters(m500c=np.logspace(11,15,101), logk_min=-1., sigma_lnc=0.25)
+prms_slnc_m = Parameters(m500c=np.logspace(11,15,101), logk_min=-1., sigma_lnc=-0.25)
+
 # get constant fgas_500c at f_bar
 prms_fconst = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 0,
