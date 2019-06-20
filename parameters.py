@@ -316,6 +316,27 @@ prms_l10mt = [prms_l10mt1,
               prms_l10mt4,
               prms_l10mt5]
 
+# get 15 & 85 percentiles fgas_500c
+prms_f15 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
+                      fgas_500c_prms={"log10mt": 14.18,
+                                      "a": 1.22,
+                                      "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_f85 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
+                      fgas_500c_prms={"log10mt": 13.69,
+                                      "a": 1.39,
+                                      "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_bias70 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
+                         fgas_500c_prms={"log10mt": 14.44,
+                                         "a": 1.99,
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_bias80 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
+                         fgas_500c_prms={"log10mt": 14.22,
+                                         "a": 1.80,
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
+prms_bias84 = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
+                         fgas_500c_prms={"log10mt": 14.15,
+                                         "a": 1.70,
+                                         "fgas_500c_max": inp_interp.fgas_500c_max_interp})
 # get constant fgas_500c at f_bar
 prms_fconst = Parameters(m500c=np.logspace(11,15,101), logk_min=-1.,
                          fgas_500c_prms={"log10mt": 0,

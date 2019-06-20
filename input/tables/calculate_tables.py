@@ -1158,34 +1158,34 @@ def table_m500c_to_gamma_max(m500c=m500c,
         r200m_obs = np.vectorize(r200m_from_m, otypes=[np.float64])(m_tot, r200m)
         return (m_gas(r200m_obs) + m_stars(r200m_obs)) / m_tot(r200m_obs) - f_b
 
-    @np.vectorize
-    def compute_fbar_diff_gamma(gamma, z, m500c, fg500c, r500c, fc500c, fs500c, m200m_dmo, c200m_dmo):
-        m_dm, m_stars = m_dm_stars_from_m500c(z=z, m500c=m500c, fg500c=fg500c,
-                                              fc500c=fc500c, fs500c=fs500c,
-                                              r500c=r500c, m200m_dmo=m200m_dmo,
-                                              c200m_dmo=c200m_dmo, f_c=f_c,
-                                              sigma_lnc=sigma_lnc)
-        m_gas = m_gas_from_m500c(gamma=gamma, z=z, m500c=m500c, fg500c=fg500c,
-                                 r500c=r500c)
-        m_bar = lambda r: m_stars(r) + m_gas(r)
-        m_tot = lambda r: m_dm(r) + m_stars(r) + m_gas(r)
-        m200m = m200m_dmo((z, np.log10(m500c), fg500c))
-        r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
-        r200m_obs = np.vectorize(r200m_from_m, otypes=[np.float64])(m_tot, r200m)
-        fb_diff = ((m_gas(r200m_obs) + m_stars(r200m_obs)) / m_tot(r200m_obs)) - f_b
+    # @np.vectorize
+    # def compute_fbar_diff_gamma(gamma, z, m500c, fg500c, r500c, fc500c, fs500c, m200m_dmo, c200m_dmo):
+    #     m_dm, m_stars = m_dm_stars_from_m500c(z=z, m500c=m500c, fg500c=fg500c,
+    #                                           fc500c=fc500c, fs500c=fs500c,
+    #                                           r500c=r500c, m200m_dmo=m200m_dmo,
+    #                                           c200m_dmo=c200m_dmo, f_c=f_c,
+    #                                           sigma_lnc=sigma_lnc)
+    #     m_gas = m_gas_from_m500c(gamma=gamma, z=z, m500c=m500c, fg500c=fg500c,
+    #                              r500c=r500c)
+    #     m_bar = lambda r: m_stars(r) + m_gas(r)
+    #     m_tot = lambda r: m_dm(r) + m_stars(r) + m_gas(r)
+    #     m200m = m200m_dmo((z, np.log10(m500c), fg500c))
+    #     r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
+    #     r200m_obs = np.vectorize(r200m_from_m, otypes=[np.float64])(m_tot, r200m)
+    #     fb_diff = ((m_gas(r200m_obs) + m_stars(r200m_obs)) / m_tot(r200m_obs)) - f_b
 
-        if np.abs(fb_diff) > 1e-4 and fg500c > 0 and fg500c < f_b:
-            print("z          :", z)
-            print("m500c      :", np.log10(m500c))
-            print("fg500c     :", fg500c)
-            print("r200m_dmo  :", r200m / r500c)
-            print("r200m_obs  :", r200m_obs / r500c)
-            print("fb_200m_dmo:", m_bar(r200m) / m_tot(r200m))
-            print("gamma      :", gamma)
-            print("fb_diff    :", fb_diff)
-            print("================")
+    #     if np.abs(fb_diff) > 1e-4 and fg500c > 0 and fg500c < f_b:
+    #         print("z          :", z)
+    #         print("m500c      :", np.log10(m500c))
+    #         print("fg500c     :", fg500c)
+    #         print("r200m_dmo  :", r200m / r500c)
+    #         print("r200m_obs  :", r200m_obs / r500c)
+    #         print("fb_200m_dmo:", m_bar(r200m) / m_tot(r200m))
+    #         print("gamma      :", gamma)
+    #         print("fb_diff    :", fb_diff)
+    #         print("================")
 
-        return fb_diff
+    #     return fb_diff
         
     # ----------------------------------------------------------------------------
     def gamma_from_m500c(procn, z, m500c, fg500c, r500c,
@@ -1198,8 +1198,8 @@ def table_m500c_to_gamma_max(m500c=m500c,
                                                             cond=(fg500c == 0),
                                                             fill=0, fill_low=0,
                                                             fill_hi=np.nan)
-        fb_200m_obs = compute_fbar_diff_gamma(gamma, z, m500c, fg500c, r500c, fc500c,
-                                              fs500c, m200m_dmo, c200m_dmo)
+        # fb_200m_obs = compute_fbar_diff_gamma(gamma, z, m500c, fg500c, r500c, fc500c,
+        #                                       fs500c, m200m_dmo, c200m_dmo)
         out_q.put([procn, gamma])
         # --------------------------------------------------
     if cpus == None:
