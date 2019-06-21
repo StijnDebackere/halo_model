@@ -39,8 +39,10 @@ class Power(object):
             self.k_nan = np.min(np.where(np.isnan(prof.rho_k))[1])
         except ValueError:
             self.k_nan = prof.k_range.shape[0]
-        self.k_range = prof.k_range[:self.k_nan]
-        self.rho_k = prof.rho_k[:,:self.k_nan]
+        # self.k_range = prof.k_range[:self.k_nan]
+        # self.rho_k = prof.rho_k[:,:self.k_nan]
+        self.k_range = prof.k_range
+        self.rho_k = prof.rho_k
         self.z = prof.z
         self.cosmo = prof.cosmo
         self.bar2dmo = bar2dmo
