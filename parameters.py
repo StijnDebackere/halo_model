@@ -275,6 +275,9 @@ class Parameters(object):
 # fiducial parameters, logk_min for comparisons with simulations
 prms = Parameters(m500c=np.logspace(10,15,101), logk_min=-1.)
 
+# fiducial parameters, but with f_c = 1
+prms_fc1 = Parameters(m500c=np.logspace(10,15,101), logk_min=-1., f_c=1)
+
 # get different mass ranges
 prms_m1 = Parameters(m500c=np.logspace(10,11,101), logk_min=-1.)
 prms_m2 = Parameters(m500c=np.logspace(11,12,101), logk_min=-1.)

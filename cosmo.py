@@ -73,7 +73,7 @@ class Cosmology(object):
 
     """
     rho_crit = 2.7763458 * (10.0**11.0)
-    def __init__(self, default="wmap9_nobao", force_flat=False, **kwargs):
+    def __init__(self, default="wmap9_nobao", force_flat=True, **kwargs):
         # This gets the Cache system working
         super(Cosmology, self).__init__()
 

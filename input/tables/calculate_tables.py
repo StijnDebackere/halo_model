@@ -1,16 +1,11 @@
 import numpy as np
-import mpmath as mp
 import scipy.optimize as opt
 import scipy.interpolate as interpolate
-import scipy.special as spec
-import scipy.integrate as intg
 import multiprocessing as multi
 import asdf
 from copy import copy
-import time
 
 import halo.tools as tools
-import halo.input.initialize as init
 import halo.input.interpolators as inp_interp
 import halo.density_profiles as dp
 import halo.cosmo as cosmo
@@ -38,7 +33,7 @@ m500c = np.logspace(6, 16, 200)
 
 z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
 
-cosmo=cosmo.Cosmology()
+cosmo = cosmo.Cosmology()
 sigma8 = np.linspace(cosmo.sigma_8 - 0.02, cosmo.sigma_8 + 0.02, 3)
 omegam = np.linspace(cosmo.omegam - 0.02, cosmo.omegam + 0.02, 3)
 omegab = cosmo.omegab
@@ -50,10 +45,11 @@ h = np.linspace(cosmo.h - 0.02, cosmo.h + 0.02, 3)
 # Tools for table and interpolation functions #
 ###############################################
 
+
 def optimize(func, a, b, *args, cond=None, fill=None,
              fill_low=np.nan, fill_hi=np.nan):
     """
-    Helper function to brentq which should be called wrapped by 
+    Helper function to brentq which should be called wrapped by
     np.vectorize(optimize, otypes=[np.float64])
 
     In the case cond is satisfied, return fill value
@@ -81,6 +77,7 @@ def optimize(func, a, b, *args, cond=None, fill=None,
     # t2 = time.time()
     return result
 
+
 def convert_cosmo_commah(cosmo):
     """
     Collect parameters into a dictionary suitable for cosmolopy.
@@ -98,18 +95,15 @@ def convert_cosmo_commah(cosmo):
 
     return_dict = {}
     for k, v in amap.items():
-        return_dict.update({v:cosmo[k]})
+        return_dict.update({v: cosmo[k]})
 
     return return_dict
 
-# ------------------------------------------------------------------------------
-# End of convert_cosmo_commah()
-# ------------------------------------------------------------------------------
 
 def arrays_to_coords(*xi):
     '''
-    Convert a set of N 1-D coordinate arrays to a regular coordinate grid of 
-    dimension (npoints, N) for the interpolator 
+    Convert a set of N 1-D coordinate arrays to a regular coordinate grid of
+    dimension (npoints, N) for the interpolator
     '''
     # the meshgrid matches each of the *xi to all the other *xj
     Xi = np.meshgrid(*xi, indexing='ij')
@@ -119,20 +113,17 @@ def arrays_to_coords(*xi):
 
     return coords.reshape(-1, len(xi))
 
-# ------------------------------------------------------------------------------
-# End of arrays_to_coords()
-# ------------------------------------------------------------------------------
 
 def arrays_to_ogrid(*xi):
     '''
-    Return an ordered list of N arrays reshaped to an ogrid to match to the total
-    dimension N with shape (n1, ..., nk, ..., nn)
+    Return an ordered list of N arrays reshaped to an ogrid to match to the
+    total dimension N with shape (n1, ..., nk, ..., nn)
     '''
     n = len(xi)
 
     # all arrays need to be reshaped to (1,...,-1,..,1)
     # where -1 corresponds to their own dimension
-    shape = [1,] * n
+    shape = [1, ] * n
 
     ogrid = []
     for i, x in enumerate(xi):
@@ -143,9 +134,6 @@ def arrays_to_ogrid(*xi):
 
     return ogrid
 
-# ------------------------------------------------------------------------------
-# End of arrays_to_ogrid()
-# ------------------------------------------------------------------------------
 
 def interp(interpolator, *xi):
     '''
@@ -154,7 +142,8 @@ def interp(interpolator, *xi):
 
     The output is reshaped to the correctly matching ogrid
     '''
-    # convert the given arrays into the correct coordinates for the interpolator
+    # convert the given arrays into the correct coordinates for the
+    # interpolator
     coords = arrays_to_coords(*xi)
 
     # create the shape that will match arrays_to_ogrid(*xi)
@@ -164,13 +153,11 @@ def interp(interpolator, *xi):
 
     return interpolator(coords).reshape(shape)
 
-# ------------------------------------------------------------------------------
-# End of interp()
-# ------------------------------------------------------------------------------
 
 ##############################
 # Functions to create tables #
 ##############################
+
 
 def table_c200c_correa_cosmo(m200c=m200c,
                              z=z,
@@ -180,8 +167,9 @@ def table_c200c_correa_cosmo(m200c=m200c,
                              n=n,
                              h=h,
                              cpus=None):
-    '''Calculate the c(m) relation from Correa+2015 for the given mass, z
-    and cosmology range.
+    '''
+    Calculate the c(m) relation from Correa+2015 for the given mass, z and
+    cosmology range.
 
     Parameters
     ----------
@@ -231,13 +219,13 @@ def table_c200c_correa_cosmo(m200c=m200c,
         out_q.put([procn, c_all])
 
     # --------------------------------------------------
-    if cpus == None:
+    if cpus is None:
         cpus = multi.cpu_count()
 
     manager = multi.Manager()
     out_q = manager.Queue()
 
-    m200c_split = np.array_split(m200c, cpus)    
+    m200c_split = np.array_split(m200c, cpus)
 
     procs = []
     for i in range(cpus):
@@ -257,7 +245,13 @@ def table_c200c_correa_cosmo(m200c=m200c,
     c = np.concatenate([item[1] for item in results], axis=-1)
 
     result_info = {
-        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z", "m200c"]),
+        "dims": np.array(["sigma8",
+                          "omegam",
+                          "omegav",
+                          "n",
+                          "h",
+                          "z",
+                          "m200c"]),
         "sigma8": sigma8,
         "omegam": omegam,
         "omegav": omegav,
@@ -274,9 +268,6 @@ def table_c200c_correa_cosmo(m200c=m200c,
 
     return result_info
 
-# ------------------------------------------------------------------------------
-# End of table_c200c_correa_cosmo()
-# ------------------------------------------------------------------------------
 
 def table_c200c_correa(m200c=m200c,
                        z=z,
@@ -286,7 +277,8 @@ def table_c200c_correa(m200c=m200c,
                        n=0.972,
                        h=0.7,
                        cpus=None):
-    '''Calculate the c(m) relation from Correa+2015 for the given mass, z
+    '''
+    Calculate the c(m) relation from Correa+2015 for the given mass, z
     and cosmology.
 
     Parameters

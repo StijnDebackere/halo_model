@@ -1,30 +1,19 @@
 import numpy as np
 import scipy.optimize as opt
-import scipy.interpolate as intp
 import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator
 
-import sys
-import os
-import pickle
-from copy import deepcopy
-
-# allow import of plot
-sys.path.append('~/Documents/Leiden/MR/code')
-import plot as pl
-
-import halo.hmf as hmf
 import halo.parameters as p
 import halo.tools as tools
 import halo.density_profiles as dp
-import halo.tools as tools
 import halo.model.density as dens
 import halo.model.power as power
-import halo.data.data as d
 import halo.input.interpolators as inp_interp
 
 import pdb
 import cProfile
+
+plt.style.use("paper")
+
 
 def do_cprofile(func):
     def profiled_func(*args, **kwargs):
@@ -766,7 +755,7 @@ def load_gamma(prms=p.prms,
                             csat_500c=csat_500c,
                             fcen_500c=fcen_500c,
                             fsat_500c=fsat_500c)
-    
+
     m_dm = m_dm_model(m500c_dm=m500c_dm,
                       c500c_dm=c500c_dm,
                       r500c=r500c)
@@ -777,8 +766,8 @@ def load_gamma(prms=p.prms,
         # need to have a flag to change r_fl back if we change
         # it to r200m_obs later
         r_fl_changed = False
-        # First, we need to see whether our gamma values would not exceed f_b at
-        # the resuling r200m_obs
+        # First, we need to see whether our gamma values would not exceed f_b
+        # at the resuling r200m_obs
         gamma_mx = inp_interp.gamma_max_interp(f_c=f_c, sigma_lnc=sigma_lnc,
                                                r_c=r_c, beta=beta, r_flat=r_fl)
 
@@ -814,7 +803,7 @@ def load_gamma(prms=p.prms,
                                   for i in np.arange(0, r500c.shape[0])])
 
             m200m_obs = tools.radius_to_mass(r200m_obs, 200 * prms.cosmo.rho_m)
-            
+
             # now we need to correct the gas, baryonic and total masses in case
             # r_flat is None, since then we will MAKE r_flat = r200m_obs
             if r_fl is None:
@@ -946,6 +935,7 @@ def load_gamma(prms=p.prms,
 # End of load_gamma()
 # ----------------------------------------------------------------------
 
+
 def plot_profiles_paper(dens_gas,
                         dens_gas_r500c_r200m,
                         dens_gas_r200m_5r500c,
@@ -956,17 +946,15 @@ def plot_profiles_paper(dens_gas,
     '''
     Plot the density for our different gas profiles in one plot
     '''
-    fig = plt.figure(figsize=(20,8))
-    ax1 = fig.add_axes([0.1,0.1,0.266,0.8])
-    ax2 = fig.add_axes([0.366,0.1,0.266,0.8])
-    ax3 = fig.add_axes([0.632,0.1,0.266,0.8])
+    fig = plt.figure(figsize=(20, 8))
+    ax1 = fig.add_axes([0.1, 0.1, 0.266, 0.8])
+    ax2 = fig.add_axes([0.366, 0.1, 0.266, 0.8])
+    ax3 = fig.add_axes([0.632, 0.1, 0.266, 0.8])
 
     idx_1 = 0
     idx_2 = 50
     idx_3 = -1
     r200m = prms.r200m
-    reload(pl)
-    pl.set_style('line')
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
     if not rho_k:
