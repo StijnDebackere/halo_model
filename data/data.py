@@ -1,27 +1,23 @@
+import halo.parameters as p
+import halo.tools as tools
+import halo.input.interpolators as inp_interp
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.collections import LineCollection
-from cycler import cycler
 import scipy.optimize as opt
-import scipy.special as spec
 import scipy.interpolate as interp
 import astropy.constants as const
 import astropy.units as u
 import astropy.io.fits as fits
 import glob
-import copy
 import re
 import sys
 import pickle
 
 # allow import of plot
 sys.path.append('/Users/stijn/Documents/MR/code')
-import plot as pl
-
-import halo.parameters as p
-import halo.tools as tools
-import halo.input.interpolators as inp_interp
 
 import pdb
 
@@ -35,11 +31,12 @@ def read_croston():
     files = glob.glob(ddir + 'Croston08*.dat')
     fnames = [f.split('/')[-1] for f in files]
     idcs = [re.search('[0-9]*.dat', f).span() for f in fnames]
-    sysnum = [int(fnames[idx][i[0]:i[1]][:-4]) for idx,i in enumerate(idcs)]
+    sysnum = [int(fnames[idx][i[0]:i[1]][:-4]) for idx, i in enumerate(idcs)]
 
-    # -------------------------------------------------------------------------- #
-    # We leave all the original h_70 scalings, we scale our model when comparing #
-    # -------------------------------------------------------------------------- #
+    # ---------------------------------------- #
+    # We leave all the original h_70 scalings, #
+    # we scale our model when comparing        #
+    # ---------------------------------------- #
 
     data = np.loadtxt(ddir + 'Pratt09.dat')
     z = data[:,0]
@@ -317,13 +314,13 @@ def bin_eckert(n=20):
     r500_med = np.empty((n_m-1), dtype=float)
     m500c_med = np.empty((n_m-1), dtype=float)
 
-    pl.set_style('line')
     for idx_m, m_bin in enumerate(np.arange(1, len(m_bins))):
         idx_in_bin = (m_bin_idx == m_bin)
         m500_med[idx_m] = np.median(m500g[idx_in_bin])
         r500_med[idx_m] = np.median(r500[idx_in_bin])
         m500c_med[idx_m] = tools.radius_to_mass(np.median(r500[idx_in_bin]),
-                                                500 * prms.cosmo.rho_crit * 0.7**2)
+                                                500 * prms.cosmo.rho_crit *
+                                                0.7**2)
         for idx in idx_in_bin.nonzero()[0]:
             # find maximum allowed rx range in bin
             if r_min < rx[idx].min():
@@ -383,7 +380,6 @@ def fit_croston():
     # we need to plug in the 0.7^2
     m500 = tools.radius_to_mass(r500, 500 * p.prms.cosmo.rho_crit * 0.7**2)
 
-    pl.set_style()
     a = np.empty((0,), dtype=float)
     b = np.empty((0,), dtype=float)
     m_sl = np.empty((0,), dtype=float)
@@ -413,15 +409,15 @@ def fit_croston():
         # print('f_gas,500c_fitted :', m500gas / m500[idx])
         # print('m_gas,500c_fitted / m_gas,500c_actual', m500gas / m500g[idx])
         # print('-------------------')
-        # plt.plot(r, prof, label='obs')
-        # plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # , popt[2],
-        #                          m500gas, r500[idx]),
-        #          label='fit')
-        # plt.title('%i'%idx)
-        # plt.xscale('log')
-        # plt.yscale('log')
-        # plt.legend()
-        # plt.show()
+        plt.plot(r, prof, label='obs')
+        plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # , popt[2],
+                                 m500gas, r500[idx]),
+                 label='fit')
+        plt.title('%i'%idx)
+        plt.xscale('log')
+        plt.yscale('log')
+        plt.legend()
+        plt.show()
 
         # Final fit will need to reproduce the m500gas mass
         a = np.append(a, popt[0])
@@ -430,11 +426,8 @@ def fit_croston():
         aerr = np.append(aerr, np.sqrt(np.diag(pcov))[0])
         berr = np.append(berr, np.sqrt(np.diag(pcov))[1])
 
-    return a, aerr, b, berr, m_sl, m500g, r500 # c, cerr, m500g
+    return a, aerr, b, berr, m_sl, m500g, r500  # c, cerr, m500g
 
-# ------------------------------------------------------------------------------
-# End of fit_croston()
-# ------------------------------------------------------------------------------
 
 def fit_eckert():
     # these are all assuming h_70!!
@@ -445,7 +438,6 @@ def fit_eckert():
     # we need to plug in the 0.7^2
     m500 = tools.radius_to_mass(r500, 500 * p.prms.cosmo.rho_crit * 0.7**2)
 
-    pl.set_style()
     a = np.empty((0,), dtype=float)
     b = np.empty((0,), dtype=float)
     m_sl = np.empty((0,), dtype=float)
