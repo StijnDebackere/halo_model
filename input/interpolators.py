@@ -13,11 +13,10 @@ else:
 table_dir += "tables/"
 
 
-
 def arrays_to_coords(*xi):
     '''
-    Convert a set of N 1-D coordinate arrays to a regular coordinate grid of 
-    dimension (npoints, N) for the interpolator 
+    Convert a set of N 1-D coordinate arrays to a regular coordinate grid of
+    dimension (npoints, N) for the interpolator
     '''
     # the meshgrid matches each of the *xi to all the other *xj
     Xi = np.meshgrid(*xi, indexing='ij')
@@ -27,20 +26,17 @@ def arrays_to_coords(*xi):
 
     return coords.reshape(-1, len(xi))
 
-# ------------------------------------------------------------------------------
-# End of arrays_to_coords()
-# ------------------------------------------------------------------------------
 
 def arrays_to_ogrid(*xi):
     '''
-    Return an ordered list of N arrays reshaped to an ogrid to match to the total
-    dimension N with shape (n1, ..., nk, ..., nn)
+    Return an ordered list of N arrays reshaped to an ogrid to match to the
+    total dimension N with shape (n1, ..., nk, ..., nn)
     '''
     n = len(xi)
 
     # all arrays need to be reshaped to (1,...,-1,..,1)
     # where -1 corresponds to their own dimension
-    shape = [1,] * n
+    shape = [1, ] * n
 
     ogrid = []
     for i, x in enumerate(xi):
@@ -51,9 +47,6 @@ def arrays_to_ogrid(*xi):
 
     return ogrid
 
-# ------------------------------------------------------------------------------
-# End of arrays_to_ogrid()
-# ------------------------------------------------------------------------------
 
 ###################################
 # Functions to interpolate tables #
@@ -71,7 +64,7 @@ def c200c_cosmo_interp(c_file="c200c_correa_cosmo.asdf"):
     ov = af.tree["omegav"][:]
     n = af.tree["n"][:]
     h = af.tree["h"][:]
-    
+
     z = af.tree["z"][:]
     m = af.tree["m200c"][:]
     c = af.tree["c200c"][:]
@@ -81,9 +74,6 @@ def c200c_cosmo_interp(c_file="c200c_correa_cosmo.asdf"):
 
     return c_interp
 
-# ------------------------------------------------------------------------------
-# End of c200c_cosmo_interp()
-# ------------------------------------------------------------------------------
 
 def c200c_interp(c_file="c200c_correa.asdf"):
     '''
@@ -102,9 +92,6 @@ def c200c_interp(c_file="c200c_correa.asdf"):
 
     return c_interp
 
-# ------------------------------------------------------------------------------
-# End of c200c_interp()
-# ------------------------------------------------------------------------------
 
 def c200m_cosmo_interp(c_file="c200m_correa_cosmo.asdf"):
     '''
@@ -118,7 +105,7 @@ def c200m_cosmo_interp(c_file="c200m_correa_cosmo.asdf"):
     ov = af.tree["omegav"][:]
     n = af.tree["n"][:]
     h = af.tree["h"][:]
-    
+
     z = af.tree["z"][:]
     m = af.tree["m200m"][:]
     c = af.tree["c200m"][:]
@@ -128,9 +115,6 @@ def c200m_cosmo_interp(c_file="c200m_correa_cosmo.asdf"):
 
     return c_interp
 
-# ------------------------------------------------------------------------------
-# End of c200m_cosmo_interp()
-# ------------------------------------------------------------------------------
 
 def c200m_interp(c_file="c200m_correa.asdf"):
     '''
@@ -148,10 +132,7 @@ def c200m_interp(c_file="c200m_correa.asdf"):
     c_interp = interpolate.RegularGridInterpolator(coords, c)
 
     return c_interp
-    
-# ------------------------------------------------------------------------------
-# End of c200m_interp()
-# ------------------------------------------------------------------------------
+
 
 def m200m_dmo_interp(f_c, sigma_lnc, m_file=None):
     '''
@@ -179,10 +160,7 @@ def m200m_dmo_interp(f_c, sigma_lnc, m_file=None):
     m200m_dmo_interp = interpolate.RegularGridInterpolator(coords, m200m_dmo)
 
     return m200m_dmo_interp
-    
-# ------------------------------------------------------------------------------
-# End of m200m_dmo_interp()
-# ------------------------------------------------------------------------------
+
 
 def fcen500c_interp(f_c, sigma_lnc, m_file=None):
     '''
@@ -210,10 +188,7 @@ def fcen500c_interp(f_c, sigma_lnc, m_file=None):
     fcen_500c_interp = interpolate.RegularGridInterpolator(coords, fcen_500c)
 
     return fcen_500c_interp
-    
-# ------------------------------------------------------------------------------
-# End of fcen_500c_interp()
-# ------------------------------------------------------------------------------
+
 
 def fsat500c_interp(f_c, sigma_lnc, m_file=None):
     '''
@@ -241,10 +216,7 @@ def fsat500c_interp(f_c, sigma_lnc, m_file=None):
     fsat_500c_interp = interpolate.RegularGridInterpolator(coords, fsat_500c)
 
     return fsat_500c_interp
-    
-# ------------------------------------------------------------------------------
-# End of fsat_500c_interp()
-# ------------------------------------------------------------------------------
+
 
 def fbar500c_interp(f_c, sigma_lnc, m_file=None):
     '''
@@ -266,16 +238,13 @@ def fbar500c_interp(f_c, sigma_lnc, m_file=None):
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
     fbar_500c = af.tree["fbar_500c"][:]
-    
+
     coords = (z, np.log10(m), f)
 
     fbar_500c_interp = interpolate.RegularGridInterpolator(coords, fbar_500c)
 
     return fbar_500c_interp
-    
-# ------------------------------------------------------------------------------
-# End of fbar_500c_interp()
-# ------------------------------------------------------------------------------
+
 
 def fgas_500c_max_interp(f_c, sigma_lnc, m_file=None):
     '''
@@ -298,21 +267,19 @@ def fgas_500c_max_interp(f_c, sigma_lnc, m_file=None):
     fgas_500c_max = af.tree["fgas_500c_max"][:]
 
     coords = (z, np.log10(m))
-    fgas_500c_max_interp = interpolate.RegularGridInterpolator(coords, fgas_500c_max)
+    fgas_500c_max_interp = interpolate.RegularGridInterpolator(coords,
+                                                               fgas_500c_max)
 
     return fgas_500c_max_interp
-    
-# ------------------------------------------------------------------------------
-# End of fgas_500c_max_interp()
-# ------------------------------------------------------------------------------
+
 
 def gamma_max_interp_test(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):
     '''
     Return the interpolator for the gamma_max(z, m500c, fgas500c) relation
     '''
     if m_file is None:
-        fname_append = "_fc_{}_slnc_{}_rc_{}_beta_{}_rflat_{}.asdf".format(f_c, sigma_lnc,
-                                                                           r_c, beta, r_flat)
+        fs = [f_c, sigma_lnc, r_c, beta, r_flat]
+        fname_append = "_fc_{}_slnc_{}_rc_{}_beta_{}_rflat_{}.asdf".format(*fs)
         m_file = "m500c_to_gamma_max" + fname_append
 
     m_file = table_dir + m_file
@@ -338,18 +305,15 @@ def gamma_max_interp_test(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):
     gamma_max_interp = interpolate.RegularGridInterpolator(coords, gamma_max)
 
     return gamma_max_interp
-    
-# ------------------------------------------------------------------------------
-# End of gamma_max_interp()
-# ------------------------------------------------------------------------------
+
 
 def gamma_max_interp(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):
     '''
     Return the interpolator for the gamma_max(z, m500c, fgas500c) relation
     '''
     if m_file is None:
-        fname_append = "_fc_{}_slnc_{}_rc_{}_beta_{}_rflat_{}.asdf".format(f_c, sigma_lnc,
-                                                                           r_c, beta, r_flat)
+        fs = [f_c, sigma_lnc, r_c, beta, r_flat]
+        fname_append = "_fc_{}_slnc_{}_rc_{}_beta_{}_rflat_{}.asdf".format(*fs)
         m_file = "m500c_to_gamma_max" + fname_append
 
     m_file = table_dir + m_file
@@ -370,16 +334,13 @@ def gamma_max_interp(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
     gamma_max = af.tree["gamma_max"][:]
-    
+
     coords = (z, np.log10(m), f)
 
     gamma_max_interp = interpolate.RegularGridInterpolator(coords, gamma_max)
 
     return gamma_max_interp
-    
-# ------------------------------------------------------------------------------
-# End of gamma_max_interp()
-# ------------------------------------------------------------------------------
+
 
 def mask_interp(f_c, sigma_lnc, m_file=None):
     '''
@@ -405,8 +366,8 @@ def mask_interp(f_c, sigma_lnc, m_file=None):
     coords = (z, np.log10(m), f)
     mask_interp = interpolate.RegularGridInterpolator(coords, mask)
 
-    return mask
-    
+    return mask_interp
+
 # ------------------------------------------------------------------------------
 # End of mask_interp()
 # ------------------------------------------------------------------------------

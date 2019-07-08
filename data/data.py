@@ -358,17 +358,16 @@ def bin_eckert(n=20):
 
     return r_ranges, rho_med, rho_std, m500_med, r500_med
 
-# ------------------------------------------------------------------------------
-# End of bin_eckert()
-# ------------------------------------------------------------------------------
 
 def prof_gas_hot(x, sl, a, b, m_sl, r500):
     '''beta profile'''
-    profile = (1 + (x/a)**2)**(-3*b/2)
+    y = x / a
+    profile = (1 + y**2)**(-3*b/2)
     mass = tools.m_h(profile[sl], x[sl] * r500)
     profile *= m_sl/mass
 
     return profile
+
 
 def fit_croston():
     '''
@@ -398,17 +397,19 @@ def fit_croston():
         # Need to perform the fit for [0.15,1] r500c -> mass within this region
         # need to match
         sl_fit = np.ones(sl.sum(), dtype=bool)
-        popt, pcov = opt.curve_fit(lambda r, a, b: \
+        popt, pcov = opt.curve_fit(lambda r, a, b:
                                    prof_gas_hot(r, sl_fit, a, b,
                                                 mass, r500[idx]),
                                    r[sl], prof[sl],
                                    sigma=rho_err[idx][sl],
-                                   bounds=([0, 0], [1, 5]))
+                                   bounds=([0, 0], [5, 3]))
 
         # print('f_gas,500c_actual :', m500g[idx] / m500[idx])
         # print('f_gas,500c_fitted :', m500gas / m500[idx])
         # print('m_gas,500c_fitted / m_gas,500c_actual', m500gas / m500g[idx])
         # print('-------------------')
+        plt.ioff()
+        plt.clf()
         plt.plot(r, prof, label='obs')
         plt.plot(r, prof_gas_hot(r, sl_500, popt[0], popt[1], # , popt[2],
                                  m500gas, r500[idx]),

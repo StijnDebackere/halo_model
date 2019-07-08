@@ -65,7 +65,7 @@ class MassFunction(transfer.Transfer):
 
 
     def __init__(self, m=np.logspace(10, 15, 100), hmf_model=ff.Tinker08, hmf_params=None,
-                 delta_h=200.0,delta_wrt='mean',
+                 delta_h=200.0, delta_wrt='mean',
                  delta_c=1.686, filter_model=TopHat, filter_params=None,
                  **transfer_kwargs):
         # # Call super init MUST BE DONE FIRST.

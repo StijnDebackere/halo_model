@@ -313,7 +313,7 @@ def table_c200c_correa(m200c=m200c,
                            Mi=m200c/cosmo["h"],
                            z=z,
                            mah=False)['c'].T
-        
+
         out_q.put([procn, c_all])
 
     # --------------------------------------------------
@@ -323,14 +323,14 @@ def table_c200c_correa(m200c=m200c,
     cosmo["omega_lambda_0"] = omegav
     cosmo["n"] = n
     cosmo["h"] = h
-    
+
     if cpus == None:
         cpus = multi.cpu_count()
 
     manager = multi.Manager()
     out_q = manager.Queue()
 
-    m200c_split = np.array_split(m200c, cpus)    
+    m200c_split = np.array_split(m200c, cpus)
 
     procs = []
     for i in range(cpus):
@@ -415,7 +415,7 @@ def table_m200c_to_m200m(m200c=m200c,
 
     c200c = c_interp(coords).reshape(z.shape + m200c.shape)
     r200c = tools.mass_to_radius(m200c, 200 * rhoc)
-    
+
     m200m, c200m, r200m = m200c_to_m200m(m200c=m200c.reshape(1,-1),
                                          c200c=c200c,
                                          r200c=r200c.reshape(1,-1),
@@ -495,7 +495,7 @@ def table_m200c_to_m200m_cosmo(m200c=m200c,
     c200c = c_interp(coords).reshape(sigma8.shape + omegam.shape + omegav.shape +
                                      n.shape + h.shape + z.shape + m200c.shape)
     r200c = tools.mass_to_radius(m200c, 200 * rhoc)
-    
+
     m200m, c200m, r200m = m200c_to_m200m_cosmo(m200c=m200c.reshape(1,1,1,1,1,1,-1),
                                                c200c=c200c,
                                                r200c=r200c.reshape(1,1,1,1,1,1,-1),
@@ -696,8 +696,8 @@ def table_c200m_correa_cosmo(m200m=m200m,
                             c_interp = interpolate.interp1d(np.log10(m200m_t[idx_s8, idx_om, idx_ov,
                                                                         idx_n, idx_h, 0]),
                                                        c200m_t[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0])
-                            
-                            
+
+
                             c_all[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0] = c_interp(np.log10(m200m))
 
         out_q.put([procn, c_all])
@@ -764,7 +764,7 @@ def table_c200m_correa_cosmo(m200m=m200m,
 
 def f_stars_interp(comp='all'):
     '''
-    Return the stellar fraction interpolator as a function of halo mass as found 
+    Return the stellar fraction interpolator as a function of halo mass as found
     by Zu & Mandelbaum (2015).
 
     For m200m < 1e10 M_sun/h we return f_stars=0
@@ -805,6 +805,7 @@ def f_stars_interp(comp='all'):
 # End of f_stars_interp()
 # ------------------------------------------------------------------------------
 
+
 def table_m500c_to_m200m_dmo(m500c=m500c,
                              z=z,
                              fg500c=np.linspace(0, 1, 100),
@@ -819,7 +820,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
                              fname="m500c_to_m200m_dmo",
                              cpus=None):
     '''
-    Create a table that computes the DMO equivalent halo mass m200m_dmo given the 
+    Create a table that computes the DMO equivalent halo mass m200m_dmo given the
     observed m500c & fgas_500c (normalized to the cosmic baryon fraction). The
     stellar fraction are also computed and saved.
 
@@ -854,11 +855,12 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         dict with m200m_dmo, c200m_dmo, fstar_500c and all input values
 
         - this dict gets saved to fname
-    '''    
+    '''
     def m_diff(m200m_dmo, m500c, r500c, fg500c, fs200m, fc200m, c200m, z):
         # for a given halo mass, we know the concentration
         try:
-            c200m_dmo = c200m(np.array([z, np.log10(m200m_dmo)])) * np.e**sigma_lnc
+            c200m_dmo = c200m(np.array([z, np.log10(m200m_dmo)]))
+            c200m_dmo = c200m_dmo * np.e**sigma_lnc
         except ValueError:
             print(np.array([z, np.log10(m200m_dmo)]))
         r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
@@ -906,7 +908,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         fsat_200m = fs200m(m200m_dmo / 0.7)
         fsat_500c = dp.m_NFW(r500c, m_x=fsat_200m*m200m_dmo, c_x=f_c*c200m_dmo,
                             r_x=r200m_dmo) / m500c
-        
+
         out_q.put([procn, m200m_dmo, fcen_500c, fsat_500c])
 
     # --------------------------------------------------
@@ -924,7 +926,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
 
     # set background densities
     rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
-    
+
     r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
 
     # otherwise the code gets upset when passing empty arrays to optimize
@@ -1019,8 +1021,8 @@ def table_m500c_to_gamma_max(m500c=m500c,
                              fname="m500c_to_gamma_max",
                              cpus=None):
     '''
-    Create a table that computes the maximum gamma for each m500c & fgas_500c 
-    (normalized to the cosmic baryon fraction) with the requirement that the 
+    Create a table that computes the maximum gamma for each m500c & fgas_500c
+    (normalized to the cosmic baryon fraction) with the requirement that the
     cosmic baryon fraction is just reached at r200m_obs
 
     Parameters
@@ -1177,7 +1179,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
     #         print("================")
 
     #     return fb_diff
-        
+
     # ----------------------------------------------------------------------------
     def gamma_from_m500c(procn, z, m500c, fg500c, r500c,
                          fc500c, fs500c, m200m_dmo, c200m_dmo,
@@ -1221,7 +1223,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
     # split arrays along m500c axis
     m500c_split = np.array_split(m500c_r, cpus, axis=1)
     r500c_split = np.array_split(r500c_r, cpus, axis=1)
-    
+
     procs = []
     for i, (mi, ri) in enumerate(zip(m500c_split, r500c_split)):
         process = multi.Process(target=gamma_from_m500c,
@@ -1287,7 +1289,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 #                                    fname="m500c_to_m200m_dmo_cosmo.asdf",
 #                                    cpus=None):
 #     '''
-#     Create a table that computes the DMO equivalent halo mass m200m_dmo given the 
+#     Create a table that computes the DMO equivalent halo mass m200m_dmo given the
 #     observed m500c & fgas_500c (normalized to the cosmic baryon fraction). The
 #     stellar fraction are also computed and saved.
 
@@ -1367,7 +1369,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 
 #     # set background densities
 #     rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
-    
+
 #     r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
 
 #     # otherwise the code gets upset when passing empty arrays to optimize
@@ -1471,7 +1473,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 
 #     # set background densities
 #     rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
-    
+
 #     r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
 
 #     # otherwise the code gets upset when passing empty arrays to optimize
@@ -1541,7 +1543,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 #     """
 #     pass
 
-    
+
 # def extrapolate_plaw(x_range, func, verbose=False):
 #     '''
 #     Extrapolate func NaN values as a powerlaw. Works best if power law behaviour
@@ -1836,7 +1838,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 #       x overdensity radius to match rho_x at, in units of r_range
 #     r_y : (m,) array
 #       y radius, in units of r_range
-    
+
 #     Returns
 #     -------
 #     profile : (m,r) array
@@ -1859,7 +1861,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 
 # def profile_uni_k(k_range, rho_x, r_x, r_y):
 #     '''
-#     Return the analytic 3D radially symmetric FT of a uniform profile with density 
+#     Return the analytic 3D radially symmetric FT of a uniform profile with density
 #     rho_x at r_x between r_x and r_y
 
 #     Parameters
@@ -1872,7 +1874,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 #       x overdensity radius to match rho_x at, in units of r_range
 #     r_y : (m,) array
 #       y radius, in units of r_range
-    
+
 #     Returns
 #     -------
 #     profile_k : (m,k) array
@@ -1890,7 +1892,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 #     sincoskrx = np.sin(krx) / krx**3 - np.cos(krx) / (krx)**2
 
 #     profile_k = 4 * np.pi * rho_x * (r_y**3 * sincoskry - r_x**3 * sincoskrx)
-    
+
 #     return profile_k
 
 # # ------------------------------------------------------------------------------
@@ -1968,7 +1970,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
 
 # def profile_beta_plaw_uni_k(k_range, fgas500c, rc, beta, gamma):
 #     '''
-#     Calculate 
+#     Calculate
 #     '''
 #     r_range = np.logspace(-2, 1, 200)
 
