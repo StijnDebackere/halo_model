@@ -105,12 +105,12 @@ class Power(object):
         # define shapes for readability
         m_s = self.m_h.shape[0]
 
-        m_h = self.m_h.reshape(m_s,1)
+        m200m_dmo = self.m200m_dmo.reshape(m_s,1)
         dndm = self.dndm.reshape(m_s,1)
 
         prefactor = (1. / self.rho_m)**2
         result = tools.Integrate(y=dndm * np.abs(self.rho_k)**2,
-                                 x=m_h, axis=0)
+                                 x=m200m_dmo, axis=0)
 
         result *= prefactor
 
@@ -274,7 +274,7 @@ class Power_Components(object):
                 prof_2 = self.profiles[key_2]
 
                 cross_name = '{:s}-{:s}'.format(key_1, key_2)
-                cross[cross_name] = Power_Components._cross_power(m_h=self.m_h,
+                cross[cross_name] = Power_Components._cross_power(m_h=self.m200m_dmo,
                                                                   dndm=self.m_fn.dndm,
                                                                   rho_m=self.rho_m,
                                                                   prof_1=prof_1,
@@ -290,7 +290,7 @@ class Power_Components(object):
         # define shapes for readability
         m_s = self.m_h.shape[0]
 
-        m_h = self.m_h.reshape(m_s,1)
+        m_h = self.m200m_dmo.reshape(m_s,1)
         dndm = self.m_fn.dndm.reshape(m_s,1)
 
         prefactor = (1. / self.rho_m)**2

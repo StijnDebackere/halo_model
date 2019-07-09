@@ -368,13 +368,13 @@ def m_gas_model(m500c, r500c, rc, beta, gamma, fgas_500c, r_flat=None, z=0.,
     if r_flat is None:
         gas_args['gamma'] = gamma
         gas_args['rho_x'] = rho_500c
-        m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw(r, **{k: v[sl] for k,v in
+        m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw(r, **{k: v[sl] for k, v in
                                                              gas_args.items()})
     else:
         gas_args['r_y'] = r_flat * r500c
         gas_args['gamma'] = gamma
         gas_args['rho_x'] = rho_500c
-        m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw_uni(r, **{k: v[sl] for k,v in
+        m_gas = lambda r, sl, **kwargs: dp.m_beta_plaw_uni(r, **{k: v[sl] for k, v in
                                                                  gas_args.items()})
 
     return m_gas
@@ -391,18 +391,14 @@ def m_stars_model(m500c_dmo, r500c, csat_500c, fcen_500c, fsat_500c):
     sat_args = {'m_x': fsat_500c * m500c_dmo,
                 'c_x': csat_500c,
                 'r_x': r500c}
-    
 
-    m_stars = lambda r, sl, **kwargs: (dp.m_delta(r, **{k: v[sl] for k,v in
+    m_stars = lambda r, sl, **kwargs: (dp.m_delta(r, **{k: v[sl] for k, v in
                                                         cen_args.items()}) +
-                                       dp.m_NFW(r, **{k: v[sl] for k,v in
+                                       dp.m_NFW(r, **{k: v[sl] for k, v in
                                                       sat_args.items()}))
 
     return m_stars
 
-# ----------------------------------------------------------------------
-# End of m_stars_model()
-# ----------------------------------------------------------------------
 
 def m_dm_model(m500c_dm, c500c_dm, r500c):
     '''
@@ -412,14 +408,11 @@ def m_dm_model(m500c_dm, c500c_dm, r500c):
                'c_x': c500c_dm,
                'r_x': r500c}
 
-    m_dm = lambda r, sl, **kwargs: dp.m_NFW(r, **{k: v[sl] for k,v in
+    m_dm = lambda r, sl, **kwargs: dp.m_NFW(r, **{k: v[sl] for k, v in
                                                   dm_args.items()})
 
     return m_dm
 
-# ----------------------------------------------------------------------
-# End of m_dm_model()
-# ----------------------------------------------------------------------
 
 def r200m_from_m(m_f, r200m_dmo, cosmo, **kwargs):
     '''
@@ -439,16 +432,13 @@ def r200m_from_m(m_f, r200m_dmo, cosmo, **kwargs):
       radius where mean enclosed density is 200 rho_m
     '''
     def diff_m200m(r):
-        m200m = 4. /3 * np.pi * 200 * cosmo.rho_m * r**3
+        m200m = 4. / 3 * np.pi * 200 * cosmo.rho_m * r**3
         m_diff = m_f(r, **kwargs) - m200m
         return m_diff
 
     r200m = opt.brentq(diff_m200m, 0.2 * r200m_dmo, 1.1 * r200m_dmo)
     return r200m
 
-# ----------------------------------------------------------------------
-# End of r200m_from_m()
-# ----------------------------------------------------------------------
 
 def r_fb_from_f(f_b, cosmo, r500c, r_max, **kwargs):
     '''

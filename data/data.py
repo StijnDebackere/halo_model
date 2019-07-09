@@ -581,14 +581,11 @@ def convert_hm(r200m=True):
         with open('data/eckert_200.p', 'wb') as f:
             pickle.dump(data_eckert, f)
 
-# ------------------------------------------------------------------------------
-# End of convert_hm()
-# ------------------------------------------------------------------------------
 
 def f_gas(m, log10mt, a, fgas_500c_max, cosmo, f_c=0.86, sigma_lnc=0.0,
           z=0., norm=None, **kwargs):
     '''
-    Return the f_gas(m500c) relation for m. The relation cannot exceed 
+    Return the f_gas(m500c) relation for m. The relation cannot exceed
     f_b,500c - f_stars,500c
 
     This function assumes h=0.7 for everything!

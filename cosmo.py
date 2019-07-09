@@ -303,17 +303,17 @@ class Cosmology(object):
         dict
             Dictionary of values appropriate for pycamb
         """
-        amap = {"sigma_8":"sigma_8",
-                "omegab":"omegab",
-                "omegac":"omegac",
-                "omegav":"omegav",
-                "omegam":"omegam",
-                "n":"n",
-                "H0":"H0"}
+        amap = {"sigma_8": "sigma_8",
+                "omegab": "omegab",
+                "omegac": "omegac",
+                "omegav": "omegav",
+                "omegam": "omegam",
+                "n": "n",
+                "H0": "H0"}
 
         return_dict = {}
         for k, v in amap.items():
-            return_dict.update({v:getattr(self, k)})
+            return_dict.update({v: getattr(self, k)})
 
         return return_dict
 
@@ -327,12 +327,12 @@ class Cosmology(object):
         dict
             Dictionary of values appropriate for pycamb
         """
-        amap = {"omegam":"Om0",
-                "H0":"H0"}
+        amap = {"omegam": "Om0",
+                "H0": "H0"}
 
         return_dict = {}
         for k, v in amap.items():
-            return_dict.update({v:getattr(self, k)})
+            return_dict.update({v: getattr(self, k)})
 
         return return_dict
 
@@ -346,25 +346,24 @@ class Cosmology(object):
         dict
             Dictionary of values appropriate for pycamb
         """
-        amap = {"w":"w_lam",
-               "t_cmb":"TCMB",
-               "y_he":"yhe",
-               "z_reion":"reion__redshift",
-               "N_nu":"Num_Nu_massless",
-               "omegab":"omegab",
-               "omegac":"omegac",
-               "H0":"H0",
-               "omegav":"omegav",
-               "omegak":"omegak",
-               "omegan":"omegan",
-               "cs2_lam":"cs2_lam",
-               "n":"scalar_index",
-               "N_nu_massive":"Num_Nu_massive"
-               }
+        amap = {"w": "w_lam",
+                "t_cmb": "TCMB",
+                "y_he": "yhe",
+                "z_reion": "reion__redshift",
+                "N_nu": "Num_Nu_massless",
+                "omegab": "omegab",
+                "omegac": "omegac",
+                "H0": "H0",
+                "omegav": "omegav",
+                "omegak": "omegak",
+                "omegan": "omegan",
+                "cs2_lam": "cs2_lam",
+                "n": "scalar_index",
+                "N_nu_massive": "Num_Nu_massive"}
 
         return_dict = {}
         for k, v in amap.items():
-            return_dict.update({v:getattr(self, k)})
+            return_dict.update({v: getattr(self, k)})
 
         return return_dict
 
@@ -378,56 +377,58 @@ class Cosmology(object):
         dict
             Dictionary of values appropriate for cosmolopy
         """
-        amap = {"tau":"tau",
-               "z_reion":"z_reion",
-               "omegab":"omega_b_0",
-               "h":"h",
-               "omegav":"omega_lambda_0",
-               "omegak":"omega_k_0",
-               "sigma_8":"sigma_8",
-               "omegam":"omega_M_0",
-               "n":"n",
-               "omegan":"omega_n_0",
-               "N_nu_massive":"N_nu",
-               "w":"w"}
+        amap = {"tau": "tau",
+                "z_reion": "z_reion",
+                "omegab": "omega_b_0",
+                "h": "h",
+                "omegav": "omega_lambda_0",
+                "omegak": "omega_k_0",
+                "sigma_8": "sigma_8",
+                "omegam": "omega_M_0",
+                "n": "n",
+                "omegan": "omega_n_0",
+                "N_nu_massive": "N_nu",
+                "w": "w"}
 
         return_dict = {}
         for k, v in amap.items():
-            return_dict.update({v:getattr(self, k)})
+            return_dict.update({v: getattr(self, k)})
 
         return return_dict
 
-#===============================================================================
-# SOME BASE COSMOLOGIES
-#===============================================================================
+#########################
+# SOME BASE COSMOLOGIES #
+#########################
 # The extras dict has common parameter defaults between all bases
-extras = {"w"   :-1,
-          "omegan"  : 0.0,
-          'cs2_lam' : 1,
-          't_cmb'    : 2.725,
-          'y_he'     : 0.24,
-          'N_nu'    : 3.04,
-          "delta_c" : 1.686,
-          "N_nu_massive":0.0,
+
+
+extras = {"w": -1,
+          "omegan": 0.0,
+          "cs2_lam": 1,
+          "t_cmb": 2.725,
+          "y_he": 0.24,
+          "N_nu": 3.04,
+          "delta_c": 1.686,
+          "N_nu_massive": 0.0,
           }
 
 # # Base Planck (no extra things like lensing and WP)
-planck1_base = {"omegab_h2"   : 0.022068,
-                "omegac_h2"   : 0.12029,
-                "omegav"   : 0.6825,
-                "H0"       : 67.11,
-                'z_reion': 11.35,
-                'tau': 0.0925,
-                "sigma_8":0.8344,
-                "n":0.9624,
+planck1_base = {"omegab_h2": 0.022068,
+                "omegac_h2": 0.12029,
+                "omegav": 0.6825,
+                "H0": 67.11,
+                "z_reion": 11.35,
+                "tau": 0.0925,
+                "sigma_8": 0.8344,
+                "n": 0.9624,
                 }
 
-wmap9_nobao = {'sigma_8': 0.821,
-               'H0': 70.0,
-               'z_reion': 10.6,
-               'tau': 0.089,
-               'omegab': 0.0463,
-               'omegac': 0.233,
-               'omegam': 0.2793,
-               'omegav': 0.7207,
-               'n': 0.972}
+wmap9_nobao = {"sigma_8": 0.821,
+               "H0": 70.0,
+               "z_reion": 10.6,
+               "tau": 0.089,
+               "omegab": 0.0463,
+               "omegac": 0.233,
+               "omegam": 0.2793,
+               "omegav": 0.7207,
+               "n": 0.972}
