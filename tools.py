@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.integrate
+import scipy.integrate as intg
 from scipy.interpolate import interp1d
 from scipy.special import hyp2f1
 import scipy.optimize as opt
@@ -98,7 +98,7 @@ def Integrate(y, x, axis=-1):
     '''
     y_new = np.nan_to_num(y)
     # the last interval is computed with trapz
-    result = scipy.integrate.simps(y=y_new, x=x, axis=axis, even='first')
+    result = intg.simps(y=y_new, x=x, axis=axis, even='first')
     # result = np.trapz(y=y_new, x=x, axis=axis)
 
     return result
@@ -416,6 +416,35 @@ def radius_to_mass(r, mean_dens):
     return 4 * np.pi * r ** 3 * mean_dens / 3.
 
 
+@np.vectorize
+def rx_from_m(m_f, rho_x, **kwargs):
+    '''
+    For a given cumulative mass profile m_f that takes the radius as its first
+    argument, compute the radius where the mean enclosed density is rho_x
+
+    Parameters
+    ----------
+    m_f : function
+        function to compute cumulative mass profile, radius is its first arg
+    rho_x : float
+        mean enclosed overdensity
+    kwargs : dict
+        arguments for m_f
+
+    Returns
+    -------
+    rx : float
+        radius where mean enclosed density is rho_x
+    '''
+    def diff_mx(r):
+        mx = 4. / 3 * np.pi * rho_x * r**3
+        m_diff = m_f(r, **kwargs) - mx
+        return m_diff
+
+    rx = opt.brentq(diff_mx, 1e-4, 100)
+    return rx
+
+
 def sigma_from_rho(R, r_range, rho):
     """
     Project a 3-D density profile to a surface density profile.
@@ -444,6 +473,101 @@ def sigma_from_rho(R, r_range, rho):
         sigma[idx] = Integrate(integrand, r_int)
 
     return sigma
+
+
+def sigma_from_rho_func(R, rho_func, func_args, rmax=None):
+    """
+    Project a 3-D density profile to a surface density profile.
+
+    Parameters
+    ----------
+    R : (R,) array
+        projected radii
+    r_range : (r,) array
+        radial range for the density profile
+    rho : (r,) array
+        density profile at r_range
+
+    Returns
+    -------
+    sigma : (R,) array
+        mass surface density from rho at R
+    """
+    sigma = np.zeros(R.shape)
+
+    for idx, ri in enumerate(R):
+        integrand = lambda r, *func_args: (2 * r *
+                                           rho_func(r, *func_args) /
+                                           np.sqrt(r**2 - ri**2))
+
+        if rmax is not None:
+            sigma[idx] = intg.quad(integrand, ri + 1e-4, rmax,
+                                   args=func_args)[0]
+        else:
+            sigma[idx] = intg.quad(integrand, ri + 1e-4, np.inf,
+                                   args=func_args)[0]
+
+    return sigma
+
+
+def sigma_enc_from_sigma(R, sigma):
+    """
+    Compute the 3D enclosed mass profile for sigma
+
+    Parameters
+    ----------
+    R : (R, ) array
+        projected radii
+    sigma : (R, ) array
+        surface mass density profile
+
+    Returns
+    -------
+    sigma_enc : (R, ) array
+        enclosed surface mass
+    """
+    sigma_enc = np.zeros(R.shape)
+    r_min = np.min(R)
+    r_max = np.max(R)
+
+    for idx, r in enumerate(R):
+        sigma_int = interp1d(R, sigma, fill_value="extrapolate")
+        r_int = np.logspace(np.log10(r_min) - 1, np.log10(r), 150)
+
+        integrand = 2 * np.pi * sigma_int(r_int) * r_int
+        sigma_enc[idx] = Integrate(integrand, r_int)
+
+    return sigma_enc
+
+
+def sigma_enc(R, R_range, sigma):
+    """
+    Compute the 3D enclosed mass profile for sigma
+
+    Parameters
+    ----------
+    R : float
+        projected radius to compute enclosed mass at
+    R_range : (R, ) array
+        projected radii for the mass density profile
+    sigma : (R, ) array
+        surface mass density profile
+
+    Returns
+    -------
+    sigma_enc : float
+        enclosed surface mass
+    """
+    r_min = np.min(R_range)
+    r_max = R
+
+    sigma_int = interp1d(R_range, sigma, fill_value="extrapolate")
+    r_int = np.logspace(np.log10(r_min) - 1, np.log10(r_max), 150)
+
+    integrand = 2 * np.pi * sigma_int(r_int) * r_int
+    sigma_enc = Integrate(integrand, r_int)
+
+    return sigma_enc
 
 
 def massdiff_2m5c_duffy(m200m, m500c, rhoc, rhom, z):

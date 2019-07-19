@@ -436,8 +436,35 @@ def r200m_from_m(m_f, r200m_dmo, cosmo, **kwargs):
         m_diff = m_f(r, **kwargs) - m200m
         return m_diff
 
-    r200m = opt.brentq(diff_m200m, 0.2 * r200m_dmo, 1.1 * r200m_dmo)
+    r200m = opt.brentq(diff_m200m, 0.2 * r200m_dmo, 2 * r200m_dmo)
     return r200m
+
+
+def r200c_from_m(m_f, r200c_dmo, cosmo, **kwargs):
+    '''
+    For a given cumulative mass profile m_f that takes the radius as its
+    first argument, compute the radius where the mean enclosed density
+    is 200 rho_crit
+
+    Parameters
+    ----------
+    m_f : function
+      function to compute cumulative mass profile, radius is its first arg
+    kwargs : dict
+      arguments for m_f
+
+    Returns
+    -------
+    r200c : float
+      radius where mean enclosed density is 200 rho_crit
+    '''
+    def diff_m200c(r):
+        m200c = 4. / 3 * np.pi * 200 * cosmo.rho_crit * r**3
+        m_diff = m_f(r, **kwargs) - m200c
+        return m_diff
+
+    r200c = opt.brentq(diff_m200c, 0.2 * r200c_dmo, 2 * r200c_dmo)
+    return r200c
 
 
 def r_fb_from_f(f_b, cosmo, r500c, r_max, **kwargs):
@@ -640,6 +667,7 @@ def load_interp_prms(prms=p.prms):
 
     return prms_interp
 
+
 # @do_cprofile
 def load_gamma(prms=p.prms,
                prms_interp=None,
@@ -724,12 +752,26 @@ def load_gamma(prms=p.prms,
     m500c_dm = prms_interp["m500c_dm"]
     m500c_dmo = prms_interp["m500c_dmo"]
 
+    # get r200c_dmo
+    m_dmo = m_dm_model(m500c_dm=m500c_dmo,
+                       c500c_dm=c500c_dm,
+                       r500c=r500c)
+    r200c_dmo = np.array([r200c_from_m(m_f=m_dmo,
+                                       r200c_dmo=r200m_dmo[i],
+                                       cosmo=prms.cosmo,
+                                       sl=i)
+                          for i in np.arange(0, r500c.shape[0])])
+
+    m200c_dmo = tools.radius_to_mass(r200c_dmo, 200 * prms.cosmo.rho_crit)
+
     # add basic model parameters to the final dict
     results = {'prms': prms,
                'm500c': prms.m500c,
                'm200m_dmo': m200m_dmo,
                'r200m_dmo': r200m_dmo,
                'c200m_dmo': c200m_dmo,
+               'm200c_dmo': m200c_dmo,
+               'r200c_dmo': r200c_dmo,
                'fstar_500c': fstar_500c,
                'fcen_500c': fcen_500c,
                'fsat_500c': fsat_500c,
@@ -793,6 +835,15 @@ def load_gamma(prms=p.prms,
                                   for i in np.arange(0, r500c.shape[0])])
 
             m200m_obs = tools.radius_to_mass(r200m_obs, 200 * prms.cosmo.rho_m)
+
+            # get r200c_obs
+            r200c_obs = np.array([r200c_from_m(m_f=m_tot_200m,
+                                               r200c_dmo=r200c_dmo[i],
+                                               cosmo=prms.cosmo,
+                                               sl=i)
+                                  for i in np.arange(0, r500c.shape[0])])
+
+            m200c_obs = tools.radius_to_mass(r200c_obs, 200 * prms.cosmo.rho_crit)
 
             # now we need to correct the gas, baryonic and total masses in case
             # r_flat is None, since then we will MAKE r_flat = r200m_obs
@@ -910,6 +961,8 @@ def load_gamma(prms=p.prms,
                     'm200m_obs': m200m_obs,
                     'm_obs_200m_dmo': m_obs_200m_dmo,
                     'r200m_obs': r200m_obs,
+                    'm200c_obs': m200c_obs,
+                    'r200c_obs': r200c_obs,
                     'r_max': r_max_fb,
                     'r_flat': r_fl}
             results['{:d}'.format(idx_r)]['{:d}'.format(idx_g)] = temp

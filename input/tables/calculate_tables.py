@@ -444,9 +444,6 @@ def table_m200c_to_m200m(m200c=m200c,
 
     return result_info
 
-# ------------------------------------------------------------------------------
-# End of table_m200c_to_m200m()
-# ------------------------------------------------------------------------------
 
 def massdiff_2m2c_cosmo(m200m, m200c, c200c, r200c, rhom, h, z):
     '''
@@ -457,6 +454,7 @@ def massdiff_2m2c_cosmo(m200m, m200c, c200c, r200c, rhom, h, z):
     mass = dp.m_NFW_delta(r200c, c200c * r200m / r200c, r200m, rhom, Delta=200)
 
     return mass - m200c
+
 
 @np.vectorize
 def m200c_to_m200m_cosmo(m200c, c200c, r200c, rhom, h, z):

@@ -307,7 +307,8 @@ def gamma_max_interp_test(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):
     return gamma_max_interp
 
 
-def gamma_max_interp(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):
+def gamma_max_interp(f_c=0.86, sigma_lnc=0.0, r_c=0.21,
+                     beta=0.71, r_flat=None, m_file=None):
     '''
     Return the interpolator for the gamma_max(z, m500c, fgas500c) relation
     '''
