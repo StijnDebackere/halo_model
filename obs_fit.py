@@ -657,12 +657,12 @@ def load_interp_prms(prms=p.prms):
 
     # get fit prms_interp for the satellite density profiles
     prms_interp["csat_500c"] = (prms.f_c * prms_interp["c200m_dmo"] *
-                               prms.r500c / prms_interp["r200m_dmo"])
+                                prms.r500c / prms_interp["r200m_dmo"])
     prms_interp["c500c_dm"] = (prms_interp["c200m_dmo"] *
-                              prms.r500c / prms_interp["r200m_dmo"])
+                               prms.r500c / prms_interp["r200m_dmo"])
 
     prms_interp["m500c_dm"] = prms.m500c * (1 - prms_interp["fgas_500c"] -
-                                           prms_interp["fstar_500c"])
+                                            prms_interp["fstar_500c"])
     prms_interp["m500c_dmo"] = prms_interp["m500c_dm"] / (1 - prms.f_bar)
 
     return prms_interp
