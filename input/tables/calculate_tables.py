@@ -602,7 +602,7 @@ def table_m200c_to_m500c(m200c=m200c,
 
     # get interpolator and coordinates for c200c
     coords = arrays_to_coords(z, np.log10(m200c))
-    c_interp = interp.c200c_interp()
+    c_interp = inp_interp.c200c_interp()
 
     c200c = c_interp(coords).reshape(z.shape + m200c.shape)
     r200c = tools.mass_to_radius(m200c, 200 * rhoc)
