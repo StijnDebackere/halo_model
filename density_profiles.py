@@ -364,7 +364,7 @@ def m_NFW_delta(r, c_x, r_x, rho_mean, Delta=200):
 
 
 @np.vectorize
-def m_NFW(r, m_x, r_x, c_x, z_range=0, **kwargs):
+def m_NFW(r, m_x, r_x, c_x, **kwargs):
     '''
     Calculate the mass of the NFW profile with c_x and r_x and m_x at r_x
 

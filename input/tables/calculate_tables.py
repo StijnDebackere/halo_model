@@ -564,23 +564,23 @@ def table_m200c_to_m200m(m200c=m200c,
     return result_info
 
 
-def massdiff_5c2c(m500c, m200c, c200c, r200c, rhoc, h, z):
+def massdiff_5c2c(m500c, m200c, c200c, r200c, rhoc):
     '''
     Integrate an NFW halo with c200c to r500c and return the mass difference
     '''
     r500c = tools.mass_to_radius(m500c, 500 * rhoc)
-    mass = dp.m_nfw(z=z, r=r200c, r_x=r500c, c_x=c200c * r500c / r200c,
+    mass = dp.m_NFW(r=r200c, r_x=r500c, c_x=c200c * r500c / r200c,
                     m_x=m500c)
 
     return mass - m200c
 
 
 @np.vectorize
-def m200c_to_m500c(m200c, c200c, r200c, rhoc, h, z):
+def m200c_to_m500c(m200c, c200c, r200c, rhoc):
     # these bounds should be reasonable for m500c < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m500c = opt.brentq(massdiff_5c2c, m200c, 10. * m200c,
-                       args=(m200c, c200c, r200c, rhoc, h, z))
+    m500c = opt.brentq(massdiff_5c2c, 0.5 * m200c, 10. * m200c,
+                       args=(m200c, c200c, r200c, rhoc))
     r500c = tools.mass_to_radius(m500c, 500 * rhoc)
     c500c = c200c * r500c / r200c
 
@@ -610,9 +610,7 @@ def table_m200c_to_m500c(m200c=m200c,
     m500c, c500c, r500c = m200c_to_m500c(m200c=m200c.reshape(1, -1),
                                          c200c=c200c,
                                          r200c=r200c.reshape(1, -1),
-                                         rhoc=rhoc,
-                                         h=h,
-                                         z=z.reshape(-1, 1))
+                                         rhoc=rhoc)
 
     result_info = {
         "dims": np.array(["z", "m200c"]),
