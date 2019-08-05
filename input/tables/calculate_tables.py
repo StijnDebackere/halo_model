@@ -366,9 +366,130 @@ def table_c200c_correa(m200c=m200c,
 
     return result_info
 
-# ------------------------------------------------------------------------------
-# End of table_c200c_correa()
-# ------------------------------------------------------------------------------
+
+def table_c500c_correa(m500c=m500c,
+                       z=z,
+                       sigma8=0.821,
+                       omegam=0.2793,
+                       omegav=0.7207,
+                       n=0.972,
+                       h=0.7,
+                       cpus=None):
+    '''Interpolate the c500c(m500c, cosmo) relation from Correa+2015
+    for the given mass, z and cosmology to a regular grid
+
+    Parameters
+    ----------
+    m500c : array [M_sun / h]
+        range of m500c for which to compute
+    z : array
+        redshifts to compute for
+    sigma8 : array
+        values of sigma_8 to compute for
+    omegam : array
+        values of omega_m to compute for
+    omegav : array
+        values of omega_lambda to compute for
+    n : array
+        values of n to compute for
+    h : array
+        values of h to compute for
+    cpus : int
+        number of cores to use
+
+    Returns
+    -------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to c_correa_200c.asdf
+
+    '''
+    def c_cosmo(procn, z_t, m500c_t, c500c_t, out_q):
+        shape = z_t.shape + m500c.shape
+        c_all = np.empty(shape)
+
+        # need to tile redshifts to match the masses
+        coords = np.vstack([np.tile(z_t.reshape(-1, 1),
+                                    (1, m500c_t.shape[1])).flatten(),
+                            np.log10(m500c_t).flatten()]).T
+        c_interp = interpolate.LinearNDInterpolator(coords, c500c_t.flatten())
+
+        # now interpolate to a regular and fixed grid in m500c
+        # need to match m500c to each z
+        tiled_z = np.tile(z_t.reshape(-1, 1), (1, m500c.shape[0]))
+        tiled_m500c = np.log10(np.tile(m500c.reshape(1, -1),
+                                       (z_t.shape[0], 1)))
+        coords_new = np.vstack([tiled_z.flatten(),
+                                tiled_m500c.flatten()])
+        c_all = c_interp(coords_new).reshape(z_t.shape + m500c.shape)
+
+        out_q.put([procn, c_all])
+
+    # --------------------------------------------------
+    if cpus is None:
+        cpus = multi.cpu_count()
+
+    if cpus > 8:
+        cpus = 8
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    # load tables
+    af = asdf.open(table_dir + "halo_200c_to_500c.asdf")
+    z_tab = af.tree["z"]
+    m500c_tab = af.tree["m500c"][:]
+    c500c_tab = af.tree["c500c"][:]
+
+    # we split along the redshift axis, only mass is not reg grid
+    m500c_tab_split = np.array_split(m500c_tab, cpus, axis=-2)
+    c500c_tab_split = np.array_split(c500c_tab, cpus, axis=-2)
+    z_tab_split = np.array_split(z_tab, cpus, axis=0)
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i,
+                                      z_tab_split[i],
+                                      m500c_tab_split[i],
+                                      c500c_tab_split[i],
+                                      out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    c500c = np.concatenate([item[1] for item in results], axis=-2)
+
+    result_info = {
+        "dims": np.array(["sigma8",
+                          "omegam",
+                          "omegav",
+                          "n",
+                          "h",
+                          "z",
+                          "m500c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m500c": m500c,
+        "c500c": c500c}
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "c500c_correa.asdf")
+    af.close()
+
+    return result_info
+
 
 def massdiff_2m2c(m200m, m200c, c200c, r200c, rhom, h, z):
     '''
@@ -379,6 +500,7 @@ def massdiff_2m2c(m200m, m200c, c200c, r200c, rhom, h, z):
     mass = dp.m_NFW_delta(r200c, c200c * r200m / r200c, r200m, rhom, Delta=200)
 
     return mass - m200c
+
 
 @np.vectorize
 def m200c_to_m200m(m200c, c200c, r200c, rhom, h, z):
@@ -391,9 +513,6 @@ def m200c_to_m200m(m200c, c200c, r200c, rhom, h, z):
 
     return m200m, c200m, r200m
 
-# ------------------------------------------------------------------------------
-# End of m200c_to_m200m()
-# ------------------------------------------------------------------------------
 
 def table_m200c_to_m200m(m200c=m200c,
                          z=z,
@@ -403,10 +522,10 @@ def table_m200c_to_m200m(m200c=m200c,
                          n=0.972,
                          h=0.7):
     '''
-    Create a table that converts from m200c to the corresponding halo properties
-    m200m
+    Create a table that converts from m200c to the corresponding halo
+    properties m200m
     '''
-    rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
+    rhoc = 2.755 * 10**(11.)  # [h^2 M_sun / Mpc^3]
     rhom = omegam * rhoc
 
     # get interpolator and coordinates for c200c
@@ -416,12 +535,12 @@ def table_m200c_to_m200m(m200c=m200c,
     c200c = c_interp(coords).reshape(z.shape + m200c.shape)
     r200c = tools.mass_to_radius(m200c, 200 * rhoc)
 
-    m200m, c200m, r200m = m200c_to_m200m(m200c=m200c.reshape(1,-1),
+    m200m, c200m, r200m = m200c_to_m200m(m200c=m200c.reshape(1, -1),
                                          c200c=c200c,
-                                         r200c=r200c.reshape(1,-1),
+                                         r200c=r200c.reshape(1, -1),
                                          rhom=rhom,
                                          h=h,
-                                         z=z.reshape(-1,1))
+                                         z=z.reshape(-1, 1))
 
     result_info = {
         "dims": np.array(["z", "m200c"]),
@@ -440,6 +559,78 @@ def table_m200c_to_m200m(m200c=m200c,
 
     af = asdf.AsdfFile(result_info)
     af.write_to(table_dir + "halo_200c_to_200m.asdf")
+    af.close()
+
+    return result_info
+
+
+def massdiff_5c2c(m500c, m200c, c200c, r200c, rhoc, h, z):
+    '''
+    Integrate an NFW halo with c200c to r500c and return the mass difference
+    '''
+    r500c = tools.mass_to_radius(m500c, 500 * rhoc)
+    mass = dp.m_nfw(z=z, r=r200c, r_x=r500c, c_x=c200c * r500c / r200c,
+                    m_x=m500c)
+
+    return mass - m200c
+
+
+@np.vectorize
+def m200c_to_m500c(m200c, c200c, r200c, rhoc, h, z):
+    # these bounds should be reasonable for m500c < 1e18
+    # 1e19 Msun is ~maximum for c_correa
+    m500c = opt.brentq(massdiff_5c2c, m200c, 10. * m200c,
+                       args=(m200c, c200c, r200c, rhoc, h, z))
+    r500c = tools.mass_to_radius(m500c, 500 * rhoc)
+    c500c = c200c * r500c / r200c
+
+    return m500c, c500c, r500c
+
+
+def table_m200c_to_m500c(m200c=m200c,
+                         z=z,
+                         sigma8=0.821,
+                         omegam=0.2793,
+                         omegav=0.7207,
+                         n=0.972,
+                         h=0.7):
+    '''
+    Create a table that converts from m200c to the corresponding halo
+    properties m500c
+    '''
+    rhoc = 2.755 * 10**(11.)  # [h^2 M_sun / Mpc^3]
+
+    # get interpolator and coordinates for c200c
+    coords = arrays_to_coords(z, np.log10(m200c))
+    c_interp = interp.c200c_interp()
+
+    c200c = c_interp(coords).reshape(z.shape + m200c.shape)
+    r200c = tools.mass_to_radius(m200c, 200 * rhoc)
+
+    m500c, c500c, r500c = m200c_to_m500c(m200c=m200c.reshape(1, -1),
+                                         c200c=c200c,
+                                         r200c=r200c.reshape(1, -1),
+                                         rhoc=rhoc,
+                                         h=h,
+                                         z=z.reshape(-1, 1))
+
+    result_info = {
+        "dims": np.array(["z", "m200c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200c": m200c,
+        "r200c": r200c,
+        "c200c": c200c,
+        "m500c": m500c,
+        "r500c": r500c,
+        "c500c": c500c}
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "halo_200c_to_500c.asdf")
     af.close()
 
     return result_info
@@ -756,9 +947,6 @@ def table_c200m_correa_cosmo(m200m=m200m,
 
     return result_info
 
-# ------------------------------------------------------------------------------
-# End of table_c200m_correa_cosmo()
-# ------------------------------------------------------------------------------
 
 def f_stars_interp(comp='all'):
     '''
@@ -798,10 +986,6 @@ def f_stars_interp(comp='all'):
                                               fill_value=(0,f_sat[-1]))
 
     return f_stars_interp
-
-# ------------------------------------------------------------------------------
-# End of f_stars_interp()
-# ------------------------------------------------------------------------------
 
 
 def table_m500c_to_m200m_dmo(m500c=m500c,
