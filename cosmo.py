@@ -73,6 +73,7 @@ class Cosmology(object):
 
     """
     rho_crit = 2.7763458 * (10.0**11.0)
+
     def __init__(self, default="wmap9_nobao", force_flat=True, **kwargs):
         # This gets the Cache system working
         super(Cosmology, self).__init__()
@@ -80,6 +81,8 @@ class Cosmology(object):
         # Map the 'default' cosmology to its dictionary
         if default == "wmap9_nobao":
             self.__base = dict(wmap9_nobao, **extras)
+        elif default == "planck1_base":
+            self.__base = dict(planck1_base, **extras)
 
         # Set some simple parameters
         self.force_flat = force_flat
@@ -88,6 +91,9 @@ class Cosmology(object):
         if not any(kwargs):
             if default == "wmap9_nobao":
                 self.cosmo_update(**dict(wmap9_nobao, **extras))
+            elif default == "planck1_base":
+                self.cosmo_update(**dict(planck1_base, **extras))
+
         else:
             self.cosmo_update(**kwargs)
 

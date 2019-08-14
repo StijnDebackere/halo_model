@@ -421,7 +421,7 @@ def table_c500c_correa(m500c=m500c,
         tiled_m500c = np.log10(np.tile(m500c.reshape(1, -1),
                                        (z_t.shape[0], 1)))
         coords_new = np.vstack([tiled_z.flatten(),
-                                tiled_m500c.flatten()])
+                                tiled_m500c.flatten()]).T
         c_all = c_interp(coords_new).reshape(z_t.shape + m500c.shape)
 
         out_q.put([procn, c_all])

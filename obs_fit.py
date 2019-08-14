@@ -27,9 +27,6 @@ def do_cprofile(func):
             profile.print_stats(sort='cumtime')
     return profiled_func
 
-# ------------------------------------------------------------------------------
-# Definition of different matter components
-# ------------------------------------------------------------------------------
 
 def load_dm_dmo_rmax(prms, r_max, m200m_dmo, r200m_dmo, c200m_dmo):
     '''
