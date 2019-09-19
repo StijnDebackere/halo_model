@@ -26,7 +26,7 @@ from halo.parameters import Parameters
 
 default = {
     # m500c grid
-    "m500c": np.logspace(11, 15, 101),
+    "m500c": np.logspace(10, 15, 101),
     # r grid
     "r_min": -4,
     "r_bins": 100,
@@ -45,10 +45,10 @@ default = {
     "sigma_lnc": 0.0,
     # hot gas parameters
     # => only matter for halo model
-    "fgas500c_prms" : {"log10mt": 13.94,
-                       "a": 1.35,
-                       "fstar500c_max": interp.fsat500c_interp(f_c=0.86,
-                                                               sigma_lnc=0.0)},
+    "fgas500c_prms": {"log10mt": 13.94,
+                      "a": 1.35,
+                      "norm": None,
+                      "fgas_500c_max": interp.fgas_500c_max_interp},
     # cosmology
     "cosmo": cosmo.Cosmology(**{"sigma_8": 0.821,
                                 "omegam": 0.2793,
@@ -58,6 +58,7 @@ default = {
                                 "n": 0.972,
                                 "h": 0.7})
 }
+
 
 def init_model(fname=None):
     '''
