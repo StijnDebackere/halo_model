@@ -413,6 +413,7 @@ def table_c500c_correa(m500c=m500c,
         coords = np.vstack([np.tile(z_t.reshape(-1, 1),
                                     (1, m500c_t.shape[1])).flatten(),
                             np.log10(m500c_t).flatten()]).T
+        print(coords.shape)
         c_interp = interpolate.LinearNDInterpolator(coords, c500c_t.flatten())
 
         # now interpolate to a regular and fixed grid in m500c
@@ -421,7 +422,7 @@ def table_c500c_correa(m500c=m500c,
         tiled_m500c = np.log10(np.tile(m500c.reshape(1, -1),
                                        (z_t.shape[0], 1)))
         coords_new = np.vstack([tiled_z.flatten(),
-                                tiled_m500c.flatten()])
+                                tiled_m500c.flatten()]).T
         c_all = c_interp(coords_new).reshape(z_t.shape + m500c.shape)
 
         out_q.put([procn, c_all])
