@@ -1081,7 +1081,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         fcen_500c = fc200m(m200m_dmo / 0.7) * m200m_dmo / m500c
         fsat_200m = fs200m(m200m_dmo / 0.7)
         fsat_500c = dp.m_NFW(r500c, m_x=fsat_200m*m200m_dmo, c_x=f_c*c200m_dmo,
-                            r_x=r200m_dmo) / m500c
+                             r_x=r200m_dmo) / m500c
 
         out_q.put([procn, m200m_dmo, fcen_500c, fsat_500c])
 
@@ -1266,8 +1266,8 @@ def table_m500c_to_gamma_max(m500c=m500c,
         m500c_dmo = m500c * (1 - fg500c - fstars500c) / (1 - omegab / omegam)
 
         # now we know
-        cen_args = {'m_range': fcen500c * m500c_dmo}
-        sat_args = {'m_x': fsat500c * m500c_dmo,
+        cen_args = {'m_x': fcen500c * m500c}
+        sat_args = {'m_x': fsat500c * m500c,
                     'c_x': c500c_sat,
                     'r_x': r500c}
 
@@ -1290,11 +1290,11 @@ def table_m500c_to_gamma_max(m500c=m500c,
         rho_500c = dp.profile_beta(np.reshape(r500c, (-1,1)),
                                    m_x=np.array([fg500c * m500c]),
                                    r_x=np.array([r500c]),
-                                   rc=np.array([r_c * r500c]),
+                                   r_c=np.array([r_c * r500c]),
                                    beta=np.array([beta])).reshape(-1)
         gas_args =  {'m_x': np.array([fg500c * m500c]),
                      'r_x': np.array([r500c]),
-                     'rc': np.array([r_c * r500c]),
+                     'r_c': np.array([r_c * r500c]),
                      'beta': np.array([beta]),
                      'gamma': np.array([gamma]),
                      'rho_x': np.array([rho_500c])}
