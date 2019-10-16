@@ -9,6 +9,7 @@ import halo.input.interpolators as inp_interp
 
 import pdb
 
+
 class Parameters(object):
     '''
     An object containing all parameters for the halo model.
@@ -274,6 +275,9 @@ class Parameters(object):
 # ------------------------------------------------------------------------------
 # fiducial parameters, logk_min for comparisons with simulations
 prms = Parameters(m500c=np.logspace(10, 15, 101), logk_min=-1.)
+
+# fiducial parameters for halo mass project
+prms_masses = Parameters(m500c=np.logspace(13, 15.5, 201), logk_min=-1.)
 
 # fiducial parameters, but with f_c = 1
 prms_fc1 = Parameters(m500c=np.logspace(10, 15, 101), logk_min=-1., f_c=1)

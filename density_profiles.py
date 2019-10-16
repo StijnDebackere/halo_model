@@ -462,11 +462,11 @@ def profile_NFW_f(k_range, m_h, r_h, c_h, z_range=0):
     return profile_f
 
 
-def profile_beta(r_range, m_x, r_x, rc, beta):
+def profile_beta(r_range, m_x, r_x, r_c, beta):
     '''
     Return a beta profile with mass m_x inside r_range <= r_x
 
-        rho[r] =  rho_c[m_range, rc, r_x] / (1 + ((r/r_x)/rc)^2)^(beta / 2)
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
 
     rho_c is determined by the mass of the profile.
 
@@ -480,7 +480,7 @@ def profile_beta(r_range, m_x, r_x, rc, beta):
       x overdensity radius to match m_x at, in units of r_range
     beta : (m,) array
       power law slope of profile
-    rc : (m,) array
+    r_c : (m,) array
       physical core radius of beta profile in as a fraction
 
     Returns
@@ -492,22 +492,22 @@ def profile_beta(r_range, m_x, r_x, rc, beta):
 
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3. * beta / 2,
-                                                       5./2, -(r_x / rc)**2))
+                                                       5./2, -(r_x / r_c)**2))
 
-    rc = np.reshape(rc, (m + (1,)))
+    r_c = np.reshape(r_c, (m + (1,)))
     beta = np.reshape(beta, (m + (1,)))
     r_x = np.reshape(r_x, (m + (1,)))
     m_x = np.reshape(m_x, (m + (1,)))
     rho_0 = np.reshape(rho_0, (m + (1,)))
     r_range = np.reshape(r_range, (m + (-1,)))
 
-    profile = rho_0 / (1 + (r_range / rc)**2)**(3*beta/2)
+    profile = rho_0 / (1 + (r_range / r_c)**2)**(3*beta/2)
 
     return profile
 
 
 @np.vectorize
-def m_beta(r, m_x, r_x, rc, beta, **kwargs):
+def m_beta(r, m_x, r_x, r_c, beta, **kwargs):
     '''
     Return the analytic enclosed mass for the beta profile normalized to
     m_x at r_x
@@ -520,23 +520,23 @@ def m_beta(r, m_x, r_x, rc, beta, **kwargs):
       gas mass at r500c
     r_x : float
       physical radius corresponding to halo mass m500c
-    rc : float
+    r_c : float
       physical core radius r_c of the profile
     beta : float
       beta slope of the profile
     '''
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
-                                                       5./2, -(r_x / rc)**2))
+                                                       5./2, -(r_x / r_c)**2))
 
     m = 4./3 * np.pi * rho_0 * r**3 * spec.hyp2f1(3./2, 3 * beta / 2,
-                                                  5./2, -(r/rc)**2)
+                                                  5./2, -(r/r_c)**2)
 
     return m
 
 
 @np.vectorize
-def r_where_m_beta(m, m_x, r_x, rc, beta):
+def r_where_m_beta(m, m_x, r_x, r_c, beta):
     '''
     Return the radius where the beta profile mass is m
 
@@ -548,14 +548,14 @@ def r_where_m_beta(m, m_x, r_x, rc, beta):
       gas mass at r500c
     r_x : float
       physical radius corresponding to halo mass m500c
-    rc : float
+    r_c : float
       physical core radius r_c of the profile
     beta : float
       beta slope of the profile
     '''
-    r = opt.brentq(lambda r, m, m_x, r_x, rc, beta:
-                   m - m_beta(r, m_x, r_x, rc, beta),
-                   0, 100, args=(m, m_x, r_x, rc, beta))
+    r = opt.brentq(lambda r, m, m_x, r_x, r_c, beta:
+                   m - m_beta(r, m_x, r_x, r_c, beta),
+                   0, 100, args=(m, m_x, r_x, r_c, beta))
 
     return r
 
@@ -667,11 +667,11 @@ def profile_plaw_f(k_range, rho_x, r_x, r_y, gamma):
     return prefactor * (upper_bound - lower_bound)
 
 
-def profile_beta_plaw(r_range, m_x, r_x, rc, beta, gamma, rho_x=None):
+def profile_beta_plaw(r_range, m_x, r_x, r_c, beta, gamma, rho_x=None):
     '''
     Return a beta profile with mass m_x inside r_range <= r_x
 
-        rho[r] =  rho_c[m_range, rc, r_x] / (1 + ((r/r_x)/rc)^2)^(beta / 2)
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
 
     and a power law outside
 
@@ -689,7 +689,7 @@ def profile_beta_plaw(r_range, m_x, r_x, rc, beta, gamma, rho_x=None):
       x overdensity radius to match m_x at, in units of r_range
     beta : (m,) array
       power law slope of profile
-    rc : (m,) array
+    r_c : (m,) array
       physical core radius of beta profile
     gamma : (m,) array
       power law index
@@ -703,16 +703,16 @@ def profile_beta_plaw(r_range, m_x, r_x, rc, beta, gamma, rho_x=None):
 
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
-                                                       5./2, -(r_x / rc)**2))
+                                                       5./2, -(r_x / r_c)**2))
 
     if rho_x is None:
         rho_x = profile_beta(r_x.reshape(-1, 1),
                              m_x=m_x,
                              r_x=r_x,
-                             rc=rc,
+                             r_c=r_c,
                              beta=beta).reshape(-1)
 
-    rc = rc.reshape(m, 1)
+    r_c = r_c.reshape(m, 1)
     beta = beta.reshape(m, 1)
     r_x = r_x.reshape(m, 1)
     m_x = m_x.reshape(m, 1)
@@ -724,7 +724,7 @@ def profile_beta_plaw(r_range, m_x, r_x, rc, beta, gamma, rho_x=None):
         sl_beta = (r <= r_x[idx])
         sl_plaw = (r > r_x[idx])
         profile[idx][sl_beta] = (rho_0[idx] / np.power(1 + (r[sl_beta] /
-                                                            rc[idx])**2,
+                                                            r_c[idx])**2,
                                                        3*beta[idx]/2))
         profile[idx][sl_plaw] = (rho_x[idx] * np.power(r[sl_plaw]/r_x[idx],
                                                        -gamma[idx]))
@@ -733,7 +733,7 @@ def profile_beta_plaw(r_range, m_x, r_x, rc, beta, gamma, rho_x=None):
 
 
 @np.vectorize
-def m_beta_plaw(r, m_x, r_x, rc, beta, gamma, rho_x=None, **kwargs):
+def m_beta_plaw(r, m_x, r_x, r_c, beta, gamma, rho_x=None, **kwargs):
     '''
     Return the analytic enclosed mass inside r for a beta profile upto
     r_x and a power law outside
@@ -746,7 +746,7 @@ def m_beta_plaw(r, m_x, r_x, rc, beta, gamma, rho_x=None, **kwargs):
       mass inside r_x
     r_x : float
       radius to match rho_x at, in units of r_range
-    rc : float
+    r_c : float
       physical core radius r_c of the profile
     beta : float
       beta slope of the profile
@@ -755,20 +755,20 @@ def m_beta_plaw(r, m_x, r_x, rc, beta, gamma, rho_x=None, **kwargs):
     rho_x : density at r_x
     '''
     if r <= r_x:
-        return m_beta(r=r, m_x=m_x, r_x=r_x, rc=rc, beta=beta)
+        return m_beta(r=r, m_x=m_x, r_x=r_x, r_c=r_c, beta=beta)
     else:
         if rho_x is None:
             rho_x = profile_beta(np.array([r_x]).reshape(-1, 1),
                                  m_x=np.array([m_x]).reshape(-1, 1),
                                  r_x=np.array([r_x]).reshape(-1, 1),
-                                 rc=np.array([rc]).reshape(-1, 1),
+                                 r_c=np.array([r_c]).reshape(-1, 1),
                                  beta=np.array([beta]).reshape(-1, 1))
             rho_x = rho_x.reshape(-1)
         return (m_x + m_plaw(r=r, rho_x=rho_x, r_x=r_x, gamma=gamma))
 
 
 @np.vectorize
-def r_where_m_beta_plaw(m, m_x, r_x, rc, beta, gamma, rho_x):
+def r_where_m_beta_plaw(m, m_x, r_x, r_c, beta, gamma, rho_x):
     '''
     Return the radius where the beta profile mass is m
 
@@ -787,9 +787,9 @@ def r_where_m_beta_plaw(m, m_x, r_x, rc, beta, gamma, rho_x):
       power law slope of profile
     '''
     try:
-        r = opt.brentq(lambda r, m_x, r_x, rc, beta, gamma, rho_x:
-                       m - m_beta_plaw(r, m_x, r_x, rc, beta, gamma, rho_x),
-                       r_x, 15 * r_x, args=(m_x, r_x, rc, beta, gamma, rho_x))
+        r = opt.brentq(lambda r, m_x, r_x, r_c, beta, gamma, rho_x:
+                       m - m_beta_plaw(r, m_x, r_x, r_c, beta, gamma, rho_x),
+                       r_x, 15 * r_x, args=(m_x, r_x, r_c, beta, gamma, rho_x))
     # in case of ValueError we will have r >> r_y, so might as well be
     # infinite in our case
     except ValueError:
@@ -798,12 +798,12 @@ def r_where_m_beta_plaw(m, m_x, r_x, rc, beta, gamma, rho_x):
     return r
 
 
-def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
+def profile_beta_plaw_uni(r_range, m_x, r_x, r_c, beta, r_y, gamma,
                           rho_x=None):
     '''
     Return a beta profile with mass m_x inside r_range <= r_x
 
-        rho[r] =  rho_c[m_range, rc, r_x] / (1 + ((r/r_x)/rc)^2)^(beta / 2)
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
 
     and a power law outside
 
@@ -819,7 +819,7 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
       array containing masses to match at r_x
     r_x : (m,) array
       x overdensity radius to match m_x at, in units of r_range
-    rc : (m,) array
+    r_c : (m,) array
       physical core radius of beta profile in as a fraction
     beta : (m,) array
       power law slope of profile
@@ -837,12 +837,12 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
 
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
-                                                       5./2, -(r_x / rc)**2))
+                                                       5./2, -(r_x / r_c)**2))
 
     if rho_x is None:
-        rho_x = rho_0 / (1 + (r_x / rc)**2)**(3*beta/2)
+        rho_x = rho_0 / (1 + (r_x / r_c)**2)**(3*beta/2)
 
-    rc = rc.reshape(m, 1)
+    r_c = r_c.reshape(m, 1)
     beta = beta.reshape(m, 1)
     r_x = r_x.reshape(m, 1)
     m_x = m_x.reshape(m, 1)
@@ -858,7 +858,7 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
         sl_plaw = ((r > r_x[idx]) & (r <= r_y[idx]))
         sl_uni = (r > r_y[idx])
         profile[idx][sl_beta] = (rho_0[idx] / np.power(1 + (r[sl_beta] /
-                                                            rc[idx])**2,
+                                                            r_c[idx])**2,
                                                        3*beta[idx]/2))
         profile[idx][sl_plaw] = rho_x[idx] * np.power(r[sl_plaw]/r_x[idx],
                                                       -gamma[idx])
@@ -869,7 +869,7 @@ def profile_beta_plaw_uni(r_range, m_x, r_x, rc, beta, r_y, gamma,
 
 
 @np.vectorize
-def m_beta_plaw_uni(r, m_x, r_x, rc, beta, r_y, gamma, rho_x=None, **kwargs):
+def m_beta_plaw_uni(r, m_x, r_x, r_c, beta, r_y, gamma, rho_x=None, **kwargs):
     '''
     Return the analytic enclosed mass inside r for a beta profile upto
     r_x and a power law outside
@@ -882,7 +882,7 @@ def m_beta_plaw_uni(r, m_x, r_x, rc, beta, r_y, gamma, rho_x=None, **kwargs):
       mass inside r_x
     r_x : float
       radius to match rho_x at, in units of r_range
-    rc : float
+    r_c : float
       physical core radius r_c of the profile
     beta : float
       beta slope of the profile
@@ -893,13 +893,13 @@ def m_beta_plaw_uni(r, m_x, r_x, rc, beta, r_y, gamma, rho_x=None, **kwargs):
     rho_x : density at r_x
     '''
     if r <= r_x:
-        return m_beta(r=r, m_x=m_x, r_x=r_x, rc=rc, beta=beta)
+        return m_beta(r=r, m_x=m_x, r_x=r_x, r_c=r_c, beta=beta)
     else:
         if rho_x is None:
             rho_x = profile_beta(np.array([r_x]).reshape(-1, 1),
                                  m_x=np.array([m_x]).reshape(-1, 1),
                                  r_x=np.array([r_x]).reshape(-1, 1),
-                                 rc=np.array([rc]).reshape(-1, 1),
+                                 r_c=np.array([r_c]).reshape(-1, 1),
                                  beta=np.array([beta]).reshape(-1, 1))
             rho_x = rho_x.reshape(-1)
         if r <= r_y:
@@ -912,7 +912,7 @@ def m_beta_plaw_uni(r, m_x, r_x, rc, beta, r_y, gamma, rho_x=None, **kwargs):
 
 
 @np.vectorize
-def r_where_m_beta_plaw_uni(m, m_x, r_x, rc, beta, r_y, gamma, rho_x):
+def r_where_m_beta_plaw_uni(m, m_x, r_x, r_c, beta, r_y, gamma, rho_x):
     '''
     Return the radius where the profile mass is m
 
@@ -933,11 +933,11 @@ def r_where_m_beta_plaw_uni(m, m_x, r_x, rc, beta, r_y, gamma, rho_x):
       power law slope of profile
     '''
     try:
-        r = opt.brentq(lambda r, m_x, r_x, rc, beta, r_y, gamma, rho_x:
-                       m - m_beta_plaw_uni(r=r, m_x=m_x, r_x=r_x, rc=rc,
+        r = opt.brentq(lambda r, m_x, r_x, r_c, beta, r_y, gamma, rho_x:
+                       m - m_beta_plaw_uni(r=r, m_x=m_x, r_x=r_x, r_c=r_c,
                                            beta=beta, r_y=r_y, gamma=gamma,
                                            rho_x=rho_x),
-                       r_x, 15 * r_x, args=(m_x, r_x, rc, beta, r_y, gamma,
+                       r_x, 15 * r_x, args=(m_x, r_x, r_c, beta, r_y, gamma,
                                             rho_x))
     # in case of ValueError we will have r >> r_y, so might as well be
     # infinite in our case
@@ -945,6 +945,125 @@ def r_where_m_beta_plaw_uni(m, m_x, r_x, rc, beta, r_y, gamma, rho_x):
         r = np.inf
 
     return r
+
+
+def profile_beta_gamma_plaw(r_range, m_x, r_x, r_c, beta, r_y, gamma,
+                            delta=3, rho_x=None):
+    '''
+    Return a beta profile with mass m_x inside r_range <= r_x
+
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
+
+    and a power-law between r_x and r_y
+
+        rho[r] = rho_x (r/r_x)^(-gamma)
+
+    and a power-law with slope -delta outside r_y.
+
+    Parameters
+    ----------
+    r_range : (m, r) array
+      array containing r_range for each m
+    m_x : (m,) array
+      array containing masses to match at r_x
+    r_x : (m,) array
+      x overdensity radius to match m_x at, in units of r_range
+    r_c : (m,) array
+      physical core radius of beta profile in as a fraction
+    beta : (m,) array
+      power law slope of profile
+    r_y : (m,) array
+      radius out to which power law holds
+    gamma : (m,) array
+      power law index
+    delta : (m,) array
+      power law index
+
+    Returns
+    -------
+    profile : (m, r) array
+      array containing beta profile
+    '''
+    m = m_x.shape[0]
+
+    # analytic enclosed mass inside r_x gives normalization rho_0
+    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3 * beta / 2,
+                                                       5./2, -(r_x / r_c)**2))
+
+    if rho_x is None:
+        rho_x = rho_0 / (1 + (r_x / r_c)**2)**(3*beta/2)
+
+    r_c = r_c.reshape(m, 1)
+    beta = beta.reshape(m, 1)
+    r_x = r_x.reshape(m, 1)
+    m_x = m_x.reshape(m, 1)
+    r_y = r_y.reshape(m, 1)
+    rho_0 = rho_0.reshape(m, 1)
+    rho_x = rho_x.reshape(m, 1)
+
+    rho_x = rho_x.reshape(m, 1)
+    profile = np.zeros_like(r_range)
+    for idx, r in enumerate(r_range):
+        # create slices for the different profiles
+        sl_beta = (r <= r_x[idx])
+        sl_gamma = ((r > r_x[idx]) & (r <= r_y[idx]))
+        sl_delta = (r > r_y[idx])
+        profile[idx][sl_beta] = (rho_0[idx] / np.power(1 + (r[sl_beta] /
+                                                            r_c[idx])**2,
+                                                       3*beta[idx]/2))
+        profile[idx][sl_gamma] = rho_x[idx] * np.power(r[sl_gamma]/r_x[idx],
+                                                       -gamma[idx])
+        profile[idx][sl_delta] = (rho_x[idx] * np.power(r_y[idx] / r_x[idx],
+                                                        -gamma[idx]) *
+                                  np.power(r[sl_delta] / r_y[idx],
+                                           -delta[idx]))
+
+    return profile
+
+
+@np.vectorize
+def m_beta_gamma_plaw(r, m_x, r_x, r_c, beta, r_y, gamma, delta=3,
+                      rho_x=None, **kwargs):
+    '''
+    Return the analytic enclosed mass inside r for a beta profile upto
+    r_x and a power law outside
+
+    Parameters
+    ----------
+    r : float
+      radius to compute for
+    m_x : float
+      mass inside r_x
+    r_x : float
+      radius to match rho_x at, in units of r_range
+    r_c : float
+      physical core radius r_c of the profile
+    beta : float
+      beta slope of the profile
+    r_y : float
+      radius to extend power law to
+    gamma : float
+      power law slope of profile
+    delta : float
+      asymptotic power-law slope
+    rho_x : density at r_x
+    '''
+    if r <= r_x:
+        return m_beta(r=r, m_x=m_x, r_x=r_x, r_c=r_c, beta=beta)
+    else:
+        if rho_x is None:
+            rho_x = profile_beta(np.array([r_x]).reshape(-1, 1),
+                                 m_x=np.array([m_x]).reshape(-1, 1),
+                                 r_x=np.array([r_x]).reshape(-1, 1),
+                                 r_c=np.array([r_c]).reshape(-1, 1),
+                                 beta=np.array([beta]).reshape(-1, 1))
+            rho_x = rho_x.reshape(-1)
+        if r <= r_y:
+            return (m_x + m_plaw(r=r, rho_x=rho_x, r_x=r_x, gamma=gamma))
+        else:
+            rho_y = rho_x * (r_y / r_x)**(-gamma)
+            return (m_x + m_plaw(r=r_y, rho_x=rho_x, r_x=r_x, gamma=gamma) +
+                    m_plaw(r=r, rho_x=rho_y, r_x=r_y, gamma=delta))
 
 
 def profile_uniform(r_range, m_y, r_x, r_y):
@@ -1055,7 +1174,7 @@ def profile_uniform_f(k_range, m_y, r_x, r_y):
     return profile_f
 
 
-def profile_delta(r_range, m_range):
+def profile_delta(r_range, m_x):
     '''
     Returns a delta function profile
     '''
@@ -1073,20 +1192,20 @@ def profile_delta(r_range, m_range):
                     1./(4 * np.pi * r_range[:, 0]**2))
 
     profile[..., 0] = 1.
-    profile *= m_range.reshape(-1, 1) * simps_factor.reshape(-1, 1)
+    profile *= m_x.reshape(-1, 1) * simps_factor.reshape(-1, 1)
 
     return profile
 
 
 @np.vectorize
-def m_delta(r, m_range, **kwargs):
+def m_delta(r, m_x, **kwargs):
     '''
     Returns a delta function mass
     '''
-    return m_range
+    return m_x
 
 
-def profile_delta_f(k_range, m_range):
+def profile_delta_f(k_range, m_x):
     '''
     Returns the normalized analytic Fourier transform of the delta profile for
     m_range along axis 0 and k_range along axis 1.
@@ -1095,7 +1214,7 @@ def profile_delta_f(k_range, m_range):
     ----------
     k_range : (k,) array
       array containing k_range for profile
-    m_range : (m,) array
+    m_x : (m,) array
       array containing each M for which we compute profile
 
     Returns
@@ -1103,8 +1222,8 @@ def profile_delta_f(k_range, m_range):
     profile_f : (m, k) array
       array containing Fourier transform of delta profile
     '''
-    m = m_range.shape[0]
-    profile = m_range.reshape(m, 1) * np.ones(m_range.shape + k_range.shape,
+    m = m_x.shape[0]
+    profile = m_x.reshape(m, 1) * np.ones(m_x.shape + k_range.shape,
                                               dtype=float)
 
     return profile
