@@ -59,21 +59,28 @@ def hmf_integral_gtm(M, dndm, mass_density=False):
 
     # Calculate the mass function (and its integral) from the highest M up to 10**18
     if m[-1] < m[0] * 10 ** 18 / m[3]:
-        m_upper = np.arange(np.log(m[-1]), np.log(10 ** 18), np.log(m[1]) - np.log(m[0]))
+        m_upper = np.arange(np.log(m[-1]), np.log(10 ** 18), np.log(m[-1]) - np.log(m[-2]))
         mf_func = _spline(np.log(m), np.log(dndlnm), k=1)
         mf = mf_func(m_upper)
 
         if not mass_density:
-            int_upper = intg.simps(np.exp(mf), dx=m_upper[2] - m_upper[1], even='first')
+            int_upper = intg.simps(np.exp(mf), x=m_upper, even='first')
         else:
-            int_upper = intg.simps(np.exp(m_upper + mf), dx=m_upper[2] - m_upper[1], even='first')
+            int_upper = intg.simps(np.exp(m_upper + mf), dx=m_upper, even='first')
     else:
         int_upper = 0
 
-    # Calculate the cumulative integral (backwards) of [m*]dndlnm
+
+    # Calculate the cumulative integral (backwards) of [m*]dndm
     if not mass_density:
-        ngtm = np.concatenate((intg.cumtrapz(dndlnm[::-1], dx=np.log(m[1]) - np.log(m[0]))[::-1], np.zeros(1)))
+        # CHANGES: changed dndlnm to dndm since we use explicit
+        # mass range instead of fixed integral, hence we don't need
+        # the extra factor of m
+        # need minus due to flipping integration range
+        ngtm = np.concatenate((intg.cumtrapz(dndm[::-1], x=-m[::-1])[::-1],
+                               np.zeros(1)))
     else:
-        ngtm = np.concatenate((intg.cumtrapz(m[::-1] * dndlnm[::-1], dx=np.log(m[1]) - np.log(m[0]))[::-1], np.zeros(1)))
+        ngtm = np.concatenate((intg.cumtrapz(m[::-1] * dndm[::-1],
+                                             x=-m[::-1])[::-1], np.zeros(1)))
 
     return (ngtm + int_upper)

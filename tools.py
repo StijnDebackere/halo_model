@@ -1,4 +1,5 @@
 import halo.input.interpolators as inp_interp
+import halo.density_profiles as dp
 
 import numpy as np
 import scipy.integrate as intg
@@ -478,11 +479,15 @@ def sigma_from_rho(R, r_range, rho):
     """
     sigma = np.zeros(R.shape)
     for idx, r in enumerate(R):
-        rho_int = interp1d(r_range, rho)
+        log10_rho_int = interp1d(r_range, np.log10(rho))
         # can neglect first part of integral since integrand converges to 0
         # there
-        r_int = np.logspace(np.log10(r + 1e-5), np.log10(r_range.max()), 150)
-        integrand = 2 * rho_int(r_int) * r_int / np.sqrt(r_int**2 - r**2)
+        # Need a lot of steps to make answer converge to analytic result!
+        r_int = np.logspace(np.log10(r + 1e-5),
+                            np.log10(r_range.max() - 1e-5),
+                            10000)
+        integrand = (2 * 10**(log10_rho_int(r_int)) * r_int /
+                     np.sqrt(r_int**2 - r**2))
         sigma[idx] = Integrate(integrand, r_int)
 
     return sigma
@@ -1133,33 +1138,6 @@ def rx_to_r200(x, c_200, rho_mean):
     return rx_200
 
 
-def mean_density_NFW(r, m_x, r_x, c_x):
-    '''
-    Calculate the mean enclosed density of the NFW profile with c_x and m_x 
-    at r_x
-
-    Parameters
-    ----------
-    r : float
-      radius to compute density for
-    m_x : float
-      mass inside r_x
-    r_x : float
-      r_x to evaluate r_s from r_s = r_x/c_x
-    c_x : float
-      concentration of halo
-
-    Returns
-    -------
-    rho : float
-      density
-    '''
-    rho_s = m_x / (4. * np.pi * r_x**3) * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
-    rho = 3./r**3 * rho_s * (np.log(1+c_x*r) - c_x*r/(1+c_x*r))/c_x**3
-
-    return rho
-
-
 @np.vectorize
 def rx_from_y(rho_x, m_y, r_y, c_y):
     '''
@@ -1187,10 +1165,11 @@ def rx_from_y(rho_x, m_y, r_y, c_y):
     >>> r_500c = rx_from_y(500 * rho_crit, 1e14, 1.1, 3)
     >>> r_200m = rx_from_y(200 * rho_mean, 1e14, 1.1, 3)
     '''
-    def dens_diff(r, my, ry, cy):
-        return mean_density_NFW(r, my, ry, cy) - rho_x
+    def m_diff(r, my, ry, cy):
+        return (dp.m_NFW(r, m_x=my, r_x=ry, c_x=cy) -
+                4./3 * np.pi * rho_x * r**3)
 
-    r_x = opt.brentq(dens_diff, 1e-6, 10, args=(m_y, r_y, c_y))
+    r_x = opt.brentq(m_diff, 1e-6, 10, args=(m_y, r_y, c_y))
 
     return r_x
 

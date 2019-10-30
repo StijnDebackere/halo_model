@@ -301,6 +301,51 @@ def profile_NFW(r_range, m_x, c_x, r_x, z_range=0):
 
 
 @np.vectorize
+def sigma_NFW(R, log10_mx, r_s, rho_x):
+    """Return the surface mass density profile of an NFW halo with mass
+    m_x, radius r_x and concentration c_x
+
+    Parameters
+    ----------
+    R : array-like
+        projected radius [h^-1 Mpc]
+    log10_mx : float
+        log_10 halo mass inside r_x [h^-1 M_sun]
+    r_s : float
+        physical scale radius [h^-1 Mpc]
+    rho_x : float
+        mean overdensity at r_x [h^2 M_sun/Mpc^3]
+
+    Returns
+    -------
+    sigma_NFW : array
+        surface mass density of NFW profile at projected radius R
+    """
+    m_x = 10**log10_mx
+    r_x = tools.mass_to_radius(m_x, rho_x)
+    c_x = r_x / r_s
+    rho_s = m_x / (4 * np.pi * r_x**3) * c_x**3 / (np.log(1 + c_x) -
+                                                   c_x / (1 + c_x))
+
+    prefactor = 2 * r_s * rho_s
+
+    if R == r_s:
+        return 1. / 3 * prefactor
+    elif R < r_s:
+        x = R / r_s
+        prefactor *= 1. / (x**2 - 1)
+        sigma = prefactor * (1 - 2 / np.sqrt(1 - x**2) *
+                             np.arctanh(np.sqrt((1 - x) / (1 + x))))
+        return sigma
+    else:
+        x = R / r_s
+        prefactor *= 1. / (x**2 - 1)
+        sigma = prefactor * (1 - 2 / np.sqrt(x**2 - 1) *
+                             np.arctan(np.sqrt((x - 1) / (x + 1))))
+        return sigma
+
+
+@np.vectorize
 def r200m_m_NFW(m_x, r_x, c_x, cosmo, z_range=0):
     '''
     Calculate r200m for the NFW profile with c_x and r_x and m_x at r_x

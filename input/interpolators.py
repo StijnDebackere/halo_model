@@ -57,8 +57,8 @@ def c200c_cosmo_interp(c_file="c200c_correa_cosmo.asdf"):
     Return the interpolator for the given file
     '''
     c_file = table_dir + c_file
-    af = asdf.open(c_file)
 
+    af = asdf.open(c_file)
     s8 = af.tree["sigma8"][:]
     om = af.tree["omegam"][:]
     ov = af.tree["omegav"][:]
@@ -80,8 +80,8 @@ def c200c_interp(c_file="c200c_correa.asdf"):
     Return the interpolator for the given file
     '''
     c_file = table_dir + c_file
-    af = asdf.open(c_file)
 
+    af = asdf.open(c_file)
     z = af.tree["z"][:]
     m = af.tree["m200c"][:]
     c = af.tree["c200c"][:]
@@ -98,8 +98,8 @@ def c200m_cosmo_interp(c_file="c200m_correa_cosmo.asdf"):
     Return the interpolator for the given file
     '''
     c_file = table_dir + c_file
-    af = asdf.open(c_file)
 
+    af = asdf.open(c_file)
     s8 = af.tree["sigma8"][:]
     om = af.tree["omegam"][:]
     ov = af.tree["omegav"][:]
@@ -121,8 +121,8 @@ def c200m_interp(c_file="c200m_correa.asdf"):
     Return the interpolator for the c200m(m200m) relation
     '''
     c_file = table_dir + c_file
-    af = asdf.open(c_file)
 
+    af = asdf.open(c_file)
     z = af.tree["z"][:]
     m = af.tree["m200m"][:]
     c = af.tree["c200m"][:]
@@ -143,13 +143,13 @@ def m200m_dmo_interp(f_c, sigma_lnc, m_file=None):
                                                                 sigma_lnc)
 
     m_file = table_dir + m_file
-    af = asdf.open(m_file)
 
+    af = asdf.open(m_file)
     if f_c != af.tree["f_c"]:
         raise ValueError("f_c in {} is not {}".format(m_file, f_c))
     if sigma_lnc != af.tree["sigma_lnc"]:
-        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
-
+        raise ValueError("sigma_lnc in {} is not {}".format(m_file,
+                                                            sigma_lnc))
     z = af.tree["z"][:]
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
@@ -171,13 +171,13 @@ def fcen500c_interp(f_c, sigma_lnc, m_file=None):
                                                                 sigma_lnc)
 
     m_file = table_dir + m_file
-    af = asdf.open(m_file)
 
+    af = asdf.open(m_file)
     if f_c != af.tree["f_c"]:
         raise ValueError("f_c in {} is not {}".format(m_file, f_c))
     if sigma_lnc != af.tree["sigma_lnc"]:
-        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
-
+        raise ValueError("sigma_lnc in {} is not {}".format(m_file,
+                                                            sigma_lnc))
     z = af.tree["z"][:]
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
@@ -199,13 +199,12 @@ def fsat500c_interp(f_c, sigma_lnc, m_file=None):
                                                                 sigma_lnc)
 
     m_file = table_dir + m_file
-    af = asdf.open(m_file)
 
+    af = asdf.open(m_file)
     if f_c != af.tree["f_c"]:
         raise ValueError("f_c in {} is not {}".format(m_file, f_c))
     if sigma_lnc != af.tree["sigma_lnc"]:
         raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
-
     z = af.tree["z"][:]
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
@@ -227,13 +226,13 @@ def fbar500c_interp(f_c, sigma_lnc, m_file=None):
                                                                 sigma_lnc)
 
     m_file = table_dir + m_file
-    af = asdf.open(m_file)
 
+    af = asdf.open(m_file)
     if f_c != af.tree["f_c"]:
         raise ValueError("f_c in {} is not {}".format(m_file, f_c))
     if sigma_lnc != af.tree["sigma_lnc"]:
-        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
-
+        raise ValueError("sigma_lnc in {} is not {}".format(m_file,
+                                                            sigma_lnc))
     z = af.tree["z"][:]
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
@@ -256,12 +255,11 @@ def fgas_500c_max_interp(f_c, sigma_lnc, m_file=None):
 
     m_file = table_dir + m_file
     af = asdf.open(m_file)
-
     if f_c != af.tree["f_c"]:
         raise ValueError("f_c in {} is not {}".format(m_file, f_c))
     if sigma_lnc != af.tree["sigma_lnc"]:
-        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
-
+        raise ValueError("sigma_lnc in {} is not {}".format(m_file,
+                                                            sigma_lnc))
     z = af.tree["z"][:]
     m = af.tree["m500c"][:]
     fgas_500c_max = af.tree["fgas_500c_max"][:]
@@ -283,19 +281,19 @@ def gamma_max_interp_test(f_c, sigma_lnc, r_c, beta, r_flat, m_file=None):
         m_file = "m500c_to_gamma_max" + fname_append
 
     m_file = table_dir + m_file
-    af = asdf.open(m_file)
 
+    af = asdf.open(m_file)
     if f_c != af.tree["f_c"]:
         raise ValueError("f_c in {} is not {}".format(m_file, f_c))
     if sigma_lnc != af.tree["sigma_lnc"]:
-        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
+        raise ValueError("sigma_lnc in {} is not {}".format(m_file,
+                                                            sigma_lnc))
     # if r_c != af.tree["r_c"]:
     #     raise ValueError("r_c in {} is not {}".format(m_file, r_c))
     # if beta != af.tree["beta"]:
     #     raise ValueError("beta in {} is not {}".format(m_file, beta))
     # if r_flat != af.tree["r_flat"]:
     #     raise ValueError("r_flat in {} is not {}".format(m_file, r_flat))
-
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
     gamma_max = af.tree["gamma_max"][:].reshape(m.shape[0], f.shape[0])
@@ -318,19 +316,19 @@ def gamma_max_interp(f_c=0.86, sigma_lnc=0.0, r_c=0.21,
         m_file = "m500c_to_gamma_max" + fname_append
 
     m_file = table_dir + m_file
-    af = asdf.open(m_file)
 
+    af = asdf.open(m_file)
     if f_c != af.tree["f_c"]:
         raise ValueError("f_c in {} is not {}".format(m_file, f_c))
     if sigma_lnc != af.tree["sigma_lnc"]:
-        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
+        raise ValueError("sigma_lnc in {} is not {}".format(m_file,
+                                                            sigma_lnc))
     # if r_c != af.tree["r_c"]:
     #     raise ValueError("r_c in {} is not {}".format(m_file, r_c))
     # if beta != af.tree["beta"]:
     #     raise ValueError("beta in {} is not {}".format(m_file, beta))
     # if r_flat != af.tree["r_flat"]:
     #     raise ValueError("r_flat in {} is not {}".format(m_file, r_flat))
-
     z = af.tree["z"][:]
     m = af.tree["m500c"][:]
     f = af.tree["fgas_500c"][:]
@@ -341,35 +339,3 @@ def gamma_max_interp(f_c=0.86, sigma_lnc=0.0, r_c=0.21,
     gamma_max_interp = interpolate.RegularGridInterpolator(coords, gamma_max)
 
     return gamma_max_interp
-
-
-def mask_interp(f_c, sigma_lnc, m_file=None):
-    '''
-    Return the interpolator for the mask
-    '''
-    if m_file is None:
-        m_file = "m500c_to_m200m_dmo_fc_{}_slnc_{}.asdf".format(f_c,
-                                                                sigma_lnc)
-
-    m_file = table_dir + m_file
-    af = asdf.open(m_file)
-
-    if f_c != af.tree["f_c"]:
-        raise ValueError("f_c in {} is not {}".format(m_file, f_c))
-    if sigma_lnc != af.tree["sigma_lnc"]:
-        raise ValueError("sigma_lnc in {} is not {}".format(m_file, sigma_lnc))
-
-    z = af.tree["z"][:]
-    m = af.tree["m500c"][:]
-    f = af.tree["fgas_500c"][:]
-    mask = af.tree["mask"][:]
-
-    coords = (z, np.log10(m), f)
-    mask_interp = interpolate.RegularGridInterpolator(coords, mask)
-
-    return mask_interp
-
-# ------------------------------------------------------------------------------
-# End of mask_interp()
-# ------------------------------------------------------------------------------
-

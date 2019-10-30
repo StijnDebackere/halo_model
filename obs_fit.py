@@ -584,6 +584,14 @@ def load_gamma(prms=p.prms,
 
             m200c_obs = tools.radius_to_mass(r200c_obs, 200 * prms.cosmo.rho_crit)
 
+            # # get r2500c_obs
+            # r2500c_obs = np.array([tools.rx_from_m(m_f=m_tot_200m,
+            #                                        rho_x=2500 * prms.rho_crit,
+            #                                        sl=i)
+            #                       for i in np.arange(0, r500c.shape[0])])
+
+            # m2500c_obs = tools.radius_to_mass(r2500c_obs, 2500 * prms.cosmo.rho_crit)
+
             # now we need to correct the gas, baryonic and total masses in case
             # r_flat is None, since then we will MAKE r_flat = r200m_obs
             if r_fl is None:
@@ -701,6 +709,8 @@ def load_gamma(prms=p.prms,
                     'r200m_obs': r200m_obs,
                     'm200c_obs': m200c_obs,
                     'r200c_obs': r200c_obs,
+                    # 'm2500c_obs': m2500c_obs,
+                    # 'r2500c_obs': r2500c_obs,
                     'r_max': r_max_fb,
                     'r_flat': r_fl}
             results['{:d}'.format(idx_r)]['{:d}'.format(idx_g)] = temp

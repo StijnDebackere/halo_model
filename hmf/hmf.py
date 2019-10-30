@@ -492,7 +492,10 @@ class MassFunction(transfer.Transfer):
             # ff.Behroozi function won't work here.
             if not isinstance(self.hmf, ff.Behroozi):
                 new_mf = copy.deepcopy(self)
-                new_mf.update(Mmin=np.log10(self.m[-1]) + self.dlog10m, Mmax=18)
+                dlog10m = np.log10(m[-1]) - np.log10(m[-2])
+                new_mf.update(m=np.logspace(np.log10(self.m[-1]) + dlog10m,
+                                            18,
+                                            100))
                 dndm = np.concatenate((dndm, new_mf.dndm))
 
                 m = np.concatenate((m, new_mf.m))
