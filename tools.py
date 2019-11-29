@@ -36,6 +36,19 @@ def _check_iterable(prms):
     return prms_iterable
 
 
+def convert_coords_c_correa(c_correa_interp):
+    """
+    The interpolator accepts arguments differently from our standard
+    c(m) function convention, allow conversion to match c_duffy arguments
+    """
+    def wrapper(*args):
+        m200m, z_range = args
+        coords = inp_interp.arrays_to_coords(z_range, np.log10(m200m))
+        c200m = c_correa_interp(coords)
+        return c200m
+    return wrapper
+
+
 def lte(a, b, precision=1e-15):
     '''
     Compare a and b with precision set to 1e-15, since we get some roundoff
@@ -588,7 +601,7 @@ def sigma_enc(R, R_range, sigma):
     return sigma_enc
 
 
-def massdiff_2m2c_duffy(m200m, m200c, rhoc, rhom, z):
+def massdiff_2m2c(m200m, m200c, rhoc, rhom, z, c):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
     between the integral and m500c
@@ -597,10 +610,63 @@ def massdiff_2m2c_duffy(m200m, m200c, rhoc, rhom, z):
     r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
     r200m = mass_to_radius(m200m, 200 * rhom)
 
-    c200m = c_duffy(m200m, z).reshape(-1)
+    c200m = c(m200m, z).reshape(-1)
 
     # now get analytic mass
     mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200.)
+
+    return mass - m200c
+
+
+def massdiff_2m5c(m200m, m500c, rhoc, rhom, z, c):
+    '''
+    Integrate an NFW halo with m200m up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    # compute radii
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    c200m = c(m200m, z).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200.)
+
+    return mass - m500c
+
+
+def massdiff_5c2m(m500c, m200m, rhoc, rhom, z, c):
+    '''
+    Integrate an NFW halo with m200m up to r500c and return the mass difference
+    between the integral and m500c
+    '''
+    # compute radii
+    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    # compute concentration
+    c200m = c(m200m, z).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200)
+
+    return mass - m500c
+
+
+def massdiff_2c2m(m200c, m200m, rhoc, rhom, z, c):
+    '''
+    Integrate an NFW halo with m200m up to r200c and return the mass difference
+    between the integral and m200c
+    '''
+    # compute radii
+    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
+    r200m = mass_to_radius(m200m, 200 * rhom)
+
+    # compute concentration
+    c200m = c(m200m, z).reshape(-1)
+
+    # now get analytic mass
+    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
 
     return mass - m200c
 
@@ -621,27 +687,33 @@ def m200c_to_m200m_duffy(m200c, rhoc, rhom, z=0):
       corresponding halo model halo virial mass
     '''
     # these bounds should be reasonable for m200m < 1e18
-    m200m = opt.brentq(massdiff_2m2c_duffy, m200c, 10. * m200c,
-                       args=(m200c, rhoc, rhom, z))
+    m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
+                       args=(m200c, rhoc, rhom, z, c_duffy))
 
     return m200m
 
 
-def massdiff_2m5c_duffy(m200m, m500c, rhoc, rhom, z):
+@np.vectorize
+def m200c_to_m200m_correa(m200c, rhoc, rhom, z=0):
     '''
-    Integrate an NFW halo with m200m up to r500c and return the mass difference
-    between the integral and m500c
+    Give the virial mass for the halo corresponding to m500c
+
+    Parameters
+    ----------
+    m500c : float
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
     '''
-    # compute radii
-    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
+    c_correa = convert_coords_c_correa(inp_interp.c200m_interp())
+    # these bounds should be reasonable for m200m < 1e18
+    m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
+                       args=(m200c, rhoc, rhom, z, c_correa))
 
-    c200m = c_duffy(m200m, z).reshape(-1)
-
-    # now get analytic mass
-    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200.)
-
-    return mass - m500c
+    return m200m
 
 
 @np.vectorize
@@ -660,28 +732,33 @@ def m500c_to_m200m_duffy(m500c, rhoc, rhom, z=0):
       corresponding halo model halo virial mass
     '''
     # these bounds should be reasonable for m200m < 1e18
-    m200m = opt.brentq(massdiff_2m5c_duffy, m500c, 10. * m500c,
-                       args=(m500c, rhoc, rhom, z))
+    m200m = opt.brentq(massdiff_2m5c, m500c, 10. * m500c,
+                       args=(m500c, rhoc, rhom, z, c_duffy))
 
     return m200m
 
 
-def massdiff_5c2m_duffy(m500c, m200m, rhoc, rhom, z):
+@np.vectorize
+def m500c_to_m200m_correa(m500c, rhoc, rhom, z=0):
     '''
-    Integrate an NFW halo with m200m up to r500c and return the mass difference
-    between the integral and m500c
+    Give the virial mass for the halo corresponding to m500c
+
+    Parameters
+    ----------
+    m500c : float
+      halo mass at 500 times the universe critical density
+
+    Returns
+    -------
+    m200m : float
+      corresponding halo model halo virial mass
     '''
-    # compute radii
-    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
+    c_correa = convert_coords_c_correa(inp_interp.c200m_interp())
+    # these bounds should be reasonable for m200m < 1e18
+    m200m = opt.brentq(massdiff_2m5c, m500c, 10. * m500c,
+                       args=(m500c, rhoc, rhom, z, c_correa))
 
-    # compute concentration
-    c200m = c_duffy(m200m, z).reshape(-1)
-
-    # now get analytic mass
-    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200)
-
-    return mass - m500c
+    return m200m
 
 
 @np.vectorize
@@ -700,69 +777,33 @@ def m200m_to_m500c_duffy(m200m, rhoc, rhom, z=0):
       halo mass at 500 times the universe critical density
     '''
     # these bounds should be reasonable for m200m < 1e18
-    m500c = opt.brentq(massdiff_5c2m_duffy, m200m/10., m200m,
-                       args=(m200m, rhoc, rhom, z))
+    m500c = opt.brentq(massdiff_5c2m, m200m/10., m200m,
+                       args=(m200m, rhoc, rhom, z, c_duffy))
 
     return m500c
 
 
-def massdiff_2m2c_duffy(m200m, m200c, rhoc, rhom, z):
-    '''
-    Integrate an NFW halo with m200m up to r200c and return the mass difference
-    between the integral and m200c
-    '''
-    # compute radii
-    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
-
-    # compute concentration
-    c200m = c_duffy(m200m, z).reshape(-1)
-
-    # now compute analytic mass
-    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
-
-    return mass - m200c
-
-
 @np.vectorize
-def m200c_to_m200m_duffy(m200c, rhoc, rhom, z=0):
+def m200m_to_m500c_correa(m200m, rhoc, rhom, z=0):
     '''
-    Give the virial mass for the halo corresponding to m200c
+    Give m500c for the an m200m virial mass halo
 
     Parameters
     ----------
-    m200c : float
-      halo mass at 200 times the universe critical density
+    m200m : float
+      halo virial mass
 
     Returns
     -------
-    m200m : float
-      corresponding halo model halo virial mass
+    m500c : float
+      halo mass at 500 times the universe critical density
     '''
+    c_correa = convert_coords_c_correa(inp_interp.c200m_interp())
     # these bounds should be reasonable for m200m < 1e18
-    # 1e19 Msun is ~maximum for c_duffy
-    m200m = opt.brentq(massdiff_2m2c_duffy, m200c, 10. * m200c,
-                       args=(m200c, rhoc, rhom, z))
+    m500c = opt.brentq(massdiff_5c2m, m200m/10., m200m,
+                       args=(m200m, rhoc, rhom, z, c_correa))
 
-    return m200m
-
-
-def massdiff_2c2m_duffy(m200c, m200m, rhoc, rhom, z):
-    '''
-    Integrate an NFW halo with m200m up to r200c and return the mass difference
-    between the integral and m200c
-    '''
-    # compute radii
-    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
-
-    # compute concentration
-    c200m = c_duffy(m200m, z).reshape(-1)
-
-    # now get analytic mass
-    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
-
-    return mass - m200c
+    return m500c
 
 
 @np.vectorize
@@ -782,187 +823,10 @@ def m200m_to_m200c_duffy(m200m, rhoc, rhom, z=0):
     '''
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_duffy
-    m200c = opt.brentq(massdiff_2c2m_duffy, m200m / 10., m200m,
-                       args=(m200m, rhoc, rhom, z))
+    m200c = opt.brentq(massdiff_2c2m, m200m / 10., m200m,
+                       args=(m200m, rhoc, rhom, z, c_duffy))
 
     return m200c
-
-
-def massdiff_2m2c_correa(m200m, m200c, rhoc, rhom, z):
-    '''
-    Integrate an NFW halo with m200m up to r500c and return the mass difference
-    between the integral and m500c
-    '''
-    # compute radii
-    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
-
-    c200m = c_correa(m200m, z).reshape(-1)
-
-    # now get analytic mass
-    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200.)
-
-    return mass - m200c
-
-
-@np.vectorize
-def m200c_to_m200m_correa(m200c, rhoc, rhom, z=0):
-    '''
-    Give the virial mass for the halo corresponding to m500c
-
-    Parameters
-    ----------
-    m500c : float
-      halo mass at 500 times the universe critical density
-
-    Returns
-    -------
-    m200m : float
-      corresponding halo model halo virial mass
-    '''
-    # these bounds should be reasonable for m200m < 1e18
-    m200m = opt.brentq(massdiff_2m2c_correa, m200c, 10. * m200c,
-                       args=(m200c, rhoc, rhom, z))
-
-    return m200m
-
-
-def massdiff_2m5c_correa(m200m, m500c, rhoc, rhom, z):
-    '''
-    Integrate an NFW halo with m200m up to r500c and return the mass difference
-    between the integral and m500c
-    '''
-    # compute radii
-    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
-
-    c200m = c_correa(m200m, z).reshape(-1)
-
-    # now get analytic mass
-    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200.)
-
-    return mass - m500c
-
-
-@np.vectorize
-def m500c_to_m200m_correa(m500c, rhoc, rhom, z=0):
-    '''
-    Give the virial mass for the halo corresponding to m500c
-
-    Parameters
-    ----------
-    m500c : float
-      halo mass at 500 times the universe critical density
-
-    Returns
-    -------
-    m200m : float
-      corresponding halo model halo virial mass
-    '''
-    # these bounds should be reasonable for m200m < 1e18
-    m200m = opt.brentq(massdiff_2m5c_correa, m500c, 10. * m500c,
-                       args=(m500c, rhoc, rhom, z))
-
-    return m200m
-
-
-def massdiff_5c2m_correa(m500c, m200m, rhoc, rhom, z):
-    '''
-    Integrate an NFW halo with m200m up to r500c and return the mass difference
-    between the integral and m500c
-    '''
-    # compute radii
-    r500c = (m500c / (4./3 * np.pi * 500 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
-
-    # compute concentration
-    c200m = c_correa(m200m, z).reshape(-1)
-
-    # now get analytic mass
-    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200)
-
-    return mass - m500c
-
-
-@np.vectorize
-def m200m_to_m500c_correa(m200m, rhoc, rhom, z=0):
-    '''
-    Give m500c for the an m200m virial mass halo
-
-    Parameters
-    ----------
-    m200m : float
-      halo virial mass
-
-    Returns
-    -------
-    m500c : float
-      halo mass at 500 times the universe critical density
-    '''
-    # these bounds should be reasonable for m200m < 1e18
-    m500c = opt.brentq(massdiff_5c2m_correa, m200m/10., m200m,
-                       args=(m200m, rhoc, rhom, z))
-
-    return m500c
-
-
-def massdiff_2m2c_correa(m200m, m200c, rhoc, rhom, z):
-    '''
-    Integrate an NFW halo with m200m up to r200c and return the mass difference
-    between the integral and m200c
-    '''
-    # compute radii
-    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
-
-    # compute concentration
-    c200m = c_correa(m200m, z).reshape(-1)
-
-    # now compute analytic mass
-    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
-
-    return mass - m200c
-
-
-@np.vectorize
-def m200c_to_m200m_correa(m200c, rhoc, rhom, z=0):
-    '''
-    Give the virial mass for the halo corresponding to m200c
-
-    Parameters
-    ----------
-    m200c : float
-      halo mass at 200 times the universe critical density
-
-    Returns
-    -------
-    m200m : float
-      corresponding halo model halo virial mass
-    '''
-    # these bounds should be reasonable for m200m < 1e18
-    # 1e19 Msun is ~maximum for c_correa
-    m200m = opt.brentq(massdiff_2m2c_correa, m200c, 10. * m200c,
-                       args=(m200c, rhoc, rhom, z))
-
-    return m200m
-
-
-def massdiff_2c2m_correa(m200c, m200m, rhoc, rhom, z):
-    '''
-    Integrate an NFW halo with m200m up to r200c and return the mass difference
-    between the integral and m200c
-    '''
-    # compute radii
-    r200c = (m200c / (4./3 * np.pi * 200 * rhoc))**(1./3)
-    r200m = mass_to_radius(m200m, 200 * rhom)
-
-    # compute concentration
-    c200m = c_correa(m200m, z).reshape(-1)
-
-    # now get analytic mass
-    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
-
-    return mass - m200c
 
 
 @np.vectorize
@@ -980,10 +844,11 @@ def m200m_to_m200c_correa(m200m, rhoc, rhom, z=0):
     m200c : float
       halo mass at 200 times the universe critical density
     '''
+    c_correa = convert_coords_c_correa(inp_interp.c200m_interp())
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
-    m200c = opt.brentq(massdiff_2c2m_correa, m200m / 10., m200m,
-                       args=(m200m, rhoc, rhom, z))
+    m200c = opt.brentq(massdiff_2c2m, m200m / 10., m200m,
+                       args=(m200m, rhoc, rhom, z, c_correa))
 
     return m200c
 
