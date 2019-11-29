@@ -122,10 +122,15 @@ def c200m_interp(c_file="c200m_correa.asdf"):
     '''
     c_file = table_dir + c_file
 
-    af = asdf.open(c_file)
-    z = af.tree["z"][:]
-    m = af.tree["m200m"][:]
-    c = af.tree["c200m"][:]
+    # af = asdf.open(c_file, copy_arrays=True)
+    # z = af.tree["z"][:]
+    # m = af.tree["m200m"][:]
+    # c = af.tree["c200m"][:]
+
+    with asdf.open(c_file, copy_arrays=True) as af:
+        z = af.tree["z"][:]
+        m = af.tree["m200m"][:]
+        c = af.tree["c200m"][:]
 
     coords = (z, np.log10(m))
 
