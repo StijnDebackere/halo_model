@@ -1003,40 +1003,40 @@ def rx_to_r200(x, c_200, rho_mean):
     return rx_200
 
 
-@np.vectorize
-def rx_from_y(rho_x, m_y, r_y, c_y):
-    '''
-    Returns r_x at mean overdensity rho_x from an NFW profile with c_y.
+# @np.vectorize
+# def rx_from_y(rho_x, m_y, r_y, c_y):
+#     '''
+#     Returns r_x at mean overdensity rho_x from an NFW profile with c_y.
 
-    Parameters
-    ----------
-    rho_x : float
-      overdensity to compute r_x for
-    m_y : float
-      mass inside r_y
-    r_y : float
-      r_y to evaluate r_s from r_s = r_y/c_y
-    c_y : float
-      concentration of halo
+#     Parameters
+#     ----------
+#     rho_x : float
+#       overdensity to compute r_x for
+#     m_y : float
+#       mass inside r_y
+#     r_y : float
+#       r_y to evaluate r_s from r_s = r_y/c_y
+#     c_y : float
+#       concentration of halo
 
-    Returns
-    -------
-    r_x : float
-      radius enclosing mean overdensity rho_x
+#     Returns
+#     -------
+#     r_x : float
+#       radius enclosing mean overdensity rho_x
 
-    Examples
-    --------
-    Returns physical radius at which mean overdensity is rho_x
-    >>> r_500c = rx_from_y(500 * rho_crit, 1e14, 1.1, 3)
-    >>> r_200m = rx_from_y(200 * rho_mean, 1e14, 1.1, 3)
-    '''
-    def m_diff(r, my, ry, cy):
-        return (dp.m_NFW(r, m_x=my, r_x=ry, c_x=cy) -
-                4./3 * np.pi * rho_x * r**3)
+#     Examples
+#     --------
+#     Returns physical radius at which mean overdensity is rho_x
+#     >>> r_500c = rx_from_y(500 * rho_crit, 1e14, 1.1, 3)
+#     >>> r_200m = rx_from_y(200 * rho_mean, 1e14, 1.1, 3)
+#     '''
+#     def m_diff(r, my, ry, cy):
+#         return (dp.m_NFW(r, m_x=my, r_x=ry, c_x=cy) -
+#                 4./3 * np.pi * rho_x * r**3)
 
-    r_x = opt.brentq(m_diff, 1e-6, 10, args=(m_y, r_y, c_y))
+#     r_x = opt.brentq(m_diff, 1e-6, 10, args=(m_y, r_y, c_y))
 
-    return r_x
+#     return r_x
 
 
 def bins2center(bins):
