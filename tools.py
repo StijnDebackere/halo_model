@@ -1,5 +1,4 @@
 import halo.input.interpolators as inp_interp
-import halo.density_profiles as dp
 
 import numpy as np
 import scipy.integrate as intg
