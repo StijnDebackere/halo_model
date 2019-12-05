@@ -32,6 +32,7 @@ m200m = np.logspace(6, 17, 1000)
 m500c = np.logspace(6, 16, 1000)
 
 z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
+z = np.linspace(0, 3, 10)
 
 cosmo = cosmo.Cosmology()
 sigma8 = np.linspace(cosmo.sigma_8 - 0.02, cosmo.sigma_8 + 0.02, 3)
