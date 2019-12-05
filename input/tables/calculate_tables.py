@@ -491,7 +491,7 @@ def table_c500c_correa(m500c=m500c,
     return result_info
 
 
-def massdiff_2m2c(m200m, m200c, c200c, r200c, rhom, h, z):
+def massdiff_2m2c(m200m, m200c, c200c, r200c, rhom):
     '''
     Integrate an NFW halo with m200m up to r200c and return the mass difference
     between the integral and m200c
@@ -503,11 +503,11 @@ def massdiff_2m2c(m200m, m200c, c200c, r200c, rhom, h, z):
 
 
 @np.vectorize
-def m200c_to_m200m(m200c, c200c, r200c, rhom, h, z):
+def m200c_to_m200m(m200c, c200c, r200c, rhom):
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
     m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
-                       args=(m200c, c200c, r200c, rhom, h, z))
+                       args=(m200c, c200c, r200c, rhom))
     r200m = tools.mass_to_radius(m200m, 200 * rhom)
     c200m = c200c * r200m / r200c
 
@@ -532,15 +532,17 @@ def table_m200c_to_m200m(m200c=m200c,
     coords = arrays_to_coords(z, np.log10(m200c))
     c_interp = inp_interp.c200c_interp()
 
+    # scaling for rhoc with redshift
+    E2_z = omegam * (1+z)**3 + omegav
+
     c200c = c_interp(coords).reshape(z.shape + m200c.shape)
-    r200c = tools.mass_to_radius(m200c, 200 * rhoc)
+    r200c = tools.mass_to_radius(m200c.reshape(1, -1),
+                                 200 * rhoc * E2_z.reshape(-1, 1))
 
     m200m, c200m, r200m = m200c_to_m200m(m200c=m200c.reshape(1, -1),
                                          c200c=c200c,
-                                         r200c=r200c.reshape(1, -1),
-                                         rhom=rhom,
-                                         h=h,
-                                         z=z.reshape(-1, 1))
+                                         r200c=r200c,
+                                         rhom=rhom * (1 + z.reshape(-1, 1))**3)
 
     result_info = {
         "dims": np.array(["z", "m200c"]),
@@ -604,13 +606,16 @@ def table_m200c_to_m500c(m200c=m200c,
     coords = arrays_to_coords(z, np.log10(m200c))
     c_interp = inp_interp.c200c_interp()
 
+    # scaling for rhoc with redshift
+    E2_z = omegam * (1+z)**3 + omegav
+
     c200c = c_interp(coords).reshape(z.shape + m200c.shape)
-    r200c = tools.mass_to_radius(m200c, 200 * rhoc)
+    r200c = tools.mass_to_radius(m200c, 200 * rhoc * E2_z.reshape(-1, 1))
 
     m500c, c500c, r500c = m200c_to_m500c(m200c=m200c.reshape(1, -1),
                                          c200c=c200c,
-                                         r200c=r200c.reshape(1, -1),
-                                         rhoc=rhoc)
+                                         r200c=r200c,
+                                         rhoc=rhoc * E2_z.reshape(-1, 1))
 
     result_info = {
         "dims": np.array(["z", "m200c"]),
@@ -634,7 +639,7 @@ def table_m200c_to_m500c(m200c=m200c,
     return result_info
 
 
-def massdiff_2m2c_cosmo(m200m, m200c, c200c, r200c, rhom, h, z):
+def massdiff_2m2c_cosmo(m200m, m200c, c200c, r200c, rhom):
     '''
     Integrate an NFW halo with m200m up to r200c and return the mass difference
     between the integral and m200c
@@ -646,11 +651,11 @@ def massdiff_2m2c_cosmo(m200m, m200c, c200c, r200c, rhom, h, z):
 
 
 @np.vectorize
-def m200c_to_m200m_cosmo(m200c, c200c, r200c, rhom, h, z):
+def m200c_to_m200m_cosmo(m200c, c200c, r200c, rhom):
     # these bounds should be reasonable for m200m < 1e18
     # 1e19 Msun is ~maximum for c_correa
     m200m = opt.brentq(massdiff_2m2c, m200c, 10. * m200c,
-                       args=(m200c, c200c, r200c, rhom, h, z))
+                       args=(m200c, c200c, r200c, rhom))
     r200m = tools.mass_to_radius(m200m, 200 * rhom)
     c200m = c200c * r200m / r200c
 
@@ -664,16 +669,16 @@ def table_m200c_to_m200m_cosmo(m200c=m200c,
                                omegav=omegav,
                                n=n,
                                h=h):
-    '''
-    Create a table that converts from m200c and the given cosmology to the corresponding
-    halo properties m200m
+    '''Create a table that converts from m200c and the given cosmology to
+    the corresponding halo properties m200m
+
     '''
     # get interpolator and coordinates for c200c
     coords = arrays_to_coords(sigma8, omegam, omegav, n, h, z, np.log10(m200c))
     c_interp = inp_interp.c200c_cosmo_interp()
 
     # set background densities
-    rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
+    rhoc = 2.755 * 10**(11.)  # [h^2 M_sun / Mpc^3]
     rhom = omegam * rhoc
 
     c200c = c_interp(coords).reshape(sigma8.shape + omegam.shape + omegav.shape +
@@ -717,8 +722,8 @@ def table_c200m_correa(m200m=m200m,
                        n=0.972,
                        h=0.7,
                        cpus=None):
-    '''Interpolate the c200m(m200m, cosmo) relation from Correa+2015 for the given mass, z
-    and cosmology to a regular grid
+    '''Interpolate the c200m(m200m, cosmo) relation from Correa+2015 for
+    the given mass, z and cosmology to a regular grid
 
     Parameters
     ----------
@@ -752,22 +757,23 @@ def table_c200m_correa(m200m=m200m,
         c_all = np.empty(shape)
 
         # need to tile redshifts to match the masses
-        coords = np.vstack([np.tile(z_t.reshape(-1,1), (1, m200m_t.shape[1])).flatten(),
+        coords = np.vstack([np.tile(z_t.reshape(-1, 1),
+                                    (1, m200m_t.shape[1])).flatten(),
                             np.log10(m200m_t).flatten()]).T
         c_interp = interpolate.LinearNDInterpolator(coords, c200m_t.flatten())
 
         # now interpolate to a regular and fixed grid in m200m
         # need to match m200m to each z
-        coords_new = np.vstack([np.tile(z_t.reshape(-1,1),
+        coords_new = np.vstack([np.tile(z_t.reshape(-1, 1),
                                         (1, m200m.shape[0])).flatten(),
-                                np.log10(np.tile(m200m.reshape(1,-1),
+                                np.log10(np.tile(m200m.reshape(1, -1),
                                                  (z_t.shape[0], 1))).flatten()]).T
         c_all = c_interp(coords_new).reshape(z_t.shape + m200m.shape)
 
         out_q.put([procn, c_all])
 
     # --------------------------------------------------
-    if cpus == None:
+    if cpus is None:
         cpus = multi.cpu_count()
 
     if cpus > 8:
@@ -808,7 +814,8 @@ def table_c200m_correa(m200m=m200m,
     c200m = np.concatenate([item[1] for item in results], axis=-2)
 
     result_info = {
-        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z", "m200m"]),
+        "dims": np.array(["sigma8", "omegam", "omegav",
+                          "n", "h", "z", "m200m"]),
         "sigma8": sigma8,
         "omegam": omegam,
         "omegav": omegav,
@@ -825,9 +832,6 @@ def table_c200m_correa(m200m=m200m,
 
     return result_info
 
-# ------------------------------------------------------------------------------
-# End of table_c200m_correa()
-# ------------------------------------------------------------------------------
 
 def table_c200m_correa_cosmo(m200m=m200m,
                              z=z,
@@ -837,8 +841,8 @@ def table_c200m_correa_cosmo(m200m=m200m,
                              n=n,
                              h=h,
                              cpus=None):
-    '''Interpolate the c200m(m200m, cosmo) relation from Correa+2015 for the given mass, z
-    and cosmology to a regular grid
+    '''Interpolate the c200m(m200m, cosmo) relation from Correa+2015 for
+    the given mass, z and cosmology to a regular grid
 
     Parameters
     ----------
@@ -875,8 +879,8 @@ def table_c200m_correa_cosmo(m200m=m200m,
                     for idx_n in range(m200m_t.shape[3]):
                         for idx_h in range(m200m_t.shape[4]):
                             c_interp = interpolate.interp1d(np.log10(m200m_t[idx_s8, idx_om, idx_ov,
-                                                                        idx_n, idx_h, 0]),
-                                                       c200m_t[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0])
+                                                                             idx_n, idx_h, 0]),
+                                                            c200m_t[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0])
 
 
                             c_all[idx_s8, idx_om, idx_ov, idx_n, idx_h, 0] = c_interp(np.log10(m200m))
@@ -884,7 +888,7 @@ def table_c200m_correa_cosmo(m200m=m200m,
         out_q.put([procn, c_all])
 
     # --------------------------------------------------
-    if cpus == None:
+    if cpus is None:
         cpus = multi.cpu_count()
 
     if cpus > 8:
@@ -922,7 +926,8 @@ def table_c200m_correa_cosmo(m200m=m200m,
     c200m = np.concatenate([item[1] for item in results], axis=-2)
 
     result_info = {
-        "dims": np.array(["sigma8", "omegam", "omegav", "n", "h", "z", "m200m"]),
+        "dims": np.array(["sigma8", "omegam", "omegav",
+                          "n", "h", "z", "m200m"]),
         "sigma8": sigma8,
         "omegam": omegam,
         "omegav": omegav,
@@ -941,9 +946,8 @@ def table_c200m_correa_cosmo(m200m=m200m,
 
 
 def f_stars_interp(comp='all'):
-    '''
-    Return the stellar fraction interpolator as a function of halo mass as found
-    by Zu & Mandelbaum (2015).
+    '''Return the stellar fraction interpolator as a function of halo
+    mass as found by Zu & Mandelbaum (2015).
 
     For m200m < 1e10 M_sun/h we return f_stars=0
     For m200m > 1e16 M_sun/h we return f_stars=1.41e-2
@@ -954,6 +958,7 @@ def f_stars_interp(comp='all'):
     -------
     f_stars : (m,) array [h_70^(-1)]
       total stellar fraction for the halo mass
+
     '''
     comp_options = ['all', 'cen', 'sat']
     if comp not in comp_options:
@@ -969,13 +974,13 @@ def f_stars_interp(comp='all'):
 
     if comp == 'all':
         f_stars_interp = interpolate.interp1d(m_h, f_stars, bounds_error=False,
-                                              fill_value=(0,f_stars[-1]))
+                                              fill_value=(0, f_stars[-1]))
     elif comp == 'cen':
         f_stars_interp = interpolate.interp1d(m_h, f_cen, bounds_error=False,
-                                              fill_value=(0,f_cen[-1]))
+                                              fill_value=(0, f_cen[-1]))
     else:
         f_stars_interp = interpolate.interp1d(m_h, f_sat, bounds_error=False,
-                                              fill_value=(0,f_sat[-1]))
+                                              fill_value=(0, f_sat[-1]))
 
     return f_stars_interp
 
@@ -993,10 +998,10 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
                              h=0.7,
                              fname="m500c_to_m200m_dmo",
                              cpus=None):
-    '''
-    Create a table that computes the DMO equivalent halo mass m200m_dmo given the
-    observed m500c & fgas_500c (normalized to the cosmic baryon fraction). The
-    stellar fraction are also computed and saved.
+    '''Create a table that computes the DMO equivalent halo mass
+    m200m_dmo given the observed m500c & fgas_500c (normalized to the
+    cosmic baryon fraction). The stellar fraction are also computed
+    and saved.
 
     Parameters
     ----------
@@ -1029,6 +1034,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         dict with m200m_dmo, c200m_dmo, fstar_500c and all input values
 
         - this dict gets saved to fname
+
     '''
     def m_diff(m200m_dmo, m500c, r500c, fg500c, fs200m, fc200m, c200m, z):
         # for a given halo mass, we know the concentration
@@ -1037,7 +1043,8 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
             c200m_dmo = c200m_dmo * np.e**sigma_lnc
         except ValueError:
             print(np.array([z, np.log10(m200m_dmo)]))
-        r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
+        r200m_dmo = tools.mass_to_radius(m200m_dmo,
+                                         200 * rhom * (1+z)**3)
 
         # this give stellar fraction & concentration
         fcen_500c = fc200m(m200m_dmo / 0.7) * m200m_dmo / m500c
@@ -1051,7 +1058,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         # evaluated at r500c for the observations, which when scaled
         # should match the observed m500c
         m_dmo_r500c = dp.m_NFW_delta(r500c, c200m_dmo, r200m_dmo,
-                                     omegam * rhoc, Delta=200)
+                                     rhom * (1+z)**3, Delta=200)
 
         fb = omegab / omegam
         f500c = fg500c + fcen_500c + fsat_500c
@@ -1061,10 +1068,13 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     # --------------------------------------------------
     def calc_m_diff(procn, m500c, r500c, fg500c, fs200m,
                     fc200m, c200m, z, out_q):
-        m200m_dmo = np.vectorize(optimize, otypes=[np.float64])(m_diff, m500c, 5. * m500c,
+        m200m_dmo = np.vectorize(optimize, otypes=[np.float64])(m_diff, m500c,
+                                                                5. * m500c,
                                                                 *(m500c, r500c,
-                                                                  fg500c, fs200m,
-                                                                  fc200m, c200m, z))
+                                                                  fg500c,
+                                                                  fs200m,
+                                                                  fc200m,
+                                                                  c200m, z))
         # now we have m200m_dmo, so we calculate again all the other
         # resulting variables
 
@@ -1076,7 +1086,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
 
         # calculate the concentration and reshape to match m200m_dmo
         c200m_dmo = c200m(coords).reshape(shape_final) * np.e**sigma_lnc
-        r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * omegam * rhoc)
+        r200m_dmo = tools.mass_to_radius(m200m_dmo, 200 * rhom * (1+z)**3)
 
         fcen_500c = fc200m(m200m_dmo / 0.7) * m200m_dmo / m500c
         fsat_200m = fs200m(m200m_dmo / 0.7)
@@ -1086,7 +1096,7 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
         out_q.put([procn, m200m_dmo, fcen_500c, fsat_500c])
 
     # --------------------------------------------------
-    if cpus == None:
+    if cpus is None:
         cpus = multi.cpu_count()
 
     manager = multi.Manager()
@@ -1099,9 +1109,11 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     fsat_200m = f_stars_interp(comp="sat")
 
     # set background densities
-    rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
+    rhoc = 2.755 * 10**(11.)  # [h^2 M_sun / Mpc^3]
+    rhom = omegam * rhoc
 
-    r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
+    E2_z_r = omegam * (1 + z_r)**3 + omegav
+    r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc * E2_z_r)
 
     # otherwise the code gets upset when passing empty arrays to optimize
     if cpus > m500c.shape[0]:
@@ -1169,14 +1181,12 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
     }
 
     af = asdf.AsdfFile(result_info)
-    af.write_to(table_dir + fname + "_fc_{}_slnc_{}.asdf".format(f_c, sigma_lnc))
+    af.write_to(table_dir + fname + "_fc_{}_slnc_{}.asdf".format(f_c,
+                                                                 sigma_lnc))
     af.close()
 
     return result_info
 
-# ------------------------------------------------------------------------------
-# End of table_m500c_to_m200m_dmo()
-# ------------------------------------------------------------------------------
 
 def table_m500c_to_gamma_max(m500c=m500c,
                              z=z,
@@ -1239,15 +1249,6 @@ def table_m500c_to_gamma_max(m500c=m500c,
 
         - this dict gets saved to fname
     '''
-    def r200m_from_m(m_f, r200m_dmo, **kwargs):
-        def diff_m200m(r):
-            m200m = 4. /3 * np.pi * 200 * omegam * rhoc * r**3
-            m_diff = m_f(r, **kwargs) - m200m
-            return m_diff
-
-        r200m = opt.brentq(diff_m200m, 0.5 * r200m_dmo, 10 * r200m_dmo)
-        return r200m
-
     def m_dm_stars_from_m500c(z, m500c, fg500c, fc500c, fs500c, r500c,
                               m200m_dmo, c200m_dmo, f_c, sigma_lnc):
         # load the interpolated quantities
@@ -1287,7 +1288,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
         return m_dm, m_stars
 
     def m_gas_from_m500c(gamma, z, m500c, fg500c, r500c):
-        rho_500c = dp.profile_beta(np.reshape(r500c, (-1,1)),
+        rho_500c = dp.profile_beta(np.reshape(r500c, (-1, 1)),
                                    m_x=np.array([fg500c * m500c]),
                                    r_x=np.array([r500c]),
                                    r_c=np.array([r_c * r500c]),
@@ -1307,6 +1308,15 @@ def table_m500c_to_gamma_max(m500c=m500c,
             m_gas = lambda r, **kwargs: float(dp.m_beta_plaw_uni(r, **gas_args))
         return m_gas
 
+    def r200m_from_m(m_f, r200m_dmo, z, **kwargs):
+        def diff_m200m(r):
+            m200m = 4. / 3 * np.pi * 200 * rhom * (1+z)**3 * r**3
+            m_diff = m_f(r, **kwargs) - m200m
+            return m_diff
+
+        r200m = opt.brentq(diff_m200m, 0.5 * r200m_dmo, 10 * r200m_dmo)
+        return r200m
+
     def fb_diff(gamma, z, m500c, fg500c, r500c, fc500c, fs500c, m200m_dmo,
                 c200m_dmo):
         m_dm, m_stars = m_dm_stars_from_m500c(z=z, m500c=m500c, fg500c=fg500c,
@@ -1321,8 +1331,10 @@ def table_m500c_to_gamma_max(m500c=m500c,
         # if fg500c == f_b:
         #     print(fg500c, m200m_dmo((z, np.log10(m500c), fg500c)))
         m200m = m200m_dmo((z, np.log10(m500c), fg500c))
-        r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc)
-        r200m_obs = np.vectorize(r200m_from_m, otypes=[np.float64])(m_tot, r200m)
+        r200m = tools.mass_to_radius(m200m, 200 * omegam * rhoc * (1+z)**3)
+        r200m_obs = np.vectorize(r200m_from_m, otypes=[np.float64])(m_tot,
+                                                                    r200m,
+                                                                    z)
         return (m_gas(r200m_obs) + m_stars(r200m_obs)) / m_tot(r200m_obs) - f_b
 
     # @np.vectorize
@@ -1359,8 +1371,11 @@ def table_m500c_to_gamma_max(m500c=m500c,
                          fc500c, fs500c, m200m_dmo, c200m_dmo,
                          out_q):
         gamma = np.vectorize(optimize, otypes=[np.float64])(fb_diff, 0., 1000.,
-                                                            *(z, m500c, fg500c, r500c,
-                                                              fc500c, fs500c, m200m_dmo,
+                                                            *(z, m500c, fg500c,
+                                                              r500c,
+                                                              fc500c,
+                                                              fs500c,
+                                                              m200m_dmo,
                                                               c200m_dmo),
                                                             cond=(fg500c == 0),
                                                             fill=0, fill_low=0,
@@ -1369,7 +1384,7 @@ def table_m500c_to_gamma_max(m500c=m500c,
         #                                       fs500c, m200m_dmo, c200m_dmo)
         out_q.put([procn, gamma])
         # --------------------------------------------------
-    if cpus == None:
+    if cpus is None:
         cpus = multi.cpu_count()
 
     manager = multi.Manager()
@@ -1379,10 +1394,14 @@ def table_m500c_to_gamma_max(m500c=m500c,
     (z_r, m500c_r, fg500c_r) = arrays_to_ogrid(z, m500c, fg500c)
     fgas500c_r = fg500c_r * omegab / omegam
     # set background density
-    rhoc = 2.755 * 10**(11.) # [h^2 M_sun / Mpc^3]
+    rhoc = 2.755 * 10**(11.)  # [h^2 M_sun / Mpc^3]
+    rhom = omegam * rhoc
     f_b = omegab / omegam
 
-    r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc)
+    # scaling for rhoc with redshift
+    E2_z_r = omegam * (1+z_r)**3 + omegav
+
+    r500c_r = tools.mass_to_radius(m500c_r, 500 * rhoc * E2_z_r)
 
     # load interpolators
     fcen_500c = inp_interp.fcen500c_interp(f_c=f_c, sigma_lnc=sigma_lnc)
@@ -1416,7 +1435,8 @@ def table_m500c_to_gamma_max(m500c=m500c,
     gamma_max = np.concatenate([item[1] for item in results], axis=1)
 
     # we still need to get our mask
-    fbar_500c = inp_interp.fbar500c_interp(f_c=f_c, sigma_lnc=sigma_lnc)((z_r, np.log10(m500c_r),
+    fbar_500c = inp_interp.fbar500c_interp(f_c=f_c, sigma_lnc=sigma_lnc)((z_r,
+                                                                          np.log10(m500c_r),
                                                                           fgas500c_r))
     mask = (fbar_500c == np.nan)
 
@@ -1436,7 +1456,8 @@ def table_m500c_to_gamma_max(m500c=m500c,
         "r_flat": r_flat,
         "m500c": m500c,
         "fgas_500c": fg500c * omegab / omegam,
-        "gamma_max": gamma_max
+        "gamma_max": gamma_max,
+        "mask": mask
     }
 
     af = asdf.AsdfFile(result_info)
