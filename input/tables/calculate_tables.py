@@ -409,7 +409,6 @@ def table_c500c_correa(m500c=m500c,
         shape = z_t.shape + m500c.shape
         c_all = np.empty(shape)
 
-        pdb.set_trace()
         # need to tile redshifts to match the masses
         coords = np.vstack([np.tile(z_t.reshape(-1, 1),
                                     (1, m500c_t.shape[1])).flatten(),
