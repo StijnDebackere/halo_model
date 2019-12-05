@@ -324,7 +324,7 @@ def table_c200c_correa(m200c=m200c,
     cosmo["n"] = n
     cosmo["h"] = h
 
-    if cpus == None:
+    if cpus is None:
         cpus = multi.cpu_count()
 
     manager = multi.Manager()
