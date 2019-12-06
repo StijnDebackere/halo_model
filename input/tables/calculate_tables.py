@@ -4,6 +4,7 @@ import scipy.interpolate as interpolate
 import multiprocessing as multi
 import asdf
 from copy import copy
+import pyDOE as pd
 
 import halo.tools as tools
 import halo.input.interpolators as inp_interp
@@ -27,20 +28,47 @@ else:
 # default parameters #
 ######################
 
-m200c = np.logspace(5, 17, 1000)
-m200m = np.logspace(6, 17, 1000)
-m500c = np.logspace(6, 16, 1000)
+m200c = np.logspace(5, 17, 500)
+m200m = np.logspace(6, 17, 500)
+m500c = np.logspace(6, 16, 500)
 
-z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
+# z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
 z = np.linspace(0, 3, 10)
 
 cosmo = cosmo.Cosmology()
-sigma8 = np.linspace(cosmo.sigma_8 - 0.02, cosmo.sigma_8 + 0.02, 3)
-omegam = np.linspace(cosmo.omegam - 0.02, cosmo.omegam + 0.02, 3)
-omegab = cosmo.omegab
-omegav = np.linspace(cosmo.omegav - 0.02, cosmo.omegav + 0.02, 3)
-n = np.linspace(cosmo.n - 0.02, cosmo.n + 0.02, 3)
-h = np.linspace(cosmo.h - 0.02, cosmo.h + 0.02, 3)
+cosmo_ref = np.array([cosmo.sigma_8,
+                      cosmo.omegam,
+                      cosmo.omegav,
+                      cosmo.n,
+                      cosmo.h])
+
+# 5D cosmological parameter space
+sigma8_r=np.array([cosmo_ref[0] - 0.2,
+                   cosmo_ref[0] + 0.2])
+omegam_r=np.array([cosmo_ref[1] - 0.2,
+                   cosmo_ref[1] + 0.2])
+omegav_r=np.array([cosmo_ref[2] - 0.2,
+                   cosmo_ref[2] + 0.2])
+n_r=np.array([cosmo_ref[3] - 0.05,
+              cosmo_ref[3] + 0.05])
+h_r=np.array([cosmo_ref[4] - 0.1,
+              cosmo_ref[4] + 0.1])
+
+n_lh = 200
+
+cosmo_coords = pd.lhs(5, n_lh, criterion="maximin")
+
+sigma8_c = (cosmo_coords[:, 0] * (sigma8_r.max() - sigma8_r.min()) +
+            sigma8_r.min())
+omegam_c = (cosmo_coords[:, 1] * (omegam_r.max() - omegam_r.min()) +
+            omegam_r.min())
+omegav_c = (cosmo_coords[:, 2] * (omegav_r.max() - omegav_r.min()) +
+            omegav_r.min())
+n_c = (cosmo_coords[:, 3] * (n_r.max() - n_r.min()) +
+       n_r.min())
+h_c = (cosmo_coords[:, 4] * (h_r.max() - h_r.min()) +
+       h_r.min())
+
 
 ###############################################
 # Tools for table and interpolation functions #
@@ -162,11 +190,12 @@ def interp(interpolator, *xi):
 
 def table_c200c_correa_cosmo(m200c=m200c,
                              z=z,
-                             sigma8=sigma8,
-                             omegam=omegam,
-                             omegav=omegav,
-                             n=n,
-                             h=h,
+                             sigma8=sigma8_c,
+                             omegam=omegam_c,
+                             omegav=omegav_c,
+                             n=n_c,
+                             h=h_c,
+                             n_lh=1000,
                              cpus=None):
     '''
     Calculate the c(m) relation from Correa+2015 for the given mass, z and
@@ -175,19 +204,19 @@ def table_c200c_correa_cosmo(m200c=m200c,
     Parameters
     ----------
     m200c : array [M_sun / h]
-        range of m200c for which to compute
+        halo mass at overdensity 200 rho_crit
     z : array
-        redshifts to compute for
+        redshifts
     sigma8 : array
-        values of sigma_8 to compute for
+        values of sigma8
     omegam : array
-        values of omega_m to compute for
+        values of omegam
     omegav : array
-        values of omega_lambda to compute for
+        values of omega_lambda
     n : array
-        values of n to compute for
+        values of n
     h : array
-        values of h to compute for
+        values of h
     cpus : int
         number of cores to use
 
@@ -201,22 +230,19 @@ def table_c200c_correa_cosmo(m200c=m200c,
     '''
     def c_cosmo(procn, m200c, sigma8, omegam, omegav, n, h, out_q):
         cosmo = {}
-        c_all = np.empty(sigma8.shape + omegam.shape + omegav.shape + n.shape +
-                         h.shape + z.shape + m200c.shape)
-        for idx_s8, s8 in enumerate(sigma8):
+        c_all = np.empty(sigma8.shape + z.shape + m200c.shape)
+
+        for idx, s8 in enumerate(sigma8):
             cosmo["sigma_8"] = s8
-            for idx_om, om in enumerate(omegam):
-                cosmo["omega_M_0"] = om
-                for idx_ov, ov in enumerate(omegav):
-                    cosmo["omega_lambda_0"] = ov
-                    for idx_n, n_s in enumerate(n):
-                        cosmo["n"] = n_s
-                        for idx_h, h0 in enumerate(h):
-                            cosmo["h"] = h0
-                            c_all[idx_s8, idx_om, idx_ov, idx_n, idx_h] = commah.run(cosmology=cosmo,
-                                                                                     Mi=m200c/cosmo["h"],
-                                                                                     z=z,
-                                                                                     mah=False)['c'].T
+            cosmo["omega_M_0"] = omegam[idx]
+            cosmo["omega_lambda_0"] = omegav[idx]
+            cosmo["n"] = n[idx]
+            cosmo["h"] = h[idx]
+            c_all[idx] = commah.run(cosmology=cosmo,
+                                    Mi=m200c/cosmo["h"],
+                                    z=z,
+                                    mah=False)['c'].T
+
         out_q.put([procn, c_all])
 
     # --------------------------------------------------
