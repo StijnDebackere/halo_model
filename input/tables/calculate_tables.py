@@ -42,13 +42,11 @@ cosmo_ref = np.array([cosmo.sigma_8,
                       cosmo.n,
                       cosmo.h])
 
-# 5D cosmological parameter space
+# 4D cosmological parameter space (closed universe)
 sigma8_r=np.array([cosmo_ref[0] - 0.2,
                    cosmo_ref[0] + 0.2])
 omegam_r=np.array([cosmo_ref[1] - 0.2,
                    cosmo_ref[1] + 0.2])
-omegav_r=np.array([cosmo_ref[2] - 0.2,
-                   cosmo_ref[2] + 0.2])
 n_r=np.array([cosmo_ref[3] - 0.05,
               cosmo_ref[3] + 0.05])
 h_r=np.array([cosmo_ref[4] - 0.1,
@@ -56,17 +54,15 @@ h_r=np.array([cosmo_ref[4] - 0.1,
 
 n_lh = 200
 
-cosmo_coords = pd.lhs(5, n_lh, criterion="maximin")
+cosmo_coords = pd.lhs(4, n_lh, criterion="maximin")
 
 sigma8_c = (cosmo_coords[:, 0] * (sigma8_r.max() - sigma8_r.min()) +
             sigma8_r.min())
 omegam_c = (cosmo_coords[:, 1] * (omegam_r.max() - omegam_r.min()) +
             omegam_r.min())
-omegav_c = (cosmo_coords[:, 2] * (omegav_r.max() - omegav_r.min()) +
-            omegav_r.min())
-n_c = (cosmo_coords[:, 3] * (n_r.max() - n_r.min()) +
+n_c = (cosmo_coords[:, 2] * (n_r.max() - n_r.min()) +
        n_r.min())
-h_c = (cosmo_coords[:, 4] * (h_r.max() - h_r.min()) +
+h_c = (cosmo_coords[:, 3] * (h_r.max() - h_r.min()) +
        h_r.min())
 
 
@@ -192,7 +188,6 @@ def table_c200c_correa_cosmo(m200c=m200c,
                              z=z,
                              sigma8=sigma8_c,
                              omegam=omegam_c,
-                             omegav=omegav_c,
                              n=n_c,
                              h=h_c,
                              n_lh=1000,
@@ -211,8 +206,6 @@ def table_c200c_correa_cosmo(m200c=m200c,
         values of sigma8
     omegam : array
         values of omegam
-    omegav : array
-        values of omega_lambda
     n : array
         values of n
     h : array
@@ -253,6 +246,9 @@ def table_c200c_correa_cosmo(m200c=m200c,
     out_q = manager.Queue()
 
     m200c_split = np.array_split(m200c, cpus)
+
+    # closed universe
+    omegav = 1 - omegam
 
     procs = []
     for i in range(cpus):
@@ -693,13 +689,13 @@ def table_m200c_to_m200m_cosmo(m200c=m200c,
                                z=z,
                                sigma8=sigma8_c,
                                omegam=omegam_c,
-                               omegav=omegav_c,
                                n=n_c,
                                h=h_c):
     '''Create a table that converts from m200c and the given cosmology to
     the corresponding halo properties m200m
 
     '''
+    omegav = 1 - omegam
     # get interpolator and coordinates for c200c
     coords = arrays_to_coords(sigma8, omegam, omegav, n, h, z, np.log10(m200c))
     c_interp = inp_interp.c200c_cosmo_interp()
@@ -864,7 +860,6 @@ def table_c200m_correa_cosmo(m200m=m200m,
                              z=z,
                              sigma8=sigma8_c,
                              omegam=omegam_c,
-                             omegav=omegav_c,
                              n=n_c,
                              h=h_c,
                              cpus=None):
@@ -881,8 +876,6 @@ def table_c200m_correa_cosmo(m200m=m200m,
         values of sigma_8 to compute for
     omegam : array
         values of omega_m to compute for
-    omegav : array
-        values of omega_lambda to compute for
     n : array
         values of n to compute for
     h : array
@@ -923,6 +916,9 @@ def table_c200m_correa_cosmo(m200m=m200m,
 
     manager = multi.Manager()
     out_q = manager.Queue()
+
+    # closed Universe
+    omegav = 1 - omegam
 
     # load tables
     af = asdf.open(table_dir + "halo_200c_to_200m_cosmo.asdf")
