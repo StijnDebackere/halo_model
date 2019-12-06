@@ -75,7 +75,7 @@ h_c = (cosmo_coords[:, 4] * (h_r.max() - h_r.min()) +
 ###############################################
 
 
-def optimize(func, a, b, *args, cond=None, fill=None,
+def optimize(func, a, b, args, cond=None, fill=None,
              fill_low=np.nan, fill_hi=np.nan):
     """
     Helper function to brentq which should be called wrapped by
@@ -691,11 +691,11 @@ def m200c_to_m200m_cosmo(m200c, c200c, r200c, rhom):
 
 def table_m200c_to_m200m_cosmo(m200c=m200c,
                                z=z,
-                               sigma8=sigma8,
-                               omegam=omegam,
-                               omegav=omegav,
-                               n=n,
-                               h=h):
+                               sigma8=sigma8_c,
+                               omegam=omegam_c,
+                               omegav=omegav_c,
+                               n=n_c,
+                               h=h_c):
     '''Create a table that converts from m200c and the given cosmology to
     the corresponding halo properties m200m
 
@@ -862,11 +862,11 @@ def table_c200m_correa(m200m=m200m,
 
 def table_c200m_correa_cosmo(m200m=m200m,
                              z=z,
-                             sigma8=sigma8,
-                             omegam=omegam,
-                             omegav=omegav,
-                             n=n,
-                             h=h,
+                             sigma8=sigma8_c,
+                             omegam=omegam_c,
+                             omegav=omegav_c,
+                             n=n_c,
+                             h=h_c,
                              cpus=None):
     '''Interpolate the c200m(m200m, cosmo) relation from Correa+2015 for
     the given mass, z and cosmology to a regular grid
