@@ -75,7 +75,11 @@ h_c = (cosmo_coords[:, 4] * (h_r.max() - h_r.min()) +
 ###############################################
 
 
+<<<<<<< HEAD
 # def optimize(func, a, b, args, cond=None, fill=None,
+=======
+# def optimize(func, a, b, *args, cond=None, fill=None,
+>>>>>>> 3f7e3f799666d40576fbc6b4e4c1e3d6f07cf24b
 #              fill_low=np.nan, fill_hi=np.nan):
 #     """
 #     Helper function to brentq which should be called wrapped by
