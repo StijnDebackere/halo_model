@@ -75,36 +75,36 @@ h_c = (cosmo_coords[:, 4] * (h_r.max() - h_r.min()) +
 ###############################################
 
 
-def optimize(func, a, b, args, cond=None, fill=None,
-             fill_low=np.nan, fill_hi=np.nan):
-    """
-    Helper function to brentq which should be called wrapped by
-    np.vectorize(optimize, otypes=[np.float64])
+# def optimize(func, a, b, args, cond=None, fill=None,
+#              fill_low=np.nan, fill_hi=np.nan):
+#     """
+#     Helper function to brentq which should be called wrapped by
+#     np.vectorize(optimize, otypes=[np.float64])
 
-    In the case cond is satisfied, return fill value
+#     In the case cond is satisfied, return fill value
 
-    In the case of a ValueError, fill_low is returned if both bounds
-    are < 0, and fill_hi if both bounds > 0.
-    """
-    # t1 = time.time()
-    if cond:
-        result = fill
-    else:
-        try:
-            result = opt.brentq(func, a, b, args=args)
-        except ValueError:
-            if func(a, *args) < 0 and func(b, *args) < 0:
-                result = fill_low
-            elif func(a, *args) > 0 and func(b, *args) > 0:
-                result = fill_hi
-            else:
-                result = np.nan
-                print("===============================")
-                print("args: ", *args)
-                print("===============================")
+#     In the case of a ValueError, fill_low is returned if both bounds
+#     are < 0, and fill_hi if both bounds > 0.
+#     """
+#     # t1 = time.time()
+#     if cond:
+#         result = fill
+#     else:
+#         try:
+#             result = opt.brentq(func, a, b, args=args)
+#         except ValueError:
+#             if func(a, *args) < 0 and func(b, *args) < 0:
+#                 result = fill_low
+#             elif func(a, *args) > 0 and func(b, *args) > 0:
+#                 result = fill_hi
+#             else:
+#                 result = np.nan
+#                 print("===============================")
+#                 print("args: ", *args)
+#                 print("===============================")
 
-    # t2 = time.time()
-    return result
+#     # t2 = time.time()
+#     return result
 
 
 def convert_cosmo_commah(cosmo):
