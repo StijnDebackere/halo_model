@@ -28,9 +28,9 @@ else:
 # default parameters #
 ######################
 
-m200c = np.logspace(5, 17, 500)
-m200m = np.logspace(6, 17, 500)
-m500c = np.logspace(6, 16, 500)
+m200c = np.logspace(7, 17, 500)
+m200m = np.logspace(8, 17, 500)
+m500c = np.logspace(8, 16, 500)
 
 # z = np.array([0, 0.5, 1, 1.5, 2, 2.5, 3.5, 5])
 z = np.linspace(0, 3, 10)
