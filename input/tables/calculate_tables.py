@@ -4,13 +4,17 @@ import scipy.interpolate as interpolate
 import multiprocessing as multi
 import asdf
 from copy import copy
+
 import pyDOE as pd
+from sklearn.decomposition import PCA
+import dill
 
 import halo.tools as tools
 import halo.input.interpolators as inp_interp
 import halo.density_profiles as dp
 import halo.cosmo as cosmo
 
+import warnings
 import sys
 if sys.version_info[0] >= 3:
     print("We cannot import commah, use the supplied table")
@@ -270,7 +274,6 @@ def table_c200c_correa_cosmo(m200c=m200c,
     result_info = {
         "dims": np.array(["sigma8",
                           "omegam",
-                          "omegav",
                           "n",
                           "h",
                           "z",
@@ -390,6 +393,149 @@ def table_c200c_correa(m200c=m200c,
     return result_info
 
 
+def setup_c200c_correa_emu(n_comp=7,
+                           c_file=table_dir + "c200c_correa.asdf"):
+    """Fit principal components and cosmology dependent weights for the
+    Correa+15 c(m) relation
+    """
+    # load the data
+    with asdf.open(c_file, copy_arrays=True) as af:
+        sigma8 = af.tree["sigma8"][:]
+        omegam = af.tree["omegam"][:]
+        n = af.tree["n"][:]
+        h = af.tree["h"][:]
+
+        z = af.tree["z"][:]
+        m = af.tree["m200c"][:]
+        c = af.tree["c200c"][:]
+
+    n_coords = sigma8.shape[0]
+
+    pca = PCA(n_components=n_comp)
+    c_pca = pca.fit_transform(c.reshape(-1, n_coords))
+    c_pca = c_pca.reshape(c.shape + (n_coords,))
+
+    # the pca.components_ just contain the weights to transform the PCAs back
+    # to the space with the full cosmological information
+    w_pca = pca.components_
+
+    # interpolate the mean offset cosmology dependence
+    mu_interp = interp.Rbf(sigma8, omegam, n, h, pca.mean_)
+
+    w_interp = []
+    for w in w_pca:
+        w_i = interpolate.Rbf(sigma8, omegam, n, h, w)
+        w_interp.append(w_i)
+
+    interp_info = {"m200m": m,
+                   "z": z,
+                   "dims": np.array(["sigma8", "omegam", "n", "h"]),
+                   "sigma8": sigma8,
+                   "omegam": omegam,
+                   "n": n,
+                   "h": h,
+                   "w_pca": w_pca,
+                   "Phi_pca": c_pca,
+                   "w_interp": w_interp,
+                   "mu_interp": mu_interp}
+
+    with open(table_dir + "c200c_cosmo_interpolator", "wb") as f:
+        dill.dump(interp_info, f)
+
+
+def c200c_emu(m200c=m200c,
+              z=z,
+              sigma8=sigma8_c,
+              omegam=omegam_c,
+              n=n_c,
+              h=h_c):
+    '''
+    Calculate the c(m) relation from Correa+2015 for the given mass, z and
+    cosmology range from our emulator
+
+    Parameters
+    ----------
+    m200c : array [M_sun / h]
+        halo mass at overdensity 200 rho_crit
+    z : array
+        redshifts
+    sigma8 : array
+        value of sigma8
+    omegam : array
+        value of omegam
+    n : array
+        value of n
+    h : array
+        value of h
+    cpus : int
+        number of cores to use
+
+    Returns
+    ------
+    c200c : 
+    '''
+    # load our saved interpolator info
+    with open(table_dir + "c200c_cosmo_interpolator", "rb") as f:
+        interp_info = dill.load(f)
+
+    pcs = interp_info["Phi_pca"]
+    weights_interp = interp_info["w_interp"]
+    mu_interp = interp_info["mu_interp"]
+
+    m200c_interp = interp_info["m200c"]
+    z_interp = interp_info["z"]
+
+    s8_interp = interp_info["sigma8"]
+    om_interp = interp_info["omegam"]
+    n_interp = interp_info["n"]
+    h_interp = interp_info["h"]
+
+    # warn about parameter ranges
+    if np.all(omegam > om_interp) or np.all(omegam < om_interp):
+        warnings.warn("omega_m outside of interpolated range [{}, {}]"
+                      .format(om_interp.min(),
+                              om_interp.max()),
+                      UserWarning)
+
+    if np.all(sigma8 > s8_interp) or np.all(sigma8 < s8_interp):
+        warnings.warn("sigma_8 outside of interpolated range"
+                      .format(s8_interp.min(),
+                              s8_interp.max()),
+                      UserWarning)
+
+    if np.all(n > n_interp) or np.all(n < n_interp):
+        warnings.warn("n outside of interpolated range"
+                      .format(n_interp.min(),
+                              n_interp.max()),
+                      UserWarning)
+
+    if np.all(h > h_interp) or np.all(h < h_interp):
+        warnings.warn("h outside of interpolated range"
+                      .format(h_interp.min(),
+                              h_interp.max()),
+                      UserWarning)
+
+    mu = mu_interp(sigma8, omegam, n, h)
+    weights = np.empty((pcs.shape[-1], ), dtype=float)
+    for idx, wi in enumerate(weights_interp):
+        weights[idx] = wi(sigma8, omegam, n, h)
+
+    # the resulting dndlnm(m,z)
+    c200c = (np.dot(pcs, weights) + mu)
+
+    # interpolate along z
+    c200c_interp_z = interp.interp1d(z_interp, c200c, axis=-2)
+    c200c_z = c200c_interp_z(z)
+
+    # interpolate along m200m
+    c200c_interp_m = interp.interp1d(np.log10(m200c_interp),
+                                     np.log10(c200c_z),
+                                     axis=-1)
+    c200c_mz = c200c_interp_m(np.log10(m200c))
+
+    return c200c_mz
+
+
 def table_c500c_correa(m500c=m500c,
                        z=z,
                        sigma8=0.821,
@@ -417,6 +563,115 @@ def table_c500c_correa(m500c=m500c,
         values of n to compute for
     h : array
         values of h to compute for
+    cpus : int
+        number of cores to use
+
+    Returns
+    -------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to c_correa_200c.asdf
+
+    '''
+    def c_cosmo(procn, z_t, m500c_t, c500c_t, out_q):
+        shape = z_t.shape + m500c.shape
+        c_all = np.empty(shape)
+
+        # need to tile redshifts to match the masses
+        coords = np.vstack([np.tile(z_t.reshape(-1, 1),
+                                    (1, m500c_t.shape[1])).flatten(),
+                            np.log10(m500c_t).flatten()]).T
+        c_interp = interpolate.LinearNDInterpolator(coords, c500c_t.flatten())
+
+        # now interpolate to a regular and fixed grid in m500c
+        # need to match m500c to each z
+        tiled_z = np.tile(z_t.reshape(-1, 1), (1, m500c.shape[0]))
+        tiled_m500c = np.log10(np.tile(m500c.reshape(1, -1),
+                                       (z_t.shape[0], 1)))
+        coords_new = np.vstack([tiled_z.flatten(),
+                                tiled_m500c.flatten()]).T
+        c_all = c_interp(coords_new).reshape(z_t.shape + m500c.shape)
+
+        out_q.put([procn, c_all])
+
+    # --------------------------------------------------
+    if cpus is None:
+        cpus = multi.cpu_count()
+
+    if cpus > 8:
+        cpus = 8
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    # load tables
+    af = asdf.open(table_dir + "halo_200c_to_500c.asdf")
+    z_tab = af.tree["z"]
+    m500c_tab = af.tree["m500c"][:]
+    c500c_tab = af.tree["c500c"][:]
+
+    # we split along the redshift axis, only mass is not reg grid
+    m500c_tab_split = np.array_split(m500c_tab, cpus, axis=-2)
+    c500c_tab_split = np.array_split(c500c_tab, cpus, axis=-2)
+    z_tab_split = np.array_split(z_tab, cpus, axis=0)
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i,
+                                      z_tab_split[i],
+                                      m500c_tab_split[i],
+                                      c500c_tab_split[i],
+                                      out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    c500c = np.concatenate([item[1] for item in results], axis=-2)
+
+    result_info = {
+        "dims": np.array(["sigma8",
+                          "omegam",
+                          "omegav",
+                          "n",
+                          "h",
+                          "z",
+                          "m500c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m500c": m500c,
+        "c500c": c500c}
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "c500c_correa.asdf")
+    af.close()
+
+    return result_info
+
+
+def table_c500c_correa_cosmo(m500c=m500c,
+                             z=z,
+                             cpus=None):
+    '''Interpolate the c500c(m500c, cosmo) relation from Correa+2015
+    for the given mass, z and cosmology to a regular grid
+
+    Parameters
+    ----------
+    m500c : array [M_sun / h]
+        range of m500c for which to compute
+    z : array
+        redshifts to compute for
     cpus : int
         number of cores to use
 
