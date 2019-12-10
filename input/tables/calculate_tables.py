@@ -394,7 +394,7 @@ def table_c200c_correa(m200c=m200c,
 
 
 def setup_c200c_correa_emu(n_comp=7,
-                           c_file=table_dir + "c200c_correa.asdf"):
+                           c_file=table_dir + "c200c_correa_cosmo.asdf"):
     """Fit principal components and cosmology dependent weights for the
     Correa+15 c(m) relation
     """
