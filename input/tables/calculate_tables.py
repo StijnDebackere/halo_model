@@ -475,7 +475,7 @@ def c200c_emu(m200c=m200c,
 
     Returns
     ------
-    c200c : 
+    c200c : concentration
     '''
     # load our saved interpolator info
     with open(table_dir + "c200c_cosmo_interpolator", "rb") as f:
@@ -523,11 +523,11 @@ def c200c_emu(m200c=m200c,
     for idx, wi in enumerate(weights_interp):
         weights[idx] = wi(sigma8, omegam, n, h)
 
-    # the resulting dndlnm(m,z)
+    # the resulting c200c(z, m)
     c200c = (np.dot(pcs, weights) + mu)
 
     # interpolate along z
-    c200c_interp_z = interp.interp1d(z_interp, c200c, axis=-2)
+    c200c_interp_z = interp.interp1d(z_interp, c200c, axis=0)
     c200c_z = c200c_interp_z(z)
 
     # interpolate along m200m
