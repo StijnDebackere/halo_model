@@ -423,7 +423,7 @@ def setup_c200c_correa_emu(n_comp=7,
     w_pca = pca.components_
 
     # interpolate the mean offset cosmology dependence
-    mu_interp = interp.Rbf(sigma8, omegam, n, h, pca.mean_)
+    mu_interp = interpolate.Rbf(sigma8, omegam, n, h, pca.mean_)
 
     w_interp = []
     for w in w_pca:
