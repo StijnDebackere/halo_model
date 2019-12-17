@@ -406,13 +406,15 @@ def setup_c200c_correa_emu(n_comp=7,
         h = af.tree["h"][:]
         z = af.tree["z"][:]
         m = af.tree["m200c"][:]
+        # has shape(z, m, n_cosmo)
         c = af.tree["c200c"][:]
 
+    # number of cosmologies
     n_coords = sigma8.shape[0]
 
     pca = PCA(n_components=n_comp)
     c_pca = pca.fit_transform(c.reshape(-1, n_coords))
-    c_pca = c_pca.reshape(c.shape + (n_coords,))
+    c_pca = c_pca.reshape(c.shape)
 
     # the pca.components_ just contain the weights to transform the PCAs back
     # to the space with the full cosmological information
