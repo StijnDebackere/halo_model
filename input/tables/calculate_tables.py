@@ -527,13 +527,13 @@ def c200c_emu(m200c=m200c,
     c200c = (np.dot(pcs, weights) + mu)
 
     # interpolate along z
-    c200c_interp_z = interp.interp1d(z_interp, c200c, axis=0)
+    c200c_interp_z = interpolate.interp1d(z_interp, c200c, axis=0)
     c200c_z = c200c_interp_z(z)
 
     # interpolate along m200m
-    c200c_interp_m = interp.interp1d(np.log10(m200c_interp),
-                                     np.log10(c200c_z),
-                                     axis=-1)
+    c200c_interp_m = interpolate.interp1d(np.log10(m200c_interp),
+                                          np.log10(c200c_z),
+                                          axis=-1)
     c200c_mz = c200c_interp_m(np.log10(m200c))
 
     return c200c_mz
