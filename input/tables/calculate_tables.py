@@ -532,7 +532,7 @@ def c200c_emu(m200c=m200c,
 
     # interpolate along m200m
     c200c_interp_m = interpolate.interp1d(np.log10(m200c_interp),
-                                          np.log10(c200c_z),
+                                          c200c_z,
                                           axis=-1)
     c200c_mz = c200c_interp_m(np.log10(m200c))
 
