@@ -430,7 +430,7 @@ def setup_c200c_correa_emu(n_comp=7,
         w_i = interpolate.Rbf(sigma8, omegam, n, h, w)
         w_interp.append(w_i)
 
-    interp_info = {"m200m": m,
+    interp_info = {"m200c": m,
                    "z": z,
                    "dims": np.array(["sigma8", "omegam", "n", "h"]),
                    "sigma8": sigma8,
