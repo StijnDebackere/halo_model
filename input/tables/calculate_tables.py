@@ -227,7 +227,7 @@ def table_c200c_correa_cosmo(m200c=m200c,
     '''
     def c_cosmo(procn, m200c, sigma8, omegam, omegav, n, h, out_q):
         cosmo = {}
-        c_all = np.empty(sigma8.shape + z.shape + m200c.shape)
+        c_all = np.empty(z.shape + m200c.shape + sigma8.shape)
 
         for idx, s8 in enumerate(sigma8):
             cosmo["sigma_8"] = s8
@@ -235,10 +235,10 @@ def table_c200c_correa_cosmo(m200c=m200c,
             cosmo["omega_lambda_0"] = omegav[idx]
             cosmo["n"] = n[idx]
             cosmo["h"] = h[idx]
-            c_all[idx] = commah.run(cosmology=cosmo,
-                                    Mi=m200c/cosmo["h"],
-                                    z=z,
-                                    mah=False)['c'].T
+            c_all[..., idx] = commah.run(cosmology=cosmo,
+                                         Mi=m200c/cosmo["h"],
+                                         z=z,
+                                         mah=False)['c'].T
 
         out_q.put([procn, c_all])
 
@@ -272,12 +272,12 @@ def table_c200c_correa_cosmo(m200c=m200c,
     c = np.concatenate([item[1] for item in results], axis=-1)
 
     result_info = {
-        "dims": np.array(["sigma8",
+        "dims": np.array(["z",
+                          "m200c",
+                          "sigma8",
                           "omegam",
                           "n",
-                          "h",
-                          "z",
-                          "m200c"]),
+                          "h"]),
         "sigma8": sigma8,
         "omegam": omegam,
         "omegav": omegav,
@@ -404,7 +404,6 @@ def setup_c200c_correa_emu(n_comp=7,
         omegam = af.tree["omegam"][:]
         n = af.tree["n"][:]
         h = af.tree["h"][:]
-
         z = af.tree["z"][:]
         m = af.tree["m200c"][:]
         c = af.tree["c200c"][:]

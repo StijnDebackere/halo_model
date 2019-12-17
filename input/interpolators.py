@@ -93,6 +93,24 @@ def c200c_interp(c_file="c200c_correa.asdf"):
     return c_interp
 
 
+def c500c_interp(c_file="c500c_correa.asdf"):
+    '''
+    Return the interpolator for the given file
+    '''
+    c_file = table_dir + c_file
+
+    with asdf.open(c_file, copy_arrays=True) as af:
+        z = af.tree["z"][:]
+        m = af.tree["m500c"][:]
+        c = af.tree["c500c"][:]
+
+    coords = (z, np.log10(m))
+
+    c_interp = interpolate.RegularGridInterpolator(coords, c)
+
+    return c_interp
+
+
 def c200m_cosmo_interp(c_file="c200m_correa_cosmo.asdf"):
     '''
     Return the interpolator for the given file
