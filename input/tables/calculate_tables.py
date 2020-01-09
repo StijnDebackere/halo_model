@@ -1329,7 +1329,7 @@ def table_c200c_correa_cosmo(m200c=m200c,
     return result_info
 
 
-def table_m200c_to_m200m_cosmo(cpus=None):
+def table_m200c_to_m200m_cosmo():
     '''
     Table that converts each table_c200c_correa_cosmo to the corresponding m200m
 
@@ -1396,7 +1396,7 @@ def table_m200c_to_m200m_cosmo(cpus=None):
     return result_info
 
 
-def table_m200c_to_m500c_cosmo(cpus=None):
+def table_m200c_to_m500c_cosmo():
     '''
     Table that converts each table_c200c_correa_cosmo to the corresponding m500c
 
@@ -1433,6 +1433,7 @@ def table_m200c_to_m500c_cosmo(cpus=None):
 
     r200c = tools.mass_to_radius(m200c.reshape(1, -1, 1),
                                  200 * rhoc_z)
+
     m500c, c500c, r500c = m200c_to_m500c(m200c=m200c.reshape(1, -1, 1),
                                          c200c=c200c,
                                          r200c=r200c,
