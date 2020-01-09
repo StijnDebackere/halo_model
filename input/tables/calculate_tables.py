@@ -1396,6 +1396,70 @@ def table_m200c_to_m200m_cosmo(cpus=None):
     return result_info
 
 
+def table_m200c_to_m500c_cosmo(cpus=None):
+    '''
+    Table that converts each table_c200c_correa_cosmo to the corresponding m500c
+
+    Parameters
+    ----------
+    cpus : int
+        number of cores to use
+
+    Returns
+    ------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to halo_200c_to_500c_cosmo.asdf
+    '''
+    with asdf.open(table_dir + "c200c_correa_cosmo.asdf",
+                   copy_arrays=True) as af:
+        c200c = af.tree["c200c"][:]
+        m200c = af.tree["m200c"][:]
+        z = af.tree["z"][:]
+        sigma8 = af.tree["sigma8"][:]
+        omegam = af.tree["omegam"][:]
+        omegav = af.tree["omegav"][:]
+        n = af.tree["n"][:]
+        h = af.tree["h"][:]
+
+    omegav = 1 - omegam
+    # scaling for rhoc with redshift
+    E2_z = (omegam.reshape(1, 1, -1) * (1+z.reshape(-1, 1, 1))**3 +
+            omegav.reshape(1, 1, -1))
+
+    rhoc = 2.755 * 10**(11.)  # [h^2 M_sun / Mpc^3]
+    rhoc_z = rhoc * E2_z
+
+    r200c = tools.mass_to_radius(m200c.reshape(1, -1, 1),
+                                 200 * rhoc_z)
+    m500c, c500c, r500c = m200c_to_m500c(m200c=m200c.reshape(1, -1, 1),
+                                         c200c=c200c,
+                                         r200c=r200c,
+                                         rhoc=rhoc_z)
+
+    result_info = {
+        "dims": np.array(["z", "m200c"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m200c": m200c,
+        "r200c": r200c,
+        "c200c": c200c,
+        "m500c": m500c,
+        "r500c": r500c,
+        "c500c": c500c}
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "halo_200c_to_500c_cosmo.asdf")
+    af.close()
+
+    return result_info
+
+
 def table_c200m_correa_cosmo(m200m=m200m,
                              cpus=None):
     '''
@@ -1507,6 +1571,117 @@ def table_c200m_correa_cosmo(m200m=m200m,
     return result_info
 
 
+def table_c500c_correa_cosmo(m500c=m500c,
+                             cpus=None):
+    '''
+    Calculate the c(m) relation from Correa+2015 for the given mass, z and
+    cosmology range.
+
+    Parameters
+    ----------
+    m500c : array [M_sun / h]
+        halo mass at overdensity 500 rho_c
+    cpus : int
+        number of cores to use
+
+    Returns
+    ------
+    results : dict
+        dict with c and all input values
+
+        - this dict also gets saved to c500c_correa_cosmo.asdf
+
+    '''
+    def c_cosmo(procn, z_t, m500c_t, c500c_t, out_q):
+        shape = (z_t.shape[0], m500c.shape[0], c500c_t.shape[-1])
+        c_all = np.empty(shape)
+
+        # loop over the cosmological dependence
+        for idx_c in np.arange(c500c_t.shape[-1]):
+            # need to tile redshifts to match the masses
+            coords = np.vstack([np.tile(z_t.reshape(-1, 1),
+                                        (1, m500c_t.shape[1])).flatten(),
+                                np.log10(m500c_t[..., idx_c]).flatten()]).T
+
+            c_interp = interpolate.LinearNDInterpolator(coords,
+                                                        c500c_t[..., idx_c].flatten())
+
+            # now interpolate to a regular and fixed grid in m500c
+            # need to match m500c to each z
+            coords_new = np.vstack([np.tile(z_t.reshape(-1, 1),
+                                            (1, m500c.shape[0])).flatten(),
+                                    np.log10(np.tile(m500c.reshape(1, -1),
+                                                     (z_t.shape[0], 1))).flatten()]).T
+            c_all[..., idx_c] = c_interp(coords_new).reshape(z_t.shape
+                                                             + m500c.shape)
+
+        out_q.put([procn, c_all])
+
+    # --------------------------------------------------
+    if cpus is None:
+        cpus = multi.cpu_count()
+
+    if cpus > 8:
+        cpus = 8
+
+    manager = multi.Manager()
+    out_q = manager.Queue()
+
+    with asdf.open(table_dir + "halo_200c_to_500c_cosmo.asdf",
+                   copy_arrays=True) as af:
+        z_tab = af.tree["z"][:]
+        m500c_tab = af.tree["m500c"][:]
+        c500c_tab = af.tree["c500c"][:]
+        sigma8 = af.tree["sigma8"][:]
+        omegam = af.tree["omegam"][:]
+        omegav = af.tree["omegav"][:]
+        n = af.tree["n"][:]
+        h = af.tree["h"][:]
+
+    # we split along the redshift axis, only mass is not reg grid
+    m500c_tab_split = np.array_split(m500c_tab, cpus, axis=0)
+    c500c_tab_split = np.array_split(c500c_tab, cpus, axis=0)
+    z_tab_split = np.array_split(z_tab, cpus, axis=0)
+
+    procs = []
+    for i in range(cpus):
+        process = multi.Process(target=c_cosmo,
+                                args=(i,
+                                      z_tab_split[i],
+                                      m500c_tab_split[i],
+                                      c500c_tab_split[i],
+                                      out_q))
+
+        procs.append(process)
+        process.start()
+
+    results = []
+    for i in range(cpus):
+        results.append(out_q.get())
+
+    # need to sort results
+    results.sort()
+    c500c = np.concatenate([item[1] for item in results], axis=0)
+
+    result_info = {
+        "dims": np.array(["z", "m500c", "sigma8", "omegam", "n", "h"]),
+        "sigma8": sigma8,
+        "omegam": omegam,
+        "omegav": omegav,
+        "n": n,
+        "h": h,
+        "z": z,
+        "m500c": m500c,
+        "c500c": c500c
+    }
+
+    af = asdf.AsdfFile(result_info)
+    af.write_to(table_dir + "c500c_correa_cosmo.asdf")
+    af.close()
+
+    return result_info
+
+
 def setup_c200c_correa_emu(n_comp=7,
                            c_file=table_dir + "c200c_correa_cosmo.asdf"):
     """Fit principal components and cosmology dependent weights for the
@@ -1610,6 +1785,59 @@ def setup_c200m_correa_emu(n_comp=7,
                    "mu_interp": mu_interp}
 
     with open(table_dir + "c200m_cosmo_interpolator", "wb") as f:
+        dill.dump(interp_info, f)
+
+
+def setup_c500c_correa_emu(n_comp=7,
+                           c_file=table_dir + "c500c_correa_cosmo.asdf"):
+    """Fit principal components and cosmology dependent weights for the
+    Correa+15 c(m) relation
+    """
+    # load the data
+    with asdf.open(c_file, copy_arrays=True) as af:
+        sigma8 = af.tree["sigma8"][:]
+        omegam = af.tree["omegam"][:]
+        n = af.tree["n"][:]
+        h = af.tree["h"][:]
+        z = af.tree["z"][:]
+        m = af.tree["m500c"][:]
+        # has shape(z, m, n_cosmo)
+        c = af.tree["c500c"][:]
+
+    # number of cosmologies
+    n_coords = sigma8.shape[0]
+
+    pca = PCA(n_components=n_comp)
+    # first axis contains (z x m) coordinates, second axis cosmology
+    c_pca = pca.fit_transform(c.reshape(-1, n_coords))
+    # after transform n_cosmo -> n_comp
+    c_pca = c_pca.reshape(c.shape[:-1] + (-1, ))
+
+    # the pca.components_ just contain the weights to transform the PCAs back
+    # to the space with the full cosmological information
+    w_pca = pca.components_
+
+    # interpolate the mean offset cosmology dependence
+    mu_interp = interpolate.Rbf(sigma8, omegam, n, h, pca.mean_)
+
+    w_interp = []
+    for w in w_pca:
+        w_i = interpolate.Rbf(sigma8, omegam, n, h, w)
+        w_interp.append(w_i)
+
+    interp_info = {"m500c": m,
+                   "z": z,
+                   "dims": np.array(["sigma8", "omegam", "n", "h"]),
+                   "sigma8": sigma8,
+                   "omegam": omegam,
+                   "n": n,
+                   "h": h,
+                   "w_pca": w_pca,
+                   "Phi_pca": c_pca,
+                   "w_interp": w_interp,
+                   "mu_interp": mu_interp}
+
+    with open(table_dir + "c500c_cosmo_interpolator", "wb") as f:
         dill.dump(interp_info, f)
 
 

@@ -204,6 +204,97 @@ def c500c_interp(c_file="c500c_correa.asdf"):
     return c_interp
 
 
+def c500c_emu(m500c=np.logspace(10, 15, 100),
+              z=np.linspace(0, 1, 10),
+              sigma8=0.82,
+              omegam=0.28,
+              n=0.97,
+              h=0.7):
+    '''
+    Calculate the c(m) relation from Correa+2015 for the given mass, z and
+    cosmology range from our emulator
+
+    Parameters
+    ----------
+    m500c : array [M_sun / h]
+        halo mass at overdensity 200 rho_crit
+    z : array
+        redshifts
+    sigma8 : float
+        value of sigma8
+    omegam : float
+        value of omegam
+    n : float
+        value of n
+    h : float
+        value of h
+
+    Returns
+    ------
+    c500c : concentration
+    '''
+    # load our saved interpolator info
+    with open(table_dir + "c500c_cosmo_interpolator", "rb") as f:
+        interp_info = dill.load(f)
+
+    pcs = interp_info["Phi_pca"]
+    weights_interp = interp_info["w_interp"]
+    mu_interp = interp_info["mu_interp"]
+
+    m500c_interp = interp_info["m500c"]
+    z_interp = interp_info["z"]
+
+    s8_interp = interp_info["sigma8"]
+    om_interp = interp_info["omegam"]
+    n_interp = interp_info["n"]
+    h_interp = interp_info["h"]
+
+    # warn about parameter ranges
+    if np.all(omegam > om_interp) or np.all(omegam < om_interp):
+        warnings.warn("omega_m outside of interpolated range [{}, {}]"
+                      .format(om_interp.min(),
+                              om_interp.max()),
+                      UserWarning)
+
+    if np.all(sigma8 > s8_interp) or np.all(sigma8 < s8_interp):
+        warnings.warn("sigma_8 outside of interpolated range"
+                      .format(s8_interp.min(),
+                              s8_interp.max()),
+                      UserWarning)
+
+    if np.all(n > n_interp) or np.all(n < n_interp):
+        warnings.warn("n outside of interpolated range"
+                      .format(n_interp.min(),
+                              n_interp.max()),
+                      UserWarning)
+
+    if np.all(h > h_interp) or np.all(h < h_interp):
+        warnings.warn("h outside of interpolated range"
+                      .format(h_interp.min(),
+                              h_interp.max()),
+                      UserWarning)
+
+    mu = mu_interp(sigma8, omegam, n, h)
+    weights = np.empty((pcs.shape[-1], ), dtype=float)
+    for idx, wi in enumerate(weights_interp):
+        weights[idx] = wi(sigma8, omegam, n, h)
+
+    # the resulting c500c(z, m)
+    c500c = (np.dot(pcs, weights) + mu)
+
+    # interpolate along z
+    c500c_interp_z = interpolate.interp1d(z_interp, c500c, axis=0)
+    c500c_z = c500c_interp_z(z)
+
+    # interpolate along m500c
+    c500c_interp_m = interpolate.interp1d(np.log10(m500c_interp),
+                                          c500c_z,
+                                          axis=-1)
+    c500c_mz = c500c_interp_m(np.log10(m500c))
+
+    return c500c_mz
+
+
 def c200m_interp(c_file="c200m_correa.asdf"):
     '''
     Return the interpolator for the c200m(m200m) relation
