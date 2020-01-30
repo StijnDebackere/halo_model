@@ -94,7 +94,7 @@ h_m = (cosmo_coords[:, 4] * (h_r.max() - h_r.min()) +
 # Tools for table and interpolation functions #
 ###############################################
 
-def optimize(func, a, b, args, cond=None, fill=None,
+def optimize(func, a, b, *args, cond=None, fill=None,
              fill_low=np.nan, fill_hi=np.nan):
     """
     Helper function to brentq which should be called wrapped by
@@ -820,11 +820,11 @@ def table_m500c_to_m200m_dmo(m500c=m500c,
                     fc200m, c200m, z, out_q):
         m200m_dmo = np.vectorize(optimize, otypes=[np.float64])(m_diff, m500c,
                                                                 5. * m500c,
-                                                                (m500c, r500c,
-                                                                 fg500c,
-                                                                 fs200m,
-                                                                 fc200m,
-                                                                 c200m, z))
+                                                                *(m500c, r500c,
+                                                                  fg500c,
+                                                                  fs200m,
+                                                                  fc200m,
+                                                                  c200m, z))
         # now we have m200m_dmo, so we calculate again all the other
         # resulting variables
 
