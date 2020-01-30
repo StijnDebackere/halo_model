@@ -13,6 +13,7 @@ import scipy.special as spec
 import scipy.optimize as opt
 import mpmath as mp
 from scipy import integrate as intg
+from scipy import interpolate as interp
 
 import halo.tools as tools
 
@@ -389,6 +390,157 @@ def sigma_NFW(R, m_x, r_x, c_x):
 
 
 @np.vectorize
+def shear_NFW_fit(R, log10_mx, r_s, rho_x, sigma_crit=1):
+    """Return the surface mass density profile of an NFW halo with mass
+    m_x, radius r_x and concentration c_x
+
+    Parameters
+    ----------
+    R : array-like
+        projected radius [h^-1 Mpc]
+    log10_mx : float
+        log_10 halo mass inside r_x [h^-1 M_sun]
+    r_s : float
+        physical scale radius [h^-1 Mpc]
+    rho_x : float
+        mean overdensity at r_x [h^2 M_sun/Mpc^3]
+
+    Returns
+    -------
+    shear_NFW : array
+        surface mass density of NFW profile at projected radius R
+    """
+    m_x = 10**log10_mx
+    r_x = tools.mass_to_radius(m_x, rho_x)
+    c_x = r_x / r_s
+    rho_s = m_x / (4 * np.pi * r_x**3) * c_x**3 / (np.log(1 + c_x) -
+                                                   c_x / (1 + c_x))
+
+    prefactor = r_s * rho_s / sigma_crit
+
+    if R == r_s:
+        return prefactor * (10. / 3 + 4 * np.log(0.5))
+    elif R < r_s:
+        x = R / r_s
+        f_atanh = np.arctanh(np.sqrt((1 - x) / (1 + x)))
+        g = ((8 * f_atanh / (x**2 * np.sqrt(1 - x**2)))
+             + 4. / x**2 * np.log(0.5 * x)
+             - 2. / (x**2 - 1)
+             + 4 * f_atanh / ((x**2 - 1) * np.sqrt(1 - x**2)))
+        shear = prefactor * g
+        return shear
+    else:
+        x = R / r_s
+        f_atan = np.arctan(np.sqrt((x - 1) / (x + 1)))
+        g = ((8 * f_atan / (x**2 * np.sqrt(x**2 - 1)))
+             + 4. / x**2 * np.log(0.5 * x)
+             - 2. / (x**2 - 1)
+             + 4 * f_atan / ((x**2 - 1)**(1.5)))
+        shear = prefactor * g
+        return shear
+
+
+@np.vectorize
+def shear_NFW(R, m_x, r_x, c_x, sigma_crit=1):
+    """Return the shear profile of an NFW halo with mass
+    m_x, radius r_x and concentration c_x
+
+    Parameters
+    ----------
+    R : array-like
+        projected radius [h^-1 Mpc]
+    m_x : (m,) array
+        array containing mass inside r_x
+    c_x : (m,) or (m, z) array
+        array containing mass-concentration relation
+    r_x : (m,) or (m, z) array
+        array containing r_x to evaluate r_s from r_s = r_x/c_x
+    sigma_crit : (m,) array or (m, z) array or float
+        critical surface mass density of the observed systems
+    
+    Returns
+    -------
+    shear_NFW : array
+        shear of NFW profile at projected radius R
+    """
+    r_s = r_x / c_x
+    rho_s = m_x / (4 * np.pi * r_x**3) * c_x**3 / (np.log(1 + c_x) -
+                                                   c_x / (1 + c_x))
+
+    prefactor = r_s * rho_s / sigma_crit
+
+    if R == r_s:
+        return prefactor * (10. / 3 + 4 * np.log(0.5))
+    elif R < r_s:
+        x = R / r_s
+        f_atanh = np.arctanh(np.sqrt((1 - x) / (1 + x)))
+        g = ((8 * f_atanh / (x**2 * np.sqrt(1 - x**2)))
+             + 4. / x**2 * np.log(0.5 * x)
+             - 2. / (x**2 - 1)
+             + 4 * f_atanh / ((x**2 - 1) * np.sqrt(1 - x**2)))
+        shear = prefactor * g
+        return shear
+    else:
+        x = R / r_s
+        f_atan = np.arctan(np.sqrt((x - 1) / (x + 1)))
+        g = ((8 * f_atan / (x**2 * np.sqrt(x**2 - 1)))
+             + 4. / x**2 * np.log(0.5 * x)
+             - 2. / (x**2 - 1)
+             + 4 * f_atan / ((x**2 - 1)**(1.5)))
+        shear = prefactor * g
+        return shear
+
+
+@np.vectorize
+def sigma_mean_NFW(R, m_x, r_x, c_x):
+    """Return the mean surface mass density  profile of an NFW halo with mass
+    m_x, radius r_x and concentration c_x within R
+
+    Parameters
+    ----------
+    R : array-like
+        projected radius [h^-1 Mpc]
+    m_x : (m,) array
+        array containing mass inside r_x
+    c_x : (m,) or (m, z) array
+        array containing mass-concentration relation
+    r_x : (m,) or (m, z) array
+        array containing r_x to evaluate r_s from r_s = r_x/c_x
+
+    Returns
+    -------
+    sigma_mean : array
+        mean enclosed surface mass NFW profile at projected radius R
+    """
+    r_s = r_x / c_x
+    rho_s = m_x / (4 * np.pi * r_x**3) * c_x**3 / (np.log(1 + c_x) -
+                                                   c_x / (1 + c_x))
+
+    prefactor = 4 * r_s * rho_s
+
+    if R == r_s:
+        return prefactor * (1. + np.log(0.5))
+    elif R < r_s:
+        x = R / r_s
+        prefactor *= 1. / x**2
+
+        f_atanh = np.arctanh(np.sqrt((1 - x) / (1 + x)))
+        s_m = ((2 * f_atanh / np.sqrt(1 - x**2))
+               + np.log(0.5 * x))
+        sigma_mean = prefactor * s_m
+        return sigma_mean
+    else:
+        x = R / r_s
+        prefactor *= 1. / x**2
+
+        f_atan = np.arctan(np.sqrt((x - 1) / (x + 1)))
+        s_m = ((2 * f_atan / np.sqrt(x**2 - 1))
+               + np.log(0.5 * x))
+        sigma_mean = prefactor * s_m
+        return sigma_mean
+
+
+@np.vectorize
 def r200m_m_NFW(m_x, r_x, c_x, cosmo, z_range=0):
     '''
     Calculate r200m for the NFW profile with c_x and r_x and m_x at r_x
@@ -670,18 +822,18 @@ def sigma_beta(R, m_x, r_x, r_c, beta):
     profile : (m, r) array
       array containing beta profile
     '''
-    m = np.shape(m_x)
+    # m = np.shape(m_x)
 
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3. * beta / 2,
                                                        5./2, -(r_x / r_c)**2))
 
-    r_c = np.reshape(r_c, (m + (1,)))
-    beta = np.reshape(beta, (m + (1,)))
-    r_x = np.reshape(r_x, (m + (1,)))
-    m_x = np.reshape(m_x, (m + (1,)))
-    rho_0 = np.reshape(rho_0, (m + (1,)))
-    R = np.reshape(R, (m + (-1,)))
+    # r_c = np.reshape(r_c, (m + (1,)))
+    # beta = np.reshape(beta, (m + (1,)))
+    # r_x = np.reshape(r_x, (m + (1,)))
+    # m_x = np.reshape(m_x, (m + (1,)))
+    # rho_0 = np.reshape(rho_0, (m + (1,)))
+    # R = np.reshape(R, (m + (-1,)))
 
     prefactor = np.pi**0.5 * r_c * rho_0
     sigma = prefactor * ((((R/r_c)**2 + 1)**(0.5 - 3 * beta / 2) *
@@ -689,6 +841,104 @@ def sigma_beta(R, m_x, r_x, r_c, beta):
                          spec.gamma(3 * beta / 2))
 
     return sigma
+
+
+@np.vectorize
+def shear_beta(R, m_x, r_x, r_c, beta, sigma_crit=1,
+               **kwargs):
+    '''
+    Return a beta profile with mass m_x inside r_range <= r_x
+
+    Parameters
+    ----------
+    r_range : (m, r) array
+      array containing r_range for each m
+    m_x : (m,) array
+      array containing masses to match at r_x
+    r_x : (m,) array
+      x overdensity radius to match m_x at, in units of r_range
+    beta : (m,) array
+      power law slope of profile
+    r_c : (m,) array
+      physical core radius of beta profile in as a fraction
+    sigma_crit : (m,) array or (m, z) array or float
+        critical surface mass density of the observed systems
+
+    Returns
+    -------
+    shear : (m, r) array
+        shear for a beta profile
+    '''
+    # analytic enclosed mass inside r_x gives normalization rho_0
+    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(1.5, 1.5 * beta,
+                                                       2.5, -(r_x / r_c)**2))
+
+    prefactor = (np.pi**0.5 * r_c * rho_0 / sigma_crit)
+    x2 = (R / r_c)**2
+
+    if beta != 1:
+        prefactor *= (spec.gamma(1.5 * beta - 0.5) /
+                      spec.gamma(1.5 * beta))
+        f = (1. / (1.5 - 1.5 * beta) * 1. / x2 *
+             ((1 + x2)**(1.5 - 1.5 * beta) - 1) -
+             (1 + x2)**(0.5 - 1.5 * beta))
+
+        shear = prefactor * f
+        return shear
+
+    else:
+        prefactor *= 2. / np.pi**0.5
+        f = 1. / x2 * np.log(1 + x2) - 1. / (1 + x2)
+
+        shear = prefactor * f
+        return shear
+
+
+@np.vectorize
+def sigma_mean_beta(R, m_x, r_x, r_c, beta, **kwargs):
+    '''Return a mean enclosed surface mass density of a beta profile with
+    mass m_x inside r_range <= r_x
+
+    Parameters
+    ----------
+    R : array-like
+        projected radius [h^-1 Mpc]
+    m_x : (m,) array
+      array containing masses to match at r_x
+    r_x : (m,) array
+      x overdensity radius to match m_x at, in units of r_range
+    beta : (m,) array
+      power law slope of profile
+    r_c : (m,) array
+      physical core radius of beta profile in as a fraction
+
+    Returns
+    -------
+    sigma_mean : (m, r) array
+        mean enclosed surface mass density for a beta profile
+
+    '''
+    # analytic enclosed mass inside r_x gives normalization rho_0
+    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(1.5, 1.5 * beta,
+                                                       2.5, -(r_x / r_c)**2))
+
+    x2 = (R / r_c)**2
+
+    if beta != 1:
+        prefactor = (2 * np.pi**0.5 * r_c * rho_0 * 1. / x2 *
+                     spec.gamma(1.5 * beta - 0.5) /
+                     spec.gamma(1.5 * beta))
+        f = (1. / (1.5 - 1.5 * beta) * ((1 + x2)**(1.5 - 1.5 * beta) - 1))
+
+        sigma_mean = prefactor * f
+        return sigma_mean
+
+    else:
+        prefactor = (2 * r_c * rho_0 * 1. / x2)
+        f = np.log(1 + x2)
+
+        sigma_mean = prefactor * f
+        return sigma_mean
 
 
 def profile_plaw(r_range, rho_x, r_x, gamma):
@@ -859,9 +1109,18 @@ def profile_beta_plaw(r_range, m_x, r_x, r_c, beta, gamma, rho_x=None):
     return profile
 
 
+@np.vectorize
 def sigma_beta_plaw(R, m_x, r_x, r_c, beta, gamma, **kwargs):
-    '''
-    Return a beta profile with mass m_x inside r_range <= r_x
+    '''Return the surface mass density of a beta profile with mass m_x
+    inside r_range <= r_x
+
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
+
+    and a power law outside
+
+        rho[r] = rho_x (r/r_x)^(-gamma)
+
+    rho_c is determined by the mass of the profile.
 
     Parameters
     ----------
@@ -880,61 +1139,197 @@ def sigma_beta_plaw(R, m_x, r_x, r_c, beta, gamma, **kwargs):
 
     Returns
     -------
-    profile : (m, r) array
-      array containing beta profile
-    '''
-    m = np.shape(m_x)
+    sigma : array
+        surface mass density of beta plaw profile
 
+    '''
     # analytic enclosed mass inside r_x gives normalization rho_0
     rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(1.5, 1.5 * beta,
                                                        2.5, -(r_x / r_c)**2))
     rho_x = rho_0 / (1 + (r_x / r_c)**2)**(1.5 * beta)
 
-    r_c = np.reshape(r_c, (m + (1,)))
-    beta = np.reshape(beta, (m + (1,)))
-    gamma = np.reshape(gamma, (m + (1,)))
-    r_x = np.reshape(r_x, (m + (1,)))
-    m_x = np.reshape(m_x, (m + (1,)))
-    rho_0 = np.reshape(rho_0, (m + (1,)))
-    rho_x = np.reshape(rho_x, (m + (1,)))
-    R = np.reshape(R, (m + (-1,)))
+    if (gamma <= 1):
+        raise ValueError("for gamma <= 1 the profile diverges.")
 
-    sigma = np.zeros_like(R)
+    elif gamma == 2:
+        if R == 0:
+            sigma = (np.pi**0.5 * rho_0 * r_c * (spec.gamma(1.5 * beta - 0.5)
+                                                 / spec.gamma(1.5 * beta)) *
+                     (1 - (1 + (r_x / r_c)**2)**(0.5 - 1.5 * beta))
+                     + 2 * rho_x * r_x)
+        elif R <= r_x:
+            sigma = (np.pi**0.5 * rho_0 * r_c * (spec.gamma(1.5 * beta - 0.5)
+                                                 / spec.gamma(1.5 * beta)) *
+                     ((1 + (R / r_c)**2)**(0.5 - 1.5 * beta) -
+                      (1 + (r_x / r_c)**2)**(0.5 - 1.5 * beta))
+                     + 2 * rho_x * r_x * np.arcsin(R / r_x) / (R / r_x))
+        else:
+            sigma = np.pi * rho_x * r_x * (R / r_x)**(-1)
 
-    f_beta = (np.pi**0.5 * rho_0 * r_c * (spec.gamma(1.5 * beta - 0.5) /
-                                          spec.gamma(1.5 * beta)) *
-              ((1 + (R / r_c)**2)**(0.5 - 1.5 * beta) -
-               (1 + (r_x / r_c)**2)**(0.5 - 1.5 * beta))
-              + np.pi**0.5 * rho_x * r_x *
-              spec.gamma((gamma - 1) / 2) /
-              spec.gamma(gamma / 2))
+    else:
+        if R == 0:
+            sigma = (np.pi**0.5 * rho_0 * r_c * (spec.gamma(1.5 * beta - 0.5)
+                                                 / spec.gamma(1.5 * beta)) *
+                     (1 - (1 + (r_x / r_c)**2)**(0.5 - 1.5 * beta))
+                     + 2 * rho_x * r_x / (gamma - 1))
 
-    # f_beta = (2 * rho_0 * r_c * ((r_x / r_c)**2 - (R / r_c)**2)**0.5 *
-    #           (1 + (R / r_c)**2)**(-3 * beta / 2) *
-    #           spec.hyp2f1(0.5, 3 * beta / 2,
-    #                       3. / 2,
-    #                       ((R / r_c)**2 - (r_x / r_c)**2) /
-    #                       (1 + (R / r_c)**2)))
+        elif R < r_x:
+            sigma_beta = (np.pi**0.5 * rho_0 * r_c *
+                          (spec.gamma(1.5 * beta - 0.5)
+                           / spec.gamma(1.5 * beta)) *
+                          ((1 + (R / r_c)**2)**(0.5 - 1.5 * beta) -
+                           (1 + (r_x / r_c)**2)**(0.5 - 1.5 * beta)))
 
-    f_gamma = (np.pi**0.5 * rho_x * r_x *
-               (R / r_x)**(1 - gamma) *
-               spec.gamma((gamma - 1) / 2) /
-               spec.gamma(gamma / 2))
+            x = R / r_x
+            # Mathematica solution for rho_gamma integral
+            sigma_gamma = ((-1j * x)**(1-gamma) * mp.gamma(1 - 0.5*gamma)
+                           * mp.gamma(0.5 * gamma - 0.5) /
+                           (2 * mp.pi**0.5) +
+                           1j * mp.hyp2f1(0.5, 1 - 0.5 * gamma,
+                                          2 - 0.5 * gamma, x**(-2))
+                           / (x * (gamma - 2))) * 2 * rho_x * r_x
+            # sigma_gamma should be a real number for all values
+            # 1 < gamma <= 3
+            # the imaginary part is usually ~1e-15 due to machine error
+            sigma = sigma_beta + float(sigma_gamma.real)
 
-    for idx_m, Rr in enumerate(R):
-        sl = Rr <= r_x[idx_m]
-
-        sigma[idx_m][sl] = f_beta[idx_m][sl]
-        sigma[idx_m][~sl] = f_gamma[idx_m][~sl]
+        else:
+            sigma = (np.pi**0.5 * rho_x * r_x * (spec.gamma(0.5 * gamma - 0.5)
+                                                 / spec.gamma(0.5 * gamma))
+                     * (R / r_x)**(1 - gamma))
 
     return sigma
 
 
 @np.vectorize
-def m_beta_plaw(r, m_x, r_x, r_c, beta, gamma, rho_x=None, **kwargs):
+def shear_beta_plaw(R, m_x, r_x, r_c, beta, gamma, sigma_crit=1,
+                    n_int=1000,
+                    **kwargs):
+    '''Return the shear of a beta profile with mass m_x inside r_range <=
+    r_x
+
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
+
+    and a power law outside
+
+        rho[r] = rho_x (r/r_x)^(-gamma)
+
+    rho_c is determined by the mass of the profile.
+
+    Parameters
+    ----------
+    R : (m, r) array
+      array containing R for each m
+    m_x : float
+      mass inside r_x
+    r_x : float
+      radius to match rho_x at, in units of r_range
+    r_c : float
+      physical core radius r_c of the profile
+    beta : float
+      beta slope of the profile
+    gamma : float
+      power law slope of profile
+    sigma_crit : (m,) array or (m, z) array or float
+        critical surface mass density of the observed systems
+    n_int : int
+        number of steps to interpolate for integral
+
+    Returns
+    -------
+    shear : array
+        shear of beta plaw profile
+
     '''
-    Return the analytic enclosed mass inside r for a beta profile upto
-    r_x and a power law outside
+    sigma = sigma_beta_plaw(R=R, m_x=m_x, r_x=r_x, r_c=r_c, beta=beta,
+                            gamma=gamma, **kwargs)
+
+    sigma_mean = np.empty_like(sigma)
+    for idx_m, Rr in enumerate(R):
+        # sigma should go to a constant for small enough Rr.min()
+        log10_sigma_int = interp.interp1d(np.log10(Rr), np.log10(sigma[idx_m]),
+                                          fill_value=np.log10(sigma[idx_m, 0]))
+        for idx_r, r in enumerate(Rr):
+            R_int = np.logspace(-5, np.log10(r), n_int)
+            log10_R_int = np.linspace(-5, np.log10(r), n_int)
+
+            integrand = 10**log10_sigma_int(log10_R_int) * R_int
+            sigma_mean[idx_m, idx_r] = 2. / r**2 * intg.simps(integrand,
+                                                              x=R_int)
+
+    shear = 1. / sigma_crit * (sigma_mean - sigma)
+    return shear
+
+
+def sigma_mean_beta_plaw(R, m_x, r_x, r_c, beta, gamma, **kwargs):
+    '''Return the surface mass density of a beta profile with mass m_x
+    inside r_range <= r_x
+
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
+
+    and a power law outside
+
+        rho[r] = rho_x (r/r_x)^(-gamma)
+
+    rho_c is determined by the mass of the profile.
+
+    Parameters
+    ----------
+    R : (m, r) array
+      array containing R for each m
+    m_x : (m, 1) array
+      mass inside r_x
+    r_x : (m, 1) array
+      radius to match rho_x at, in units of r_range
+    r_c : (m, 1) array
+      physical core radius r_c of the profile
+    beta : (m, 1) array
+      beta slope of the profile
+    gamma : (m, 1) array
+      power law slope of profile
+
+    Returns
+    -------
+    sigma_mean : array
+        mean surface mass density of beta plaw profile
+
+    '''
+    if "sigma" not in kwargs:
+        sigma = sigma_beta_plaw(R=R, m_x=m_x, r_x=r_x, r_c=r_c, beta=beta,
+                                gamma=gamma, **kwargs)
+    else:
+        sigma = kwargs["sigma"]
+
+    sigma_mean = np.empty_like(sigma)
+    for idx_m, Rr in enumerate(R):
+        # sigma should go to a constant for small enough Rr.min()
+        log10_sigma_int = interp.interp1d(np.log10(Rr), np.log10(sigma[idx_m]),
+                                          bounds_error=False,
+                                          fill_value=(np.log10(sigma[idx_m, 0]),
+                                                      np.nan))
+        for idx_r, r in enumerate(Rr):
+            R_int = np.logspace(-5, np.log10(r), 1000)
+            log10_R_int = np.linspace(-5, np.log10(r), 1000)
+
+            integrand = 10**log10_sigma_int(log10_R_int) * R_int
+            sigma_mean[idx_m, idx_r] = 2. / r**2 * intg.simps(integrand,
+                                                              x=R_int)
+
+    return sigma_mean
+
+
+@np.vectorize
+def m_beta_plaw(r, m_x, r_x, r_c, beta, gamma, rho_x=None, **kwargs):
+    '''Return the mean enclosed mass of a beta profile
+    with mass m_x inside r_range <= r_x
+
+        rho[r] =  rho_c[m_range, r_c, r_x] / (1 + ((r/r_x)/r_c)^2)^(beta / 2)
+
+    and a power law outside
+
+        rho[r] = rho_x (r/r_x)^(-gamma)
+
+    rho_c is determined by the mass of the profile.
 
     Parameters
     ----------
@@ -1262,74 +1657,6 @@ def m_beta_gamma_plaw(r, m_x, r_x, r_c, beta, r_y, gamma, delta=3,
             rho_y = rho_x * (r_y / r_x)**(-gamma)
             return (m_x + m_plaw(r=r_y, rho_x=rho_x, r_x=r_x, gamma=gamma) +
                     m_plaw(r=r, rho_x=rho_y, r_x=r_y, gamma=delta))
-
-
-def sigma_beta_gamma(R, m_x, r_x, r_c, beta, r_y, gamma,
-                     **kwargs):
-    '''
-    Return a beta profile with mass m_x inside r_range <= r_x
-
-    Parameters
-    ----------
-    R : (m, r) array
-      array containing R for each m
-    m_x : float
-      mass inside r_x
-    r_x : float
-      radius to match rho_x at, in units of r_range
-    r_c : float
-      physical core radius r_c of the profile
-    beta : float
-      beta slope of the profile
-    r_y : float
-      radius to extend power law to
-    gamma : float
-      power law slope of profile
-
-    Returns
-    -------
-    profile : (m, r) array
-      array containing beta profile
-    '''
-    m = np.shape(m_x)
-
-    # analytic enclosed mass inside r_x gives normalization rho_0
-    rho_0 = m_x / (4./3 * np.pi * r_x**3 * spec.hyp2f1(3./2, 3. * beta / 2,
-                                                       5./2, -(r_x / r_c)**2))
-    rho_x = rho_0 / (1 + (r_x / r_c)**2)**(3 * beta / 2)
-
-    r_c = np.reshape(r_c, (m + (1,)))
-    beta = np.reshape(beta, (m + (1,)))
-    r_x = np.reshape(r_x, (m + (1,)))
-    m_x = np.reshape(m_x, (m + (1,)))
-    rho_0 = np.reshape(rho_0, (m + (1,)))
-    rho_x = np.reshape(rho_x, (m + (1,)))
-    R = np.reshape(R, (m + (-1,)))
-
-    sigma = np.zeros_like(R)
-
-    f_beta = (rho_0 * ((r_x / r_c)**2 - (R / r_c)**2)**0.5 *
-              (1 + (R / r_c)**2)**(3 * beta / 2) *
-              spec.hyp2f1(0.5, 3 * beta / 2,
-                          3. / 2,
-                          ((R / r_c)**2 - (r_x / r_c)**2) /
-                          (1 + (R / r_c)**2)**(3 * beta / 2)) +
-              np.pi**0.5 * rho_x * r_x *
-              spec.gamma((gamma - 1) / 2) /
-              spec.gamma(gamma / 2))
-
-    f_gamma = (np.pi**0.5 * rho_x * r_x *
-               (R / r_x)**(1 - gamma) *
-               spec.gamma((gamma - 1) / 2) /
-               spec.gamma(gamma / 2))
-
-    for idx_m, Rr in enumerate(R):
-        sl = Rr <= r_x[idx_m]
-
-        sigma[idx_m][sl] = f_beta[idx_m][sl]
-        sigma[idx_m][~sl] = f_gamma[idx_m][sl]
-
-    return sigma
 
 
 def profile_uniform(r_range, m_y, r_x, r_y):

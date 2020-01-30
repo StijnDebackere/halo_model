@@ -1,5 +1,6 @@
 import pdb
 
+
 class Cosmology(object):
     """
     A class that nicely deals with cosmological parameters.
@@ -83,6 +84,8 @@ class Cosmology(object):
             self.__base = dict(wmap9_nobao, **extras)
         elif default == "planck1_base":
             self.__base = dict(planck1_base, **extras)
+        elif default == "planck_2019":
+            self.__base = dict(planck_2019, **extras)
 
         # Set some simple parameters
         self.force_flat = force_flat
@@ -93,6 +96,8 @@ class Cosmology(object):
                 self.cosmo_update(**dict(wmap9_nobao, **extras))
             elif default == "planck1_base":
                 self.cosmo_update(**dict(planck1_base, **extras))
+            elif default == "planck_2019":
+                self.cosmo_update(**dict(planck_2019, **extras))
 
         else:
             self.cosmo_update(**kwargs)
@@ -179,7 +184,6 @@ class Cosmology(object):
         if len(kwargs) <= 1:
             if "omegab" in kwargs:
                 self.omegab_h2 = self.omegab * self.h ** 2
-                
 
             elif "omegac" in kwargs:
                 self.omegac_h2 = self.omegac * self.h ** 2
@@ -199,7 +203,8 @@ class Cosmology(object):
 
         elif len(kwargs) == 2:
             if "omegab_h2" in kwargs and "omegac_h2" in kwargs:
-                pass
+                self.omegam = self.omegac / self.h**2 + self.omegab / self.h**2
+                self.omegab = self.omegab / self.h**2
 
             elif "omegab_h2" in kwargs and "omegam" in kwargs:
                 self.omegac_h2 = self.omegam * self.h ** 2 - self.omegab_h2
@@ -208,21 +213,23 @@ class Cosmology(object):
             elif "omegab_h2" in kwargs and "omegav" in kwargs:
                 if self.force_flat:
                     self.omegam = 1 - self.omegav
-                    self.omegav = omegav
                     self.omegac_h2 = self.omegam * self.h ** 2 - self.omegab_h2
 
             elif "omegac_h2" in kwargs and "omegam" in kwargs:
                 self.omegab_h2 = self.omegam * self.h ** 2 - self.omegac_h2
                 self.omegam = self.omegam
+                self.omegab = self.omegab_h2 / self.h**2
 
             elif "omegac_h2" in kwargs and "omegav" in kwargs:
                 if self.force_flat:
                     self.omegam = 1 - self.omegav
                     self.omegab_h2 = self.omegam * self.h ** 2 - self.omegac_h2
+                    self.omegab = self.omegab_h2 / self.h**2
 
             elif "omegab" in kwargs and "omegac" in kwargs:
                 self.omegab_h2 = self.omegab * self.h ** 2
                 self.omegac_h2 = self.omegac * self.h ** 2
+                self.omegam = self.omegab + self.omegac
 
             elif "omegab" in kwargs and "omegam" in kwargs:
                 self.omegac = self.omegam - self.omegab
@@ -294,6 +301,18 @@ class Cosmology(object):
                 if self.force_flat:
                     self.omegav = 1 - self.omegam
                 self.omegab_h2 = self.omegam * self.h ** 2 - self.omegac_h2
+
+        if "omegab" not in kwargs and "omegab_h2" in kwargs:
+            self.omegab = self.omegab_h2 / self.h**2
+
+        if "omegac" not in kwargs and "omegac_h2" in kwargs:
+            self.omegac = self.omegac_h2 / self.h**2
+
+        if "omegam" not in kwargs:
+            self.omegam = self.omegab + self.omegac
+
+        if "omegav" not in kwargs and "omegav_h2" in kwargs:
+            self.omegav = self.omegav_h2 / self.h**2
 
     @property
     def rho_m(self):
@@ -428,6 +447,16 @@ planck1_base = {"omegab_h2": 0.022068,
                 "sigma_8": 0.8344,
                 "n": 0.9624,
                 }
+
+planck_2019 = {"omegab_h2": 0.02237,
+               "omegac_h2": 0.12,
+               "omegav": 0.6847,
+               "H0": 67.36,
+               "z_reion": 7.67,
+               "tau": 0.0544,
+               "sigma_8": 0.8111,
+               "n": 0.9649}
+
 
 wmap9_nobao = {"sigma_8": 0.821,
                "H0": 70.0,

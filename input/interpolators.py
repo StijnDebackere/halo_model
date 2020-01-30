@@ -50,6 +50,23 @@ def arrays_to_ogrid(*xi):
     return ogrid
 
 
+def check_interp_variable(var, var_interp, var_name):
+    '''
+    Function returns mask where var is outside of var_interp
+    '''
+    var = np.asarray(var)
+    # warn about parameter ranges
+    if np.any(var > var_interp.max()) or np.any(var < var_interp.min()):
+        var_mask = np.logical_or((var > var_interp.max()), (var < var_interp.min()))
+
+        warnings.warn("{} outside of interpolated range {}"
+                      .format(var_name, var_mask), UserWarning)
+
+        return var, var_mask
+    else:
+        return var, None
+
+
 ###################################
 # Functions to interpolate tables #
 ###################################
@@ -140,32 +157,15 @@ def c200c_emu(m200c=np.logspace(10, 15, 100),
     n_interp = interp_info["n"]
     h_interp = interp_info["h"]
 
-    # warn about parameter ranges
-    if np.all(omegam > om_interp) or np.all(omegam < om_interp):
-        warnings.warn("omega_m outside of interpolated range [{}, {}]"
-                      .format(om_interp.min(),
-                              om_interp.max()),
-                      UserWarning)
+    sigma8, s8_mask = check_interp_variable(sigma8, s8_interp, "sigma8")
+    omegam, om_mask = check_interp_variable(omegam, om_interp, "omegam")
+    n, n_mask = check_interp_variable(n, n_interp, "n")
+    h, h_mask = check_interp_variable(h, h_interp, "h")
 
-    if np.all(sigma8 > s8_interp) or np.all(sigma8 < s8_interp):
-        warnings.warn("sigma_8 outside of interpolated range"
-                      .format(s8_interp.min(),
-                              s8_interp.max()),
-                      UserWarning)
-
-    if np.all(n > n_interp) or np.all(n < n_interp):
-        warnings.warn("n outside of interpolated range"
-                      .format(n_interp.min(),
-                              n_interp.max()),
-                      UserWarning)
-
-    if np.all(h > h_interp) or np.all(h < h_interp):
-        warnings.warn("h outside of interpolated range"
-                      .format(h_interp.min(),
-                              h_interp.max()),
-                      UserWarning)
-
+    # mu is an (n_cosmo) array
     mu = mu_interp(sigma8, omegam, n, h)
+
+    # weights is an (n_pca, n_cosmo) array
     weights = np.empty((pcs.shape[-1], ), dtype=float)
     for idx, wi in enumerate(weights_interp):
         weights[idx] = wi(sigma8, omegam, n, h)
@@ -180,7 +180,7 @@ def c200c_emu(m200c=np.logspace(10, 15, 100),
     # interpolate along m200m
     c200c_interp_m = interpolate.interp1d(np.log10(m200c_interp),
                                           c200c_z,
-                                          axis=-1)
+                                          axis=1)
     c200c_mz = c200c_interp_m(np.log10(m200c))
 
     return c200c_mz
@@ -220,13 +220,13 @@ def c500c_emu(m500c=np.logspace(10, 15, 100),
         halo mass at overdensity 200 rho_crit
     z : array
         redshifts
-    sigma8 : float
+    sigma8 : float or array
         value of sigma8
-    omegam : float
+    omegam : float or array
         value of omegam
-    n : float
+    n : float or array
         value of n
-    h : float
+    h : float or array
         value of h
 
     Returns
@@ -249,37 +249,22 @@ def c500c_emu(m500c=np.logspace(10, 15, 100),
     n_interp = interp_info["n"]
     h_interp = interp_info["h"]
 
-    # warn about parameter ranges
-    if np.all(omegam > om_interp) or np.all(omegam < om_interp):
-        warnings.warn("omega_m outside of interpolated range [{}, {}]"
-                      .format(om_interp.min(),
-                              om_interp.max()),
-                      UserWarning)
+    sigma8, s8_mask = check_interp_variable(sigma8, s8_interp, "sigma8")
+    omegam, om_mask = check_interp_variable(omegam, om_interp, "omegam")
+    n, n_mask = check_interp_variable(n, n_interp, "n")
+    h, h_mask = check_interp_variable(h, h_interp, "h")
 
-    if np.all(sigma8 > s8_interp) or np.all(sigma8 < s8_interp):
-        warnings.warn("sigma_8 outside of interpolated range"
-                      .format(s8_interp.min(),
-                              s8_interp.max()),
-                      UserWarning)
-
-    if np.all(n > n_interp) or np.all(n < n_interp):
-        warnings.warn("n outside of interpolated range"
-                      .format(n_interp.min(),
-                              n_interp.max()),
-                      UserWarning)
-
-    if np.all(h > h_interp) or np.all(h < h_interp):
-        warnings.warn("h outside of interpolated range"
-                      .format(h_interp.min(),
-                              h_interp.max()),
-                      UserWarning)
-
+    # mu is an (n_cosmo) array
     mu = mu_interp(sigma8, omegam, n, h)
-    weights = np.empty((pcs.shape[-1], ), dtype=float)
+
+    # weights is an (n_pca, n_cosmo) array
+    weights = np.empty((pcs.shape[-1], ) + sigma8.shape, dtype=float)
     for idx, wi in enumerate(weights_interp):
         weights[idx] = wi(sigma8, omegam, n, h)
 
-    # the resulting c500c(z, m)
+    # the resulting c500c(z, m, n_cosmo)
+    # dot product goes over final axis of pcs and -2 of weights,
+    # hence n_pca is summed out in dot product
     c500c = (np.dot(pcs, weights) + mu)
 
     # interpolate along z
@@ -289,7 +274,7 @@ def c500c_emu(m500c=np.logspace(10, 15, 100),
     # interpolate along m500c
     c500c_interp_m = interpolate.interp1d(np.log10(m500c_interp),
                                           c500c_z,
-                                          axis=-1)
+                                          axis=1)
     c500c_mz = c500c_interp_m(np.log10(m500c))
 
     return c500c_mz
@@ -315,9 +300,9 @@ def c200m_interp(c_file="c200m_correa.asdf"):
 
 def c200m_emu(m200m=np.logspace(10, 15, 100),
               z=np.linspace(0, 1, 10),
-              sigma8=0.82,
-              omegam=0.28,
-              n=0.97,
+              sigma8=0.821,
+              omegam=0.2793,
+              n=0.972,
               h=0.7):
     '''
     Calculate the c(m) relation from Correa+2015 for the given mass, z and
@@ -358,37 +343,20 @@ def c200m_emu(m200m=np.logspace(10, 15, 100),
     n_interp = interp_info["n"]
     h_interp = interp_info["h"]
 
-    # warn about parameter ranges
-    if np.all(omegam > om_interp) or np.all(omegam < om_interp):
-        warnings.warn("omega_m outside of interpolated range [{}, {}]"
-                      .format(om_interp.min(),
-                              om_interp.max()),
-                      UserWarning)
+    sigma8, s8_mask = check_interp_variable(sigma8, s8_interp, "sigma8")
+    omegam, om_mask = check_interp_variable(omegam, om_interp, "omegam")
+    n, n_mask = check_interp_variable(n, n_interp, "n")
+    h, h_mask = check_interp_variable(h, h_interp, "h")
 
-    if np.all(sigma8 > s8_interp) or np.all(sigma8 < s8_interp):
-        warnings.warn("sigma_8 outside of interpolated range"
-                      .format(s8_interp.min(),
-                              s8_interp.max()),
-                      UserWarning)
-
-    if np.all(n > n_interp) or np.all(n < n_interp):
-        warnings.warn("n outside of interpolated range"
-                      .format(n_interp.min(),
-                              n_interp.max()),
-                      UserWarning)
-
-    if np.all(h > h_interp) or np.all(h < h_interp):
-        warnings.warn("h outside of interpolated range"
-                      .format(h_interp.min(),
-                              h_interp.max()),
-                      UserWarning)
-
+    # mu is an (n_cosmo) array
     mu = mu_interp(sigma8, omegam, n, h)
-    weights = np.empty((pcs.shape[-1], ), dtype=float)
+
+    # weights is an (n_pca, n_cosmo) array
+    weights = np.empty((pcs.shape[-1], ) + sigma8.shape, dtype=float)
     for idx, wi in enumerate(weights_interp):
         weights[idx] = wi(sigma8, omegam, n, h)
 
-    # the resulting c200m(z, m)
+    # the resulting c200m(z, m, n_cosmo)
     c200m = (np.dot(pcs, weights) + mu)
 
     # interpolate along z
@@ -397,8 +365,7 @@ def c200m_emu(m200m=np.logspace(10, 15, 100),
 
     # interpolate along m200m
     c200m_interp_m = interpolate.interp1d(np.log10(m200m_interp),
-                                          c200m_z,
-                                          axis=-1)
+                                          c200m_z, axis=1)
     c200m_mz = c200m_interp_m(np.log10(m200m))
 
     return c200m_mz

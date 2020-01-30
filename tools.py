@@ -297,7 +297,39 @@ def cum_m(rho_r, r_range):
     return cum_m
 
 
-def m_NFW(r, c_x, r_x, rho_mean, Delta=200):
+@np.vectorize
+def m_NFW(r, m_x, r_x, c_x, **kwargs):
+    '''
+    Calculate the mass of the NFW profile with c_x and r_x and m_x at r_x
+
+    Parameters
+    ----------
+    r : float
+      radius to compute mass for
+    m_x : float
+      mass inside r_x
+    r_x : float
+      r_x to evaluate r_s from r_s = r_x/c_x
+    c_x : float
+      concentration of halo
+
+    Returns
+    -------
+    m_h : float
+      mass
+    '''
+    rho_s = m_x / (4. * np.pi * r_x**3) * c_x**3/(np.log(1+c_x) - c_x/(1+c_x))
+    r_s = (r_x / c_x)
+
+    prefactor = 4 * np.pi * rho_s * r_s**3
+    c_factor = np.log((r_s + r) / r_s) - r / (r + r_s)
+
+    mass = prefactor * c_factor
+
+    return mass
+
+
+def m_NFW_delta(r, c_x, r_x, rho_mean, Delta=200):
     '''
     Calculate the mass of the NFW profile with c_x and r_x, relative to
     Delta rho_meanup to r
@@ -600,6 +632,138 @@ def sigma_enc(R, R_range, sigma):
     return sigma_enc
 
 
+def sigma_mean_from_sigma(R, R_sigma, sigma, sigma_crit=1,
+                          n_int=500, **kwargs):
+    """
+    Calculate the tangential sigma_mean from Sigma
+
+    Parameters
+    ----------
+    R : (Rs, ) array
+        projected radii
+    R_sigma : (R, ) array
+        projected radii at which sigma is defined
+    sigma : (R, ) array
+        surface mass density profile at R_sigma
+    sigma_crit : float
+        critical surface mass density
+
+    Returns
+    -------
+    sigma_mean : (Rs, ) array
+        sigma_mean
+    """
+    sigma_mean = np.zeros(R.shape)
+
+    # sigma should go to a constant for small enough Rr.min()
+    # interpolate the Sigma(R) profile
+    log10_sigma_int = interp1d(np.log10(R_sigma), np.log10(sigma),
+                               bounds_error=False,
+                               fill_value=(np.log10(sigma[0]), np.nan))
+
+    for idx, r in enumerate(R):
+        # Assumes R_sigma.min() is ~ 0
+        log10_R_int = np.linspace(-5,
+                                  np.log10(r),
+                                  n_int)
+        R_int = 10**log10_R_int
+        integrand = (2. / r**2 * 10**(log10_sigma_int(log10_R_int))
+                     * R_int)
+        sigma_mean[idx] = Integrate(integrand, R_int)
+
+    return sigma_mean
+
+
+def shear_from_sigma(R, R_sigma, sigma, sigma_crit=1,
+                     n_int=500, **kwargs):
+    """
+    Calculate the tangential shear from Sigma
+
+    Parameters
+    ----------
+    R : (Rs, ) array
+        projected radii
+    R_sigma : (R, ) array
+        projected radii at which sigma is defined
+    sigma : (R, ) array
+        surface mass density profile at R_sigma
+    sigma_crit : float
+        critical surface mass density
+
+    Returns
+    -------
+    shear : (Rs, ) array
+        tangential shear
+    """
+    sigma_mean = np.zeros(R.shape)
+    sigma_R = np.zeros(R.shape)
+
+    # sigma should go to a constant for small enough Rr.min()
+    # interpolate the Sigma(R) profile
+    log10_sigma_int = interp1d(np.log10(R_sigma), np.log10(sigma),
+                               bounds_error=False,
+                               fill_value=(np.log10(sigma[0]), np.nan))
+
+    for idx, r in enumerate(R):
+        # Assumes R_sigma.min() is ~ 0
+        log10_R_int = np.linspace(-5,
+                                  np.log10(r),
+                                  n_int)
+        R_int = 10**log10_R_int
+        integrand = (2. / r**2 * 10**(log10_sigma_int(log10_R_int))
+                     * R_int)
+        sigma_mean[idx] = Integrate(integrand, R_int)
+        sigma_R[idx] = 10**(log10_sigma_int(np.log10(r)))
+
+    shear = 1. / sigma_crit * (sigma_mean - sigma_R)
+    return shear
+
+
+def shear_from_sigma2(R, R_sigma, sigma, sigma_crit=np.array([1]),
+                      n_int=10000):
+    """
+    Calculate the tangential shear from Sigma
+
+    Parameters
+    ----------
+    R : (m, Rs) array
+        projected radii
+    R_sigma : (m, R) array
+        projected radii at which sigma is defined
+    sigma : (m, R) array
+        surface mass density profile at R_sigma
+    sigma_crit : (m,) array or float
+        critical surface mass density
+
+    Returns
+    -------
+    shear : (m, Rs) array
+        tangential shear
+    """
+    sigma_mean = np.zeros(R.shape)
+    sigma_R = np.zeros(R.shape)
+
+    # interpolate the Sigma(R) profile
+    log10_sigma_int = interp1d(np.log10(R_sigma), np.log10(sigma),
+                               axis=-1,
+                               fill_value="extrapolate")
+
+    for idx_m, rr in enumerate(R):
+        for idx_r, r in enumerate(rr):
+            # Assumes R_sigma.min() is ~ 0
+            log10_R_int = np.linspace(-5,
+                                      np.log10(r),
+                                      n_int)
+            R_int = 10**log10_R_int
+            integrand = (2. / r**2 * 10**(log10_sigma_int(log10_R_int))
+                         * R_int)
+            sigma_mean[idx_m, idx_r] = Integrate(integrand, R_int)
+            sigma_R[idx_m, idx_r] = 10**(log10_sigma_int(np.log10(r)))
+
+    shear = 1. / sigma_crit.reshape(-1, 1) * (sigma_mean - sigma_R)
+    return shear
+
+
 def massdiff_2m2c(m200m, m200c, rhoc, rhom, z, c):
     '''
     Integrate an NFW halo with m200m up to r500c and return the mass difference
@@ -612,7 +776,7 @@ def massdiff_2m2c(m200m, m200c, rhoc, rhom, z, c):
     c200m = c(m200m, z).reshape(-1)
 
     # now get analytic mass
-    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200.)
+    mass = m_NFW_delta(r200c, c200m, r200m, rhom, Delta=200.)
 
     return mass - m200c
 
@@ -629,7 +793,7 @@ def massdiff_2m5c(m200m, m500c, rhoc, rhom, z, c):
     c200m = c(m200m, z).reshape(-1)
 
     # now get analytic mass
-    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200.)
+    mass = m_NFW_delta(r500c, c200m, r200m, rhom, Delta=200.)
 
     return mass - m500c
 
@@ -647,7 +811,7 @@ def massdiff_5c2m(m500c, m200m, rhoc, rhom, z, c):
     c200m = c(m200m, z).reshape(-1)
 
     # now get analytic mass
-    mass = m_NFW(r500c, c200m, r200m, rhom, Delta=200)
+    mass = m_NFW_delta(r500c, c200m, r200m, rhom, Delta=200)
 
     return mass - m500c
 
@@ -665,7 +829,7 @@ def massdiff_2c2m(m200c, m200m, rhoc, rhom, z, c):
     c200m = c(m200m, z).reshape(-1)
 
     # now get analytic mass
-    mass = m_NFW(r200c, c200m, r200m, rhom, Delta=200)
+    mass = m_NFW_delta(r200c, c200m, r200m, rhom, Delta=200)
 
     return mass - m200c
 
@@ -850,6 +1014,39 @@ def m200m_to_m200c_correa(m200m, rhoc, rhom, z=0):
                        args=(m200m, rhoc, rhom, z, c_correa))
 
     return m200c
+
+
+@np.vectorize
+def mx_from_my(my, ry, cy, rho_x):
+    """
+    Convert a halo with mass m_y and concentration c_y at r_y
+    to the mass m_x corresponding to mean overdensity rho_x
+
+    Parameters
+    ----------
+    my : array
+        halo masses
+    ry : array
+        halo radii
+    cy : array
+        halo concentrations at r_y
+    rho_x : array
+        mean overdensity to solve for
+
+    Returns
+    -------
+    mx : array
+        masses of haloes my at mean overdensity rho_x
+    """
+    def solve_mass(rx):
+        mx = radius_to_mass(rx, rho_x)
+        m_enc = m_NFW(r=rx, m_x=my, r_x=ry, c_x=cy)
+
+        return m_enc - mx
+
+    rx = opt.brentq(solve_mass, 0.1 * ry, 10 * ry)
+    mx = radius_to_mass(rx, rho_x)
+    return mx
 
 
 def find_bounds(f, y, start=1., **f_prms):
