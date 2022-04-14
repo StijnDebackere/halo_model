@@ -674,8 +674,8 @@ def sigma_mean_from_sigma(R, R_sigma, sigma, sigma_crit=1,
     return sigma_mean
 
 
-def shear_from_sigma(R, R_sigma, sigma, sigma_crit=1,
-                     n_int=500, **kwargs):
+def shear_from_sigma(R, R_sigma, sigma, sigma_crit=1, n_int=10000,
+                     **kwargs):
     """
     Calculate the tangential shear from Sigma
 
@@ -1014,6 +1014,19 @@ def m200m_to_m200c_correa(m200m, rhoc, rhom, z=0):
                        args=(m200m, rhoc, rhom, z, c_correa))
 
     return m200c
+
+
+@np.vectorize
+def m200m_dmo_from_mx_dmo(mx, rx, rho_m):
+    def solve_mass(m200m_dmo):
+        c200m_dmo = inp_interp.c200m_emu(m200m=m200m_dmo,
+                                         z=np.array([0])).reshape(-1)
+        r200m_dmo = mass_to_radius(m200m_dmo, 200 * rho_m)
+        m_enc = m_NFW(r=rx, m_x=m200m_dmo, r_x=r200m_dmo, c_x=c200m_dmo)
+        return m_enc - mx
+
+    m200m_dmo = opt.brentq(solve_mass, 0.5 * mx, 20 * mx)
+    return m200m_dmo
 
 
 @np.vectorize
