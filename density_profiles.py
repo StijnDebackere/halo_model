@@ -20,7 +20,7 @@ import halo.tools as tools
 import pdb
 
 # def profile_f(profile, k_range, m_range):
-#     '''
+#     ''' 
 #     Return the Fourier transform of profile along the final axis
 
 #     Parameters
@@ -1308,8 +1308,8 @@ def sigma_mean_beta_plaw(R, m_x, r_x, r_c, beta, gamma, **kwargs):
                                           fill_value=(np.log10(sigma[idx_m, 0]),
                                                       np.nan))
         for idx_r, r in enumerate(Rr):
-            R_int = np.logspace(-5, np.log10(r), 1000)
-            log10_R_int = np.linspace(-5, np.log10(r), 1000)
+            R_int = np.logspace(-5, np.log10(r), 5000)
+            log10_R_int = np.linspace(-5, np.log10(r), 5000)
 
             integrand = 10**log10_sigma_int(log10_R_int) * R_int
             sigma_mean[idx_m, idx_r] = 2. / r**2 * intg.simps(integrand,
@@ -1788,6 +1788,72 @@ def profile_delta(r_range, m_x):
     profile *= m_x.reshape(-1, 1) * simps_factor.reshape(-1, 1)
 
     return profile
+
+
+@np.vectorize
+def sigma_delta(R, m_x):
+    """Return the surface mass density profile of a delta profile with mass
+    m_x
+
+    Parameters
+    ----------
+    R : array-like
+        projected radius [h^-1 Mpc]
+    m_x : (m,) array
+      array containing mass
+
+    Returns
+    -------
+    sigma_delta : array
+        surface mass density of delta profile
+    """
+    if R == 0:
+        return m_x
+    else:
+        return np.zeros_like(m_x)
+
+
+def sigma_mean_delta(R, m_x):
+    """Return the mean surface mass density profile of a delta profile with mass
+    m_x
+
+    Parameters
+    ----------
+    R : (R, 1) array
+        projected radius [h^-1 Mpc]
+    m_x : (1, m) array
+      array containing mass
+
+    Returns
+    -------
+    sigma_mean : array
+        mean surface mass density of delta profile
+    """
+    return m_x / (np.pi * R**2)
+
+
+def shear_delta(R, m_x, sigma_crit=1):
+    """Return the shear profile of a delta profile with mass m_x
+
+    Parameters
+    ----------
+    R : (R, 1) array
+        projected radius [h^-1 Mpc]
+    m_x : (1, m) array
+      array containing mass
+    sigma_crit : (m,) array or (m, z) array or float
+        critical surface mass density of the observed systems
+    
+    Returns
+    -------
+    shear_delta : array
+        shear of delta profile at projected radius R
+    """
+    if (R == 0).any():
+        raise ValueError("mean surface mass density at R=0 is undefined")
+
+    shear = sigma_mean_delta(R=R, m_x=m_x) / sigma_crit
+    return shear
 
 
 @np.vectorize
