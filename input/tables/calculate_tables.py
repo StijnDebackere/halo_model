@@ -152,6 +152,25 @@ def convert_cosmo_commah(cosmo):
     return return_dict
 
 
+def matched_arrays_to_coords(*xi):
+    '''
+    Convert a set of n arrays of shape (i_0, ..., i_n) to a list
+    of (i_0*...*i_n, n) coordinates
+    '''
+    # get single matching shape between all arrays
+    # we expect sane inputs, i.e. arrays are already reshaped
+    # to have empty dimension axes set to 1
+    b = np.broadcast(*xi)
+    shape = np.array(b.shape)
+    print(shape)
+    arrays = []
+    for i, x in enumerate(xi):
+        print(shape / np.array(x.shape))
+        arrays.append(np.tile(x, shape / np.array(x.shape)).flatten())
+
+    return np.array(arrays)
+    
+
 def arrays_to_coords(*xi):
     '''
     Convert a set of N 1-D coordinate arrays to a regular coordinate grid of
