@@ -573,6 +573,8 @@ def load_gamma(prms=p.prms,
                                                sl=i)
                                   for i in np.arange(0, r500c.shape[0])])
 
+            fb_200m_obs = np.array([m_b_200m(r, sl) / m_tot_200m(r, sl)
+                                    for sl, r in enumerate(r200m_obs)])
             m200m_obs = tools.radius_to_mass(r200m_obs, 200 * prms.cosmo.rho_m)
 
             # get r200c_obs
@@ -610,7 +612,6 @@ def load_gamma(prms=p.prms,
             m_b_fb = lambda r, sl, **kwargs: m_stars(r, sl) + m_gas_fb(r, sl)
             m_tot_fb = lambda r, sl, **kwargs: (m_dm(r, sl) + m_stars(r, sl)
                                                 + m_gas_fb(r, sl))
-
             if f_b:
                 # put r_max to radius where f_b is reached
                 fb = lambda r, sl, **kwargs: m_b_fb(r, sl, **kwargs) / m_tot_fb(r, sl, **kwargs)
@@ -706,6 +707,7 @@ def load_gamma(prms=p.prms,
                     'gamma': g,
                     'm200m_obs': m200m_obs,
                     'm_obs_200m_dmo': m_obs_200m_dmo,
+                    'fb_200m_obs': fb_200m_obs,
                     'r200m_obs': r200m_obs,
                     'm200c_obs': m200c_obs,
                     'r200c_obs': r200c_obs,
